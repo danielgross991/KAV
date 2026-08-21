@@ -18,9 +18,11 @@ export function TeamSelector({
           <p className="text-sm font-medium text-muted-foreground">KAV</p>
           <h1 className="mt-1 text-3xl font-bold tracking-normal">בחירת צוות</h1>
         </div>
-        <Link className={buttonVariants({ variant: "outline" })} href="/logout">
-          יציאה
-        </Link>
+        <form action="/logout" method="post">
+          <button className={buttonVariants({ variant: "outline" })} type="submit">
+            יציאה
+          </button>
+        </form>
       </header>
       {memberships.length > 0 ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

@@ -32,13 +32,15 @@ export function AppShell({
           variant="desktop"
         />
         <div className="absolute bottom-5 right-4 left-4">
-          <Link
-            href="/logout"
-            className="flex h-10 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-          >
-            <LogOut className="size-4" />
-            יציאה
-          </Link>
+          <form action="/logout" method="post">
+            <button
+              type="submit"
+              className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            >
+              <LogOut className="size-4" />
+              יציאה
+            </button>
+          </form>
         </div>
       </aside>
       <div className="pb-20 lg:mr-64 lg:pb-0">
