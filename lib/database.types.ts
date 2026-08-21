@@ -49,6 +49,7 @@ export type Database = {
         team_id: string;
       }>;
       pakal_types: Row<{
+        created_at: string;
         code: string | null;
         description: string | null;
         id: string;
@@ -58,14 +59,31 @@ export type Database = {
       }>;
       people: Row<{
         auth_user_id: string | null;
+        created_at: string;
+        date_of_birth: string | null;
         display_order: number;
+        email: string | null;
         full_name: string;
         id: string;
         is_active: boolean;
+        notes: string | null;
+        phone: string | null;
         photo_url: string | null;
         team_id: string;
+        updated_at: string;
+      }>;
+      person_private_details: Row<{
+        created_at: string;
+        national_id: string | null;
+        person_id: string;
+        personal_number: string | null;
+        private_notes: string | null;
+        team_id: string;
+        updated_at: string;
       }>;
       reserve_periods: Row<{
+        created_at: string;
+        created_by: string | null;
         ends_on: string;
         id: string;
         location: string | null;
@@ -73,6 +91,7 @@ export type Database = {
         starts_on: string;
         status: string;
         team_id: string;
+        updated_at: string;
       }>;
       rotation_blocks: Row<{
         ends_on: string;
@@ -118,6 +137,7 @@ export type Database = {
         user_id: string;
       }>;
       team_pakal_requirements: Row<{
+        created_at: string;
         id: string;
         pakal_type_id: string;
         required_count: number;
@@ -131,11 +151,35 @@ export type Database = {
         timezone: string;
       }>;
       person_pakals: Row<{
+        created_at: string;
         id: string;
         is_active: boolean;
+        notes: string | null;
         pakal_type_id: string;
         person_id: string;
         team_id: string;
+      }>;
+      equipment_types: Row<{
+        created_at: string;
+        id: string;
+        is_active: boolean;
+        name: string;
+        serial_required: boolean;
+        team_id: string;
+      }>;
+      person_equipment: Row<{
+        assigned_at: string | null;
+        created_at: string;
+        equipment_type_id: string;
+        id: string;
+        model: string | null;
+        notes: string | null;
+        person_id: string;
+        returned_at: string | null;
+        serial_number: string | null;
+        status: "assigned" | "returned" | "lost" | "damaged";
+        team_id: string;
+        updated_at: string;
       }>;
     };
     Views: Record<string, never>;
