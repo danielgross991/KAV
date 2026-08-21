@@ -31,6 +31,7 @@ export async function createReservePeriodAction(teamSlug: string, formData: Form
 export async function savePhaseAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
+  assertDraft(period);
   const startsOn = required(formData, "starts_on", "תאריך התחלה");
   const endsOn = required(formData, "ends_on", "תאריך סיום");
   assertInsidePeriod(startsOn, endsOn, period);
@@ -56,14 +57,20 @@ export async function savePhaseAction(teamSlug: string, formData: FormData) {
 
 export async function deletePhaseAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
+  const id = required(formData, "id", "שלב");
+  const { data: phase } = await context.supabase.from("period_phases").select("reserve_period_id")
+    .eq("id", id).eq("team_id", context.team.id).maybeSingle();
+  if (!phase) throw new Error("השלב לא נמצא");
+  assertDraft(await ownedPeriod(context, phase.reserve_period_id));
   const { error } = await context.supabase.from("period_phases").delete()
-    .eq("id", required(formData, "id", "שלב")).eq("team_id", context.team.id);
+    .eq("id", id).eq("team_id", context.team.id);
   assertOk(error, "מחיקת השלב"); refresh(teamSlug);
 }
 
 export async function saveRotationGroupAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
+  assertDraft(period);
   const initialState = enumValue(formData, "initial_state", ["base", "home"], "מצב פתיחה") as RotationState;
   const id = optional(formData, "id");
   const payload = {
@@ -79,8 +86,13 @@ export async function saveRotationGroupAction(teamSlug: string, formData: FormDa
 
 export async function deleteRotationGroupAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
+  const id = required(formData, "id", "סבב");
+  const { data: group } = await context.supabase.from("rotation_groups").select("reserve_period_id")
+    .eq("id", id).eq("team_id", context.team.id).maybeSingle();
+  if (!group) throw new Error("הסבב לא נמצא");
+  assertDraft(await ownedPeriod(context, group.reserve_period_id));
   const { error } = await context.supabase.from("rotation_groups").delete()
-    .eq("id", required(formData, "id", "סבב")).eq("team_id", context.team.id);
+    .eq("id", id).eq("team_id", context.team.id);
   assertOk(error, "מחיקת הסבב"); refresh(teamSlug);
 }
 
@@ -96,15 +108,15 @@ export async function assignRotationMemberAction(teamSlug: string, formData: For
   if (!person) throw new Error("איש הצוות לא נמצא");
   const groupIds = (groups ?? []).map((group) => group.id);
   if (groupId && !groupIds.includes(groupId)) throw new Error("הסבב אינו שייך לתקופה");
+  const startsOn = optional(formData, "starts_on");
+  const endsOn = optional(formData, "ends_on");
+  if (groupId) assertInsidePeriod(startsOn ?? period.starts_on, endsOn ?? period.ends_on, period);
   if (groupIds.length) {
     const { error } = await context.supabase.from("rotation_members").delete()
       .eq("person_id", personId).eq("team_id", context.team.id).in("rotation_group_id", groupIds);
     assertOk(error, "עדכון שיוך הסבב");
   }
   if (groupId) {
-    const startsOn = optional(formData, "starts_on");
-    const endsOn = optional(formData, "ends_on");
-    assertInsidePeriod(startsOn ?? period.starts_on, endsOn ?? period.ends_on, period);
     const { error } = await context.supabase.from("rotation_members").insert({
       team_id: context.team.id, rotation_group_id: groupId, person_id: personId,
       starts_on: startsOn, ends_on: endsOn,
@@ -117,6 +129,7 @@ export async function assignRotationMemberAction(teamSlug: string, formData: For
 export async function generateRotationBlocksAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
+  assertDraft(period);
   const anchorDate = required(formData, "anchor_date", "תאריך עוגן");
   const baseDays = integer(formData, "base_days", 1, 90);
   const homeDays = integer(formData, "home_days", 1, 90);
@@ -234,6 +247,7 @@ export async function deleteScheduleEventAction(teamSlug: string, formData: Form
 export async function publishReservePeriodAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
+  assertDraft(period);
   const [{ data: people }, { data: groups }, { data: phases }, { data: blocks }, { data: overrides }] = await Promise.all([
     context.supabase.from("people").select("id").eq("team_id", context.team.id).eq("is_active", true),
     context.supabase.from("rotation_groups").select("id").eq("team_id", context.team.id).eq("reserve_period_id", period.id),
@@ -297,6 +311,7 @@ function integer(formData: FormData, key: string, min: number, max: number) { co
 function enumValue(formData: FormData, key: string, values: string[], label: string) { const value = required(formData, key, label); if (!values.includes(value)) throw new Error(`${label} אינו תקין`); return value; }
 function assertDateRange(startsOn: string, endsOn: string) { if (endsOn < startsOn) throw new Error("תאריך הסיום חייב להיות אחרי תאריך ההתחלה"); }
 function assertInsidePeriod(startsOn: string, endsOn: string, period: { starts_on: string; ends_on: string }) { assertDateRange(startsOn, endsOn); if (startsOn < period.starts_on || endsOn > period.ends_on) throw new Error("טווח התאריכים חייב להיות בתוך תקופת המילואים"); }
+function assertDraft(period: { status: string }) { if (period.status !== "draft") throw new Error("שינויים מבניים מותרים רק בתקופה במצב טיוטה"); }
 function assertOk(error: { message: string } | null, label: string) { if (error) throw new Error(`${label} נכשלה: ${error.message}`); }
 function refresh(teamSlug: string) { revalidatePath(`/${teamSlug}/schedule`); revalidatePath(`/${teamSlug}`); revalidatePath(`/${teamSlug}/team`); }
 
