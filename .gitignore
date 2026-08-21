@@ -1,6 +1,7 @@
 .next/
 node_modules/
 .vercel/
+supabase/.temp/
 out/
 dist/
 *.tsbuildinfo

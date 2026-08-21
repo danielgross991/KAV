@@ -1,6 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
+import { getDateInTimeZone } from "@/lib/kav/dates";
+import { getOperationalScheduleSummary } from "@/lib/kav/schedule";
 import type { TeamSummary } from "@/lib/kav/teams";
 
 type Supabase = SupabaseClient<Database>;
@@ -48,12 +50,11 @@ export async function getDashboardData(
   supabase: Supabase,
   team: TeamSummary,
 ): Promise<DashboardData> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getDateInTimeZone(team.timezone);
   const now = new Date().toISOString();
 
   const [
     activePeopleResult,
-    currentPeriodResult,
     approvedLeaveResult,
     attendanceDayResult,
     upcomingEventResult,
@@ -65,15 +66,6 @@ export async function getDashboardData(
       .select("id", { count: "exact", head: true })
       .eq("team_id", team.id)
       .eq("is_active", true),
-    supabase
-      .from("reserve_periods")
-      .select("id, name, location, starts_on, ends_on, status")
-      .eq("team_id", team.id)
-      .lte("starts_on", today)
-      .gte("ends_on", today)
-      .order("starts_on", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
     supabase
       .from("leave_requests")
       .select("id", { count: "exact", head: true })
@@ -108,26 +100,22 @@ export async function getDashboardData(
   ]);
 
   assertOk(activePeopleResult.error, "active people");
-  assertOk(currentPeriodResult.error, "current period");
   assertOk(approvedLeaveResult.error, "approved leave");
   assertOk(attendanceDayResult.error, "attendance day");
   assertOk(upcomingEventResult.error, "upcoming event");
   assertOk(requirementsResult.error, "pakal requirements");
   assertOk(personPakalsResult.error, "person pakals");
 
-  const currentPeriod = currentPeriodResult.data;
+  const operationalSchedule = await getOperationalScheduleSummary(supabase, team, today);
+  const currentPeriod = operationalSchedule.period;
   const attendance = await getAttendanceSummary(
     supabase,
     team.id,
     attendanceDayResult.data?.id,
     attendanceDayResult.data?.status === "submitted",
   );
-  const rotationStatus = currentPeriod
-    ? await getRotationStatus(supabase, team.id, currentPeriod.id, today)
-    : [];
-  const expectedOnBase = currentPeriod
-    ? await getExpectedOnBase(supabase, team.id, today, rotationStatus)
-    : 0;
+  const rotationStatus = operationalSchedule.rotationStatus;
+  const expectedOnBase = operationalSchedule.expectedOnBase;
 
   const personPakals = personPakalsResult.data ?? [];
   const pakalCounts = new Map<string, number>();
@@ -207,66 +195,6 @@ async function getAttendanceSummary(
     submitted,
     total: entries.length,
   };
-}
-
-async function getRotationStatus(
-  supabase: Supabase,
-  teamId: string,
-  reservePeriodId: string,
-  today: string,
-) {
-  const { data, error } = await supabase
-    .from("rotation_blocks")
-    .select("state, rotation_groups!inner(name)")
-    .eq("team_id", teamId)
-    .eq("reserve_period_id", reservePeriodId)
-    .lte("starts_on", today)
-    .gte("ends_on", today);
-
-  assertOk(error, "rotation blocks");
-
-  return ((data ?? []) as unknown as { rotation_groups: { name: string }; state: string }[])
-    .map((block) => ({
-      name: block.rotation_groups.name,
-      state: block.state,
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name, "he"));
-}
-
-async function getExpectedOnBase(
-  supabase: Supabase,
-  teamId: string,
-  today: string,
-  rotationStatus: { name: string; state: string }[],
-) {
-  const onBaseNames = rotationStatus
-    .filter((rotation) => ["base", "on_base", "in_base"].includes(rotation.state))
-    .map((rotation) => rotation.name);
-
-  if (onBaseNames.length === 0) return 0;
-
-  const { data: groups, error: groupError } = await supabase
-    .from("rotation_groups")
-    .select("id, name")
-    .eq("team_id", teamId)
-    .in("name", onBaseNames);
-
-  assertOk(groupError, "rotation groups");
-
-  const groupIds = (groups ?? []).map((group) => group.id);
-  if (groupIds.length === 0) return 0;
-
-  const { count, error } = await supabase
-    .from("rotation_members")
-    .select("id", { count: "exact", head: true })
-    .eq("team_id", teamId)
-    .in("rotation_group_id", groupIds)
-    .or(`starts_on.is.null,starts_on.lte.${today}`)
-    .or(`ends_on.is.null,ends_on.gte.${today}`);
-
-  assertOk(error, "rotation members");
-
-  return count ?? 0;
 }
 
 function assertOk(error: { message: string } | null, label: string) {

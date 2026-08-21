@@ -1,10 +1,21 @@
-import { PhasePlaceholder } from "@/components/phase-placeholder";
+import { ScheduleView } from "@/components/schedule-view";
+import { requireAuth } from "@/lib/kav/auth";
+import { getScheduleData } from "@/lib/kav/schedule";
+import { requireTeamAccess } from "@/lib/kav/teams";
 
-export default function SchedulePage() {
-  return (
-    <PhasePlaceholder
-      title="לו״ז"
-      description="מסך זה שמור לשלב הרוטציות והיומן. בשלב הראשון הניווט והרשאות הגישה כבר קיימים."
-    />
-  );
+type SchedulePageProps = {
+  params: Promise<{ teamSlug: string }>;
+  searchParams: Promise<{ manage?: string; period?: string; view?: string }>;
+};
+
+export default async function SchedulePage({ params, searchParams }: SchedulePageProps) {
+  const [{ teamSlug }, query] = await Promise.all([params, searchParams]);
+  const { supabase, userId } = await requireAuth();
+  const membership = await requireTeamAccess(supabase, userId, teamSlug);
+  const data = await getScheduleData(supabase, membership, query.period);
+  const view = ["month", "agenda", "rotations"].includes(query.view ?? "")
+    ? query.view!
+    : "agenda";
+
+  return <ScheduleView data={data} initialManage={query.manage === "1"} view={view} />;
 }

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireAuth } from "@/lib/kav/auth";
+import { getDateInTimeZone } from "@/lib/kav/dates";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
 const EQUIPMENT_STATUSES = ["assigned", "returned", "lost", "damaged"] as const;
@@ -310,7 +311,7 @@ export async function returnEquipmentAction(
   equipmentId: string,
 ) {
   const { membership, supabase } = await requireManager(teamSlug);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getDateInTimeZone(membership.team.timezone);
 
   const { error } = await supabase
     .from("person_equipment")
