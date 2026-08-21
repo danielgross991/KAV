@@ -93,24 +93,52 @@ export type Database = {
         team_id: string;
         updated_at: string;
       }>;
+      period_phases: Row<{
+        created_at: string;
+        ends_on: string;
+        id: string;
+        name: string;
+        notes: string | null;
+        phase_type: string;
+        reserve_period_id: string;
+        sort_order: number;
+        starts_on: string;
+        team_id: string;
+      }>;
       rotation_blocks: Row<{
+        created_at: string;
         ends_on: string;
         id: string;
         reserve_period_id: string;
         rotation_group_id: string;
+        sequence_no: number | null;
+        series_key: string | null;
+        source: string;
         starts_on: string;
         state: string;
         team_id: string;
+        updated_at: string;
+      }>;
+      rotation_generation_configs: Row<{
+        anchor_date: string;
+        base_days: number;
+        created_at: string;
+        home_days: number;
+        reserve_period_id: string;
+        team_id: string;
+        updated_at: string;
       }>;
       rotation_groups: Row<{
         color_token: string | null;
         id: string;
+        initial_state: "base" | "home";
         name: string;
         reserve_period_id: string;
         sort_order: number;
         team_id: string;
       }>;
       rotation_members: Row<{
+        created_at: string;
         ends_on: string | null;
         id: string;
         person_id: string;
@@ -118,7 +146,22 @@ export type Database = {
         starts_on: string | null;
         team_id: string;
       }>;
+      rotation_overrides: Row<{
+        created_at: string;
+        created_by: string | null;
+        ends_on: string;
+        from_rotation_group_id: string | null;
+        id: string;
+        person_id: string;
+        reason: string | null;
+        reserve_period_id: string;
+        starts_on: string;
+        team_id: string;
+        to_rotation_group_id: string | null;
+      }>;
       schedule_events: Row<{
+        created_at: string;
+        created_by: string | null;
         ends_at: string | null;
         event_type: string;
         id: string;
@@ -128,6 +171,8 @@ export type Database = {
         starts_at: string;
         team_id: string;
         title: string;
+        notes: string | null;
+        updated_at: string;
       }>;
       team_memberships: Row<{
         id: string;
@@ -183,7 +228,27 @@ export type Database = {
       }>;
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      replace_generated_rotation_blocks: {
+        Args: {
+          generated_blocks: Json;
+          generator_config: Json;
+          target_reserve_period_id: string;
+          target_team_id: string;
+        };
+        Returns: undefined;
+      };
+      replace_rotation_series_from: {
+        Args: {
+          replace_from: string;
+          replacement_blocks: Json;
+          target_reserve_period_id: string;
+          target_rotation_group_id: string;
+          target_team_id: string;
+        };
+        Returns: undefined;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

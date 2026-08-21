@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "lint": "eslint .",
+    "test": "node --experimental-strip-types --test lib/kav/*.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
