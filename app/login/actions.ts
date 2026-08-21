@@ -4,7 +4,11 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { getAuthCallbackUrl, sanitizeNextPath } from "@/lib/kav/auth-config";
+import {
+  getAuthCallbackUrl,
+  getPostLoginPath,
+  sanitizeNextPath,
+} from "@/lib/kav/auth-config";
 import { getUserTeams } from "@/lib/kav/teams";
 
 export type LoginState = {
@@ -34,11 +38,8 @@ export async function signInWithPassword(
     return { message: GENERIC_LOGIN_ERROR };
   }
 
-  if (next !== "/") redirect(next);
-
-  const memberships = await getUserTeams(supabase, data.user.id);
-  if (memberships.length === 1) redirect(`/${memberships[0].team.slug}`);
-  redirect("/");
+  const memberships = next === "/" ? await getUserTeams(supabase, data.user.id) : [];
+  redirect(getPostLoginPath(next, memberships.map(({ team }) => team.slug)));
 }
 
 export async function signInWithEmail(

@@ -2,9 +2,8 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 import type { Database } from "@/lib/database.types";
+import { getAuthResponseMetadata, shouldRedirectToLogin } from "@/lib/kav/auth-session";
 import { getSupabaseEnv } from "@/lib/env";
-
-const PUBLIC_FILE = /\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$/;
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -30,18 +29,19 @@ export async function updateSession(request: NextRequest) {
 
   const { data } = await supabase.auth.getClaims();
   const pathname = request.nextUrl.pathname;
-  const isAuthRoute =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/forgot-password") ||
-    pathname.startsWith("/auth") ||
-    pathname.startsWith("/logout");
 
-  if (!data?.claims && !isAuthRoute && !PUBLIC_FILE.test(pathname)) {
+  if (shouldRedirectToLogin(pathname, Boolean(data?.claims))) {
     const urlToRedirect = request.nextUrl.clone();
     urlToRedirect.pathname = "/login";
     urlToRedirect.search = "";
     urlToRedirect.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
-    return NextResponse.redirect(urlToRedirect);
+    const redirectResponse = NextResponse.redirect(urlToRedirect);
+    const metadata = getAuthResponseMetadata(supabaseResponse);
+
+    metadata.cookies.forEach((cookie) => redirectResponse.cookies.set(cookie));
+    metadata.headers.forEach(([name, value]) => redirectResponse.headers.set(name, value));
+
+    return redirectResponse;
   }
 
   return supabaseResponse;

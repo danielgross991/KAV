@@ -32,3 +32,11 @@ export function sanitizeNextPath(value: string) {
     return "/";
   }
 }
+
+export function getPostLoginPath(nextPath: string, teamSlugs: string[]) {
+  const next = sanitizeNextPath(nextPath);
+
+  if (next !== "/") return next;
+  if (teamSlugs.length === 1) return `/${teamSlugs[0]}`;
+  return "/";
+}
