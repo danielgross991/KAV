@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
+import { getCurrentRotationContext } from "@/lib/kav/rotations";
 import { canManage, type TeamMembership } from "@/lib/kav/teams";
 
 type Client = SupabaseClient<Database>;
@@ -71,7 +72,7 @@ export async function getTeamManagementData(
   supabase: Client,
   membership: TeamMembership,
 ): Promise<TeamManagementData> {
-  const [people, pakalTypes, personPakals, rotations, rotationMembers, requirements] =
+  const [people, pakalTypes, personPakals, requirements, currentRotationContext] =
     await Promise.all([
       selectOrThrow(
         supabase
@@ -100,26 +101,12 @@ export async function getTeamManagementData(
       ),
       selectOrThrow(
         supabase
-          .from("rotation_groups")
-          .select("id, name, sort_order")
-          .eq("team_id", membership.team.id)
-          .order("sort_order", { ascending: true }),
-        "לא ניתן לטעון קבוצות רוטציה",
-      ),
-      selectOrThrow(
-        supabase
-          .from("rotation_members")
-          .select("id, person_id, rotation_group_id, starts_on, ends_on")
-          .eq("team_id", membership.team.id),
-        "לא ניתן לטעון שיוכי רוטציה",
-      ),
-      selectOrThrow(
-        supabase
           .from("team_pakal_requirements")
           .select("id, team_id, pakal_type_id, required_count, created_at")
           .eq("team_id", membership.team.id),
         "לא ניתן לטעון דרישות כשירות",
       ),
+      getCurrentRotationContext(supabase, membership.team.id),
     ]);
 
   const pakalsById = new Map(pakalTypes.map((pakal) => [pakal.id, pakal]));
@@ -127,15 +114,6 @@ export async function getTeamManagementData(
     requirements.map((requirement) => [requirement.pakal_type_id, requirement.required_count]),
   );
   const assignedCounts = countActivePakals(personPakals);
-  const rotationsById = new Map(rotations.map((rotation) => [rotation.id, rotation]));
-  const rotationByPersonId = new Map<string, { id: string; name: string }>();
-
-  for (const member of rotationMembers) {
-    const rotation = rotationsById.get(member.rotation_group_id);
-    if (rotation && !rotationByPersonId.has(member.person_id)) {
-      rotationByPersonId.set(member.person_id, { id: rotation.id, name: rotation.name });
-    }
-  }
 
   return {
     canManageTeam: canManage(membership.role),
@@ -152,14 +130,14 @@ export async function getTeamManagementData(
           const type = pakalsById.get(pakal.pakal_type_id);
           return type ? [{ id: type.id, name: type.name }] : [];
         }),
-      rotation: rotationByPersonId.get(person.id) ?? null,
+      rotation: currentRotationContext.rotationByPersonId.get(person.id) ?? null,
     })),
     pakalTypes: pakalTypes.map((pakal) => ({
       ...pakal,
       assignedCount: assignedCounts.get(pakal.id) ?? 0,
       requiredCount: requirementsByPakalId.get(pakal.id) ?? 0,
     })),
-    rotations: rotations.map((rotation) => ({ id: rotation.id, name: rotation.name })),
+    rotations: currentRotationContext.rotationOptions,
     team: membership.team,
   };
 }
