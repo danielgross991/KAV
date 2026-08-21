@@ -106,7 +106,7 @@ export async function getTeamManagementData(
           .eq("team_id", membership.team.id),
         "לא ניתן לטעון דרישות כשירות",
       ),
-      getCurrentRotationContext(supabase, membership.team.id),
+      getCurrentRotationContext(supabase, membership.team.id, membership.team.timezone),
     ]);
 
   const pakalsById = new Map(pakalTypes.map((pakal) => [pakal.id, pakal]));

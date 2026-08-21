@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
+import { getDateInTimeZone } from "@/lib/kav/dates";
 
 type Client = SupabaseClient<Database>;
 type TableRow<Name extends keyof Database["public"]["Tables"]> =
@@ -22,7 +23,8 @@ export type CurrentRotationContext = {
 export async function getCurrentRotationContext(
   supabase: Client,
   teamId: string,
-  today = new Date().toISOString().slice(0, 10),
+  timeZone: string,
+  today = getDateInTimeZone(timeZone),
 ): Promise<CurrentRotationContext> {
   const { data: reservePeriod, error: reservePeriodError } = await supabase
     .from("reserve_periods")
