@@ -1,20 +1,6 @@
 const LOCAL_HOSTS = new Set(["localhost:3000", "127.0.0.1:3000"]);
 type HeaderReader = Pick<Headers, "get">;
 
-export function shouldCreateAuthUser(email: string) {
-  if (process.env.KAV_AUTH_ALLOW_USER_CREATION !== "true") {
-    return false;
-  }
-
-  const bootstrapEmail = process.env.KAV_BOOTSTRAP_EMAIL?.trim().toLowerCase();
-
-  if (!bootstrapEmail) {
-    return true;
-  }
-
-  return email.trim().toLowerCase() === bootstrapEmail;
-}
-
 export function getAuthCallbackUrl(headersList: HeaderReader, nextPath: string) {
   const host =
     headersList.get("x-forwarded-host") ??
@@ -26,6 +12,11 @@ export function getAuthCallbackUrl(headersList: HeaderReader, nextPath: string) 
   const origin = `${protocol}://${host}`;
 
   return `${origin}/auth/confirm?next=${encodeURIComponent(sanitizeNextPath(nextPath))}`;
+}
+
+export function getAuthConfirmationNext(type: string | null, nextPath: string | null) {
+  if (type === "recovery") return "/account/update-password";
+  return sanitizeNextPath(nextPath ?? "/");
 }
 
 export function sanitizeNextPath(value: string) {

@@ -1,122 +1,67 @@
-# KAV Admin Bootstrap
+# KAV authentication and admin password bootstrap
 
-KAV is a closed-access application. Logging in is separate from being part of a
-team, and being a person in the Team Lidor roster is separate from having login
-access.
+KAV is closed-access. Supabase Auth establishes identity; `team_memberships`
+continues to grant team access and roles. The application has no public signup.
 
-## Identity Model
+## Supabase Dashboard configuration
 
-```text
-auth.users
-  -> profiles
-  -> team_memberships
-  -> Team access and role
+In **Authentication -> Providers -> Email**, keep password-based Email Auth
+enabled and configure a reasonable minimum password length supported by the
+current plan (KAV also enforces at least 8 characters in its update form).
 
-people
-  -> optional auth_user_id
-  -> Physical team member / roster record
-```
-
-Concepts:
-
-- `auth.users`: Supabase Auth identity. This is what can receive a Magic Link and create a session.
-- `profiles`: app profile metadata for an auth user.
-- `team_memberships`: authorization boundary for KAV team access and role (`admin`, `manager`, `viewer`).
-- `people`: Team roster/personnel records. A person record does not automatically grant login access.
-- `people.auth_user_id`: optional link from a roster person to an auth user.
-
-## Closed Login Policy
-
-Supabase `signInWithOtp` creates a new auth user by default when the email does
-not already exist. KAV disables this by default by sending:
-
-```ts
-options: {
-  shouldCreateUser: false
-}
-```
-
-For the first bootstrap only, the server action supports:
-
-```env
-KAV_AUTH_ALLOW_USER_CREATION=true
-KAV_BOOTSTRAP_EMAIL=first.admin@example.com
-```
-
-If `KAV_BOOTSTRAP_EMAIL` is set, only that email may be auto-created while
-bootstrap user creation is enabled. Do not set these variables in production
-after the first admin exists.
-
-## First Admin Procedure
-
-1. Temporarily enable bootstrap user creation in local development:
-
-```env
-KAV_AUTH_ALLOW_USER_CREATION=true
-KAV_BOOTSTRAP_EMAIL=<first-admin-email>
-```
-
-2. Start the app locally and request a Magic Link from `/login` using the same email.
-3. Click the Magic Link to create and sign in the auth user.
-4. Resolve the auth user ID:
-
-```sql
-select id, email
-from auth.users
-where lower(email) = lower('<first-admin-email>');
-```
-
-5. Add the Team Lidor admin membership:
-
-```sql
-insert into public.team_memberships (team_id, user_id, role, is_active)
-select t.id, u.id, 'admin', true
-from public.teams t
-cross join auth.users u
-where t.slug = 'team-lidor'
-  and lower(u.email) = lower('<first-admin-email>')
-on conflict do nothing;
-```
-
-6. Disable bootstrap user creation:
-
-```env
-KAV_AUTH_ALLOW_USER_CREATION=false
-KAV_BOOTSTRAP_EMAIL=
-```
-
-7. Log out and log in again. The user should enter Team Lidor as `admin`.
-
-## Supabase Auth URL Configuration
-
-Configure Supabase Auth -> URL Configuration:
-
-Site URL:
+In **Authentication -> URL Configuration**, keep the canonical production URL
+as the Site URL. Allow these recovery paths and their local equivalents:
 
 ```text
-https://<vercel-production-domain>
-```
-
-Additional Redirect URLs:
-
-```text
-http://127.0.0.1:3000/auth/confirm
+https://kav-teal.vercel.app/auth/confirm
+https://kav-teal.vercel.app/account/update-password
 http://localhost:3000/auth/confirm
-https://<vercel-production-domain>/auth/confirm
-https://*.vercel.app/auth/confirm
+http://localhost:3000/account/update-password
+http://127.0.0.1:3000/auth/confirm
+http://127.0.0.1:3000/account/update-password
 ```
 
-The app builds the Magic Link callback from the request host and always uses
-`/auth/confirm`. It sanitizes the `next` parameter to local paths only, so Magic
-Links cannot redirect to arbitrary external URLs.
+In **Authentication -> Email Templates -> Reset Password**, use this exact PKCE
+token-hash link:
 
-## Vercel Environment Variables
+```html
+<a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/account/update-password">
+  איפוס סיסמה
+</a>
+```
 
-Only these Supabase variables are needed for the deployed application:
+On newer Free-plan projects, Supabase's default SMTP may not permit customized
+templates. Configure custom SMTP if the Dashboard blocks the template change.
+Leaked-password protection is a paid-plan feature and is not a development
+blocker.
+
+## One-time existing-admin password bootstrap
+
+Never edit `auth.users.encrypted_password` directly. The local-only script
+updates an existing user through the Supabase Admin Auth API and never creates a
+new identity.
+
+Set these values temporarily in `.env.local`:
 
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://scqytssoghswrvzotutl.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<publishable key>
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SECRET_KEY=<server-only-secret-key>
+KAV_BOOTSTRAP_EMAIL=<existing-admin-email>
+KAV_BOOTSTRAP_PASSWORD=<new-password-at-least-8-characters>
 ```
 
-Do not configure a Supabase service-role key for this phase.
+Run from a shell that loads `.env.local` into the process environment:
+
+```bash
+node --env-file=.env.local scripts/set-auth-password.mjs
+```
+
+The successful script prints only the email/user ID summary and:
+
+```text
+User password configured successfully.
+```
+
+Immediately remove `SUPABASE_SECRET_KEY` and `KAV_BOOTSTRAP_PASSWORD` from
+`.env.local`. The deployed KAV application requires only the public Supabase URL
+and publishable key; never configure the secret key in Vercel for this flow.

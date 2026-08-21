@@ -1,14 +1,45 @@
 "use server";
 
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import { getAuthCallbackUrl, sanitizeNextPath, shouldCreateAuthUser } from "@/lib/kav/auth-config";
+import { getAuthCallbackUrl, sanitizeNextPath } from "@/lib/kav/auth-config";
+import { getUserTeams } from "@/lib/kav/teams";
 
 export type LoginState = {
   message?: string;
   ok?: boolean;
 };
+
+const GENERIC_LOGIN_ERROR = "האימייל או הסיסמה אינם נכונים.";
+
+export async function signInWithPassword(
+  _state: LoginState,
+  formData: FormData,
+): Promise<LoginState> {
+  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const password = String(formData.get("password") ?? "");
+  const next = sanitizeNextPath(String(formData.get("next") ?? "/"));
+
+  if (!email || !email.includes("@") || !password) {
+    return { message: GENERIC_LOGIN_ERROR };
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+  if (error || !data.user) {
+    console.warn("Password sign-in failed", { code: error?.code, status: error?.status });
+    return { message: GENERIC_LOGIN_ERROR };
+  }
+
+  if (next !== "/") redirect(next);
+
+  const memberships = await getUserTeams(supabase, data.user.id);
+  if (memberships.length === 1) redirect(`/${memberships[0].team.slug}`);
+  redirect("/");
+}
 
 export async function signInWithEmail(
   _state: LoginState,
@@ -28,7 +59,7 @@ export async function signInWithEmail(
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      shouldCreateUser: shouldCreateAuthUser(email),
+      shouldCreateUser: false,
       emailRedirectTo: redirectTo,
     },
   });

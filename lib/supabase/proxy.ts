@@ -32,13 +32,15 @@ export async function updateSession(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAuthRoute =
     pathname.startsWith("/login") ||
+    pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/logout");
 
   if (!data?.claims && !isAuthRoute && !PUBLIC_FILE.test(pathname)) {
     const urlToRedirect = request.nextUrl.clone();
     urlToRedirect.pathname = "/login";
-    urlToRedirect.searchParams.set("next", pathname);
+    urlToRedirect.search = "";
+    urlToRedirect.searchParams.set("next", `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(urlToRedirect);
   }
 
