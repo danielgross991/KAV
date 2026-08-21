@@ -168,10 +168,11 @@ export async function editRotationBlockAction(teamSlug: string, formData: FormDa
   const { data: block } = await context.supabase.from("rotation_blocks").select("*")
     .eq("id", id).eq("team_id", context.team.id).maybeSingle();
   if (!block) throw new Error("הבלוק לא נמצא");
+  const period = await ownedPeriod(context, block.reserve_period_id);
+  assertDraft(period);
   if (formData.get("scope") === "following") {
     const { data: config } = await context.supabase.from("rotation_generation_configs").select("*")
       .eq("reserve_period_id", block.reserve_period_id).eq("team_id", context.team.id).maybeSingle();
-    const period = await ownedPeriod(context, block.reserve_period_id);
     if (!config) throw new Error("לא נמצאה תצורת סבבים");
     const generated = generateRotationBlocks({
       period: { startsOn: block.starts_on, endsOn: period.ends_on }, anchorDate: block.starts_on,
@@ -204,11 +205,23 @@ export async function saveRotationOverrideAction(teamSlug: string, formData: For
   const startsOn = required(formData, "starts_on", "תאריך התחלה");
   const endsOn = required(formData, "ends_on", "תאריך סיום");
   assertInsidePeriod(startsOn, endsOn, period);
+  const personId = required(formData, "person_id", "איש צוות");
+  const fromGroupId = optional(formData, "from_rotation_group_id");
+  const toGroupId = required(formData, "to_rotation_group_id", "סבב חלופי");
+  const [{ data: person, error: personError }, { data: groups, error: groupsError }] = await Promise.all([
+    context.supabase.from("people").select("id").eq("id", personId).eq("team_id", context.team.id).maybeSingle(),
+    context.supabase.from("rotation_groups").select("id").eq("team_id", context.team.id).eq("reserve_period_id", period.id),
+  ]);
+  assertOk(personError, "טעינת איש הצוות");
+  assertOk(groupsError, "טעינת הסבבים");
+  if (!person) throw new Error("איש הצוות אינו שייך לצוות");
+  const groupIds = new Set((groups ?? []).map((group) => group.id));
+  if (!groupIds.has(toGroupId)) throw new Error("הסבב החלופי אינו שייך לתקופה");
+  if (fromGroupId && !groupIds.has(fromGroupId)) throw new Error("סבב המקור אינו שייך לתקופה");
+
   const payload = {
     team_id: context.team.id, reserve_period_id: period.id,
-    person_id: required(formData, "person_id", "איש צוות"),
-    from_rotation_group_id: optional(formData, "from_rotation_group_id"),
-    to_rotation_group_id: required(formData, "to_rotation_group_id", "סבב חלופי"),
+    person_id: personId, from_rotation_group_id: fromGroupId, to_rotation_group_id: toGroupId,
     starts_on: startsOn, ends_on: endsOn, reason: optional(formData, "reason"), created_by: context.userId,
   };
   const { error } = await context.supabase.from("rotation_overrides").insert(payload);
@@ -253,7 +266,7 @@ export async function publishReservePeriodAction(teamSlug: string, formData: For
     context.supabase.from("rotation_groups").select("id").eq("team_id", context.team.id).eq("reserve_period_id", period.id),
     context.supabase.from("period_phases").select("starts_on, ends_on, phase_type").eq("team_id", context.team.id).eq("reserve_period_id", period.id),
     context.supabase.from("rotation_blocks").select("rotation_group_id, state, starts_on, ends_on").eq("team_id", context.team.id).eq("reserve_period_id", period.id),
-    context.supabase.from("rotation_overrides").select("person_id, to_rotation_group_id, starts_on, ends_on").eq("team_id", context.team.id).eq("reserve_period_id", period.id),
+    context.supabase.from("rotation_overrides").select("person_id, from_rotation_group_id, to_rotation_group_id, starts_on, ends_on").eq("team_id", context.team.id).eq("reserve_period_id", period.id),
   ]);
   const groupIds = (groups ?? []).map((group) => group.id);
   const { data: memberships } = groupIds.length
@@ -264,7 +277,7 @@ export async function publishReservePeriodAction(teamSlug: string, formData: For
     activePeopleIds: (people ?? []).map((person) => person.id), groups: groups ?? [],
     memberships: (memberships ?? []).map((item) => ({ personId: item.person_id, groupId: item.rotation_group_id, startsOn: item.starts_on ?? period.starts_on, endsOn: item.ends_on ?? period.ends_on })),
     blocks: (blocks ?? []).map((item) => ({ groupId: item.rotation_group_id, state: item.state as RotationState, startsOn: item.starts_on, endsOn: item.ends_on })),
-    overrides: (overrides ?? []).flatMap((item) => item.to_rotation_group_id ? [{ personId: item.person_id, toGroupId: item.to_rotation_group_id, startsOn: item.starts_on, endsOn: item.ends_on }] : []),
+    overrides: (overrides ?? []).flatMap((item) => item.to_rotation_group_id ? [{ personId: item.person_id, fromGroupId: item.from_rotation_group_id, toGroupId: item.to_rotation_group_id, startsOn: item.starts_on, endsOn: item.ends_on }] : []),
     phases: (phases ?? []).map((phase) => ({ startsOn: phase.starts_on, endsOn: phase.ends_on, type: phase.phase_type })),
   });
   if (issues.some((issue) => issue.severity === "error")) throw new Error(`לא ניתן לפרסם: ${issues.map((issue) => issue.message).join("; ")}`);

@@ -63,9 +63,34 @@ export function localDateTimeToIso(
   return candidate.toISOString();
 }
 
+export function overlapsCalendarDayInTimeZone(
+  timeZone: string,
+  date: string,
+  startsAt: string | Date,
+  endsAt?: string | Date | null,
+): boolean {
+  const dayStartsAt = new Date(localDateTimeToIso(timeZone, date));
+  const nextDayStartsAt = new Date(localDateTimeToIso(timeZone, addCalendarDays(date, 1)));
+  const rangeStartsAt = toValidDate(startsAt);
+  const rangeEndsAt = endsAt ? toValidDate(endsAt) : rangeStartsAt;
+
+  if (rangeEndsAt < rangeStartsAt) throw new Error("Event end must not precede its start");
+  if (rangeEndsAt.getTime() === rangeStartsAt.getTime()) {
+    return rangeStartsAt >= dayStartsAt && rangeStartsAt < nextDayStartsAt;
+  }
+
+  return rangeStartsAt < nextDayStartsAt && rangeEndsAt > dayStartsAt;
+}
+
 function parseCalendarDate(value: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`Invalid calendar date: ${value}`);
   return new Date(`${value}T00:00:00.000Z`);
+}
+
+function toValidDate(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) throw new Error("Invalid date-time value");
+  return date;
 }
 
 function dateTimeParts(timeZone: string, date: Date) {

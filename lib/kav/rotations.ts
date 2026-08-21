@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone } from "@/lib/kav/dates";
+import { selectOperationalReservePeriod } from "@/lib/kav/schedule-domain";
 
 type Client = SupabaseClient<Database>;
 type TableRow<Name extends keyof Database["public"]["Tables"]> =
@@ -26,22 +27,21 @@ export async function getCurrentRotationContext(
   timeZone: string,
   today = getDateInTimeZone(timeZone),
 ): Promise<CurrentRotationContext> {
-  const { data: reservePeriod, error: reservePeriodError } = await supabase
+  const { data: reservePeriods, error: reservePeriodError } = await supabase
     .from("reserve_periods")
     .select("id, name, starts_on, ends_on, status")
     .eq("team_id", teamId)
     .in("status", [...CURRENT_RESERVE_PERIOD_STATUSES])
     .lte("starts_on", today)
     .gte("ends_on", today)
-    .order("starts_on", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("starts_on", { ascending: false });
 
   if (reservePeriodError) {
     throw new Error(`Unable to load current reserve period: ${reservePeriodError.message}`);
   }
 
-  if (!reservePeriod || !isCurrentReservePeriod(reservePeriod, today)) {
+  const reservePeriod = selectOperationalReservePeriod(reservePeriods ?? [], today);
+  if (!reservePeriod) {
     return emptyCurrentRotationContext();
   }
 
@@ -92,19 +92,6 @@ export async function getCurrentRotationContext(
   }
 
   return { reservePeriod, rotationByPersonId, rotationOptions };
-}
-
-export function isCurrentReservePeriod(
-  period: Pick<TableRow<"reserve_periods">, "ends_on" | "starts_on" | "status">,
-  today: string,
-) {
-  return (
-    CURRENT_RESERVE_PERIOD_STATUSES.includes(
-      period.status as (typeof CURRENT_RESERVE_PERIOD_STATUSES)[number],
-    ) &&
-    period.starts_on <= today &&
-    period.ends_on >= today
-  );
 }
 
 export function isRotationMembershipValidOn(

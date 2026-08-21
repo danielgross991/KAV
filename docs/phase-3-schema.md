@@ -31,3 +31,13 @@ publication validator.
 All new public data is protected by RLS. The private authorization helper checks
 `auth.uid()`, fixes its `search_path`, revokes `PUBLIC` execute, and grants only
 the authenticated role.
+
+## Follow-up integrity migration
+
+`20260821150000_harden_rotation_override_integrity.sql` adds a unique key on
+`rotation_groups (id, reserve_period_id, team_id)` and composite foreign keys
+from both override group columns. This prevents a same-team group from another
+reserve period being used without denormalizing any table. A private trigger
+also rejects override date ranges outside the referenced reserve period. The
+existing person/team and period/team foreign keys continue to enforce team
+ownership.

@@ -15,6 +15,24 @@ export type RotationOverrideInput = DateRange & {
   personId: string;
   toGroupId: string;
 };
+export type OperationalReservePeriod = {
+  ends_on: string;
+  starts_on: string;
+  status: string;
+};
+
+export function selectOperationalReservePeriod<T extends OperationalReservePeriod>(
+  periods: T[],
+  date: string,
+): T | null {
+  const current = periods.filter((period) =>
+    period.starts_on <= date && period.ends_on >= date,
+  );
+
+  return newestStarting(current.filter((period) => period.status === "active")) ??
+    newestStarting(current.filter((period) => period.status === "published")) ??
+    null;
+}
 
 export function generateRotationBlocks(input: {
   period: DateRange;
@@ -134,7 +152,11 @@ export function validateScheduleForPublication(input: {
   }
   const groupIds = new Set(input.groups.map((group) => group.id));
   for (const override of input.overrides) {
-    if (!inside(override, input.period) || !groupIds.has(override.toGroupId)) {
+    if (
+      !inside(override, input.period) ||
+      !groupIds.has(override.toGroupId) ||
+      (override.fromGroupId !== null && override.fromGroupId !== undefined && !groupIds.has(override.fromGroupId))
+    ) {
       error("invalid-override", `חריג סבב לא תקין עבור ${override.personId}`);
     }
   }
@@ -174,6 +196,12 @@ function pushClipped(
 
 function byStart(a: DateRange, b: DateRange) {
   return a.startsOn.localeCompare(b.startsOn);
+}
+
+function newestStarting<T extends OperationalReservePeriod>(periods: T[]): T | null {
+  return periods.reduce<T | null>((selected, period) =>
+    !selected || period.starts_on > selected.starts_on ? period : selected,
+  null);
 }
 
 function uniqueIssues(issues: PublicationIssue[]) {

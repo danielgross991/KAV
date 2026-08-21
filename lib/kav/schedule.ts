@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
-import { getDateInTimeZone } from "@/lib/kav/dates";
+import { getDateInTimeZone, overlapsCalendarDayInTimeZone } from "@/lib/kav/dates";
 import {
   resolvePersonSchedule,
+  selectOperationalReservePeriod,
   validateScheduleForPublication,
   type PublicationIssue,
   type RotationState,
@@ -48,8 +49,7 @@ export async function getScheduleData(
   const allPeriods = periods ?? [];
   const selectedPeriod =
     allPeriods.find((period) => period.id === selectedPeriodId) ??
-    allPeriods.find((period) => period.starts_on <= today && period.ends_on >= today && ["active", "published"].includes(period.status)) ??
-    allPeriods[0] ?? null;
+    selectOperationalReservePeriod(allPeriods, today);
 
   if (!selectedPeriod) {
     return {
@@ -134,7 +134,9 @@ export function getDaySchedule(data: ScheduleData, date: string) {
   return {
     date, groups, people,
     phase: data.phases.find((phase) => phase.starts_on <= date && phase.ends_on >= date) ?? null,
-    events: data.events.filter((event) => getDateInTimeZone(data.team.timezone, new Date(event.starts_at)) === date),
+    events: data.events.filter((event) => overlapsCalendarDayInTimeZone(
+      data.team.timezone, date, event.starts_at, event.ends_at,
+    )),
     expectedBase: people.filter((person) => person.is_active && person.resolution.state === "base"),
     expectedHome: people.filter((person) => person.is_active && person.resolution.state === "home"),
     overrides: data.overrides.filter((item) => item.starts_on <= date && item.ends_on >= date),
@@ -146,11 +148,11 @@ export async function getOperationalScheduleSummary(
   team: TeamMembership["team"],
   today = getDateInTimeZone(team.timezone),
 ) {
-  const { data: period, error } = await supabase.from("reserve_periods")
+  const { data: periods, error } = await supabase.from("reserve_periods")
     .select("*").eq("team_id", team.id).in("status", ["active", "published"])
-    .lte("starts_on", today).gte("ends_on", today).order("status", { ascending: true })
-    .order("starts_on", { ascending: false }).limit(1).maybeSingle();
+    .lte("starts_on", today).gte("ends_on", today).order("starts_on", { ascending: false });
   assertOk(error, "operational reserve period");
+  const period = selectOperationalReservePeriod(periods ?? [], today);
   if (!period) return { period: null, rotationStatus: [], expectedOnBase: 0 };
 
   const [groupsResult, blocksResult, overridesResult, peopleResult] = await Promise.all([
