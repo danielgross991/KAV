@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowRight,
   CalendarDays,
-  Mail,
   Phone,
   ShieldAlert,
   UserRound,
@@ -16,6 +15,7 @@ import {
   updateEquipmentAction,
   updatePersonAction,
 } from "@/app/[teamSlug]/team/actions";
+import { AppPage, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,44 +47,20 @@ export function PersonProfileView({
   const { person, team } = data;
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-      <Link
-        className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground"
-        href={`/${team.slug}/team`}
+    <AppPage>
+      <PageHeader
+        eyebrow={team.name}
+        title={person.full_name}
+        subtitle={person.phone || person.email || "אין פרטי קשר זמינים"}
+        action={<Link className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground hover:bg-muted" href={`/${team.slug}/team`} aria-label="חזרה לצוות"><ArrowRight className="size-4" /></Link>}
       >
-        <ArrowRight className="size-4" />
-        חזרה לצוות
-      </Link>
-
-      <header className="mb-5 rounded-lg border bg-card p-4 sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Avatar name={person.full_name} photoUrl={person.photo_url} />
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-normal">{person.full_name}</h1>
-                <Badge variant={person.is_active ? "success" : "muted"}>
-                  {person.is_active ? "פעיל" : "לא פעיל"}
-                </Badge>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                {person.phone ? <Contact icon={<Phone className="size-4" />} text={person.phone} /> : null}
-                {person.email ? <Contact icon={<Mail className="size-4" />} text={person.email} /> : null}
-                {!person.phone && !person.email ? <span>אין פרטי קשר זמינים</span> : null}
-              </div>
-            </div>
-          </div>
-          {saved ? <Badge variant="success">{savedLabel(saved)}</Badge> : null}
-        </div>
-      </header>
-
-      <nav className="mb-4 flex gap-2 overflow-x-auto rounded-lg border bg-card p-1">
+      <nav className="kav-scroll-x grid grid-cols-4 gap-1 overflow-x-auto rounded-md border bg-muted p-1" aria-label="פרופיל איש צוות">
         {tabs.map((item) => (
           <Link
             key={item.id}
             className={cn(
-              "min-w-24 rounded-md px-4 py-2 text-center text-sm font-medium text-muted-foreground",
-              activeTab === item.id && "bg-accent text-accent-foreground",
+              "min-w-20 rounded-md px-3 py-2 text-center text-sm font-medium text-muted-foreground transition-colors",
+              activeTab === item.id && "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]",
             )}
             href={`/${team.slug}/team/${person.id}?tab=${item.id}`}
           >
@@ -92,12 +68,25 @@ export function PersonProfileView({
           </Link>
         ))}
       </nav>
+      </PageHeader>
+
+      <Card className="mb-4 flex items-center gap-3 p-3.5">
+        <Avatar name={person.full_name} photoUrl={person.photo_url} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">{person.full_name}</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            <Badge variant={person.is_active ? "success" : "muted"}>{person.is_active ? "פעיל" : "לא פעיל"}</Badge>
+            {saved ? <Badge variant="info">{savedLabel(saved)}</Badge> : null}
+          </div>
+        </div>
+        {person.phone ? <a href={`tel:${person.phone}`} className="flex size-10 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted" aria-label="חיוג"><Phone className="size-4" /></a> : null}
+      </Card>
 
       {activeTab === "general" ? <GeneralTab data={data} /> : null}
       {activeTab === "pakals" ? <PakalsTab data={data} /> : null}
       {activeTab === "equipment" ? <EquipmentTab data={data} /> : null}
       {activeTab === "reserve" ? <ReserveTab data={data} /> : null}
-    </main>
+    </AppPage>
   );
 }
 
@@ -466,15 +455,6 @@ function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
     <div className="flex size-16 items-center justify-center rounded-lg border bg-accent text-accent-foreground">
       <UserRound className="size-7" />
     </div>
-  );
-}
-
-function Contact({ icon, text }: { icon: React.ReactNode; text: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      {icon}
-      {text}
-    </span>
   );
 }
 

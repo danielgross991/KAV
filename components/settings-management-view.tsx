@@ -4,6 +4,7 @@ import {
   updateRequirementAction,
   upsertPakalTypeAction,
 } from "@/app/[teamSlug]/team/actions";
+import { AppPage, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,17 +26,8 @@ export function SettingsManagementView({
   const createEquipmentType = createEquipmentTypeAction.bind(null, data.team.slug);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-      <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <Badge variant="secondary">{data.team.name}</Badge>
-          <h1 className="mt-3 text-3xl font-bold tracking-normal">הגדרות צוות</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            ניהול פקלים, דרישות כשירות וסוגי ציוד לצוות.
-          </p>
-        </div>
-        {saved ? <Badge variant="success">{savedLabel(saved)}</Badge> : null}
-      </header>
+    <AppPage>
+      <PageHeader eyebrow={data.team.name} title="הגדרות צוות" subtitle="ניהול פקלים, דרישות כשירות וסוגי ציוד לצוות." action={saved ? <Badge variant="success">{savedLabel(saved)}</Badge> : null} />
 
       <section className="grid gap-4 xl:grid-cols-[1fr_24rem]">
         <Card>
@@ -157,7 +149,7 @@ export function SettingsManagementView({
           </CardContent>
         </Card>
       </section>
-    </main>
+    </AppPage>
   );
 }
 

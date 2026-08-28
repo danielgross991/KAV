@@ -5,8 +5,9 @@ import { Mail, Phone, Plus, Search, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { createPersonAction } from "@/app/[teamSlug]/team/actions";
+import { AppPage, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,25 +43,19 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
   }, [data.people, pakal, query, rotation, status]);
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-      <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <Badge variant="secondary">{data.team.name}</Badge>
-          <h1 className="mt-3 text-3xl font-bold tracking-normal">ניהול צוות</h1>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {data.people.length} אנשי צוות, {activeCount(data)} פעילים,{" "}
-            {data.pakalTypes.length} פקלים מוגדרים
-          </p>
-        </div>
-        {data.canManageTeam ? (
+    <AppPage>
+      <PageHeader
+        eyebrow={data.team.name}
+        title="צוות"
+        subtitle={`${data.people.length} אנשי צוות · ${activeCount(data)} פעילים · ${data.pakalTypes.length} פקלים`}
+        action={data.canManageTeam ? (
           <details className="group w-full xl:w-auto">
             <summary className="list-none">
-              <Button type="button" className="w-full xl:w-auto">
+              <Button type="button" size="icon" aria-label="איש צוות חדש">
                 <Plus className="size-4" />
-                איש צוות
               </Button>
             </summary>
-            <Card className="mt-3 xl:w-[30rem]">
+            <Card className="absolute left-4 right-4 z-30 mt-3 sm:right-auto sm:w-[30rem]">
               <CardHeader>
                 <CardTitle>איש צוות חדש</CardTitle>
               </CardHeader>
@@ -82,9 +77,9 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
             </Card>
           </details>
         ) : null}
-      </header>
+      />
 
-      <section className="mb-4 grid gap-3 rounded-lg border bg-card p-3 md:grid-cols-[1fr_11rem_13rem_13rem]">
+      <section className="mb-4 grid gap-3 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(20,22,26,0.04)] md:grid-cols-[1fr_11rem_13rem_13rem]">
         <label className="relative block">
           <Search className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -172,42 +167,28 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
             </table>
           </div>
 
-          <div className="grid gap-3 md:hidden">
+          <div className="overflow-hidden rounded-lg border bg-card md:hidden">
             {filteredPeople.map((person) => (
-              <Card key={person.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+              <div className="border-b p-3 last:border-0" key={person.id}>
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-sm font-semibold text-primary">{initials(person.full_name)}</span>
+                    <div className="min-w-0 flex-1">
                       <Link
-                        className="text-lg font-semibold text-primary"
+                        className="block truncate text-sm font-semibold"
                         href={`/${data.team.slug}/team/${person.id}`}
                       >
                         {person.full_name}
                       </Link>
-                      <div className="mt-2">
-                        <PakalChips names={person.pakals.map((item) => item.name)} />
-                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{person.rotation ? `רוטציה: ${person.rotation.name}` : "אין רוטציה"}{person.pakals.length ? ` · ${person.pakals.slice(0, 2).map((item) => item.name).join(", ")}` : ""}</p>
                     </div>
                     <StatusBadge active={person.is_active} />
                   </div>
-                  <div className="mt-4 flex items-center justify-between gap-3">
-                    <span className="text-sm text-muted-foreground">
-                      {person.rotation ? `רוטציה: ${person.rotation.name}` : "אין רוטציה"}
-                    </span>
-                    <Link
-                      className={buttonVariants({ size: "sm", variant: "outline" })}
-                      href={`/${data.team.slug}/team/${person.id}`}
-                    >
-                      פתח פרופיל
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
+              </div>
             ))}
           </div>
         </>
       )}
-    </main>
+    </AppPage>
   );
 }
 
@@ -339,4 +320,8 @@ function normalize(value: string | null) {
 
 function activeCount(data: TeamManagementData) {
   return data.people.filter((person) => person.is_active).length;
+}
+
+function initials(name: string) {
+  return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("");
 }
