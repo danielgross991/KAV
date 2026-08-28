@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { LogOut } from "lucide-react";
 
 import { Separator } from "@/components/ui/separator";
 import { TeamNav } from "@/components/team-nav";
@@ -14,28 +14,33 @@ export function AppShell({
 }) {
   return (
     <div className="min-h-screen bg-background">
-      <aside className="fixed inset-y-0 right-0 hidden w-64 border-l bg-card px-4 py-5 lg:block">
-        <Link href={`/${membership.team.slug}`} className="flex items-center gap-2">
-          <span className="flex size-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <ShieldCheck className="size-4" />
-          </span>
-          <span className="text-xl font-bold">KAV</span>
-        </Link>
-        <div className="mt-6">
-          <p className="text-sm font-semibold">{membership.team.name}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{roleLabel(membership.role)}</p>
+      <aside className="fixed inset-y-0 right-0 z-40 hidden w-60 flex-col border-l bg-card lg:flex">
+        <div className="px-4 py-4">
+          <Link href={`/${membership.team.slug}`} className="inline-flex items-center gap-2.5" aria-label="KAV - בית">
+            <KavMark />
+            <span className="leading-none">
+              <span className="block text-base font-bold">KAV</span>
+              <span className="mt-0.5 block text-[11px] text-muted-foreground">קו</span>
+            </span>
+          </Link>
         </div>
-        <Separator className="my-5" />
-        <TeamNav
-          role={membership.role}
-          teamSlug={membership.team.slug}
-          variant="desktop"
-        />
-        <div className="absolute bottom-5 right-4 left-4">
+        <div className="mx-4 rounded-md border bg-muted/55 px-3 py-2.5">
+          <p className="truncate text-sm font-semibold">{membership.team.name}</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{roleLabel(membership.role)}</p>
+        </div>
+        <Separator className="mx-4 my-4 w-auto" />
+        <div className="flex-1 px-3">
+          <TeamNav
+            role={membership.role}
+            teamSlug={membership.team.slug}
+            variant="desktop"
+          />
+        </div>
+        <div className="border-t p-3">
           <form action="/logout" method="post">
             <button
               type="submit"
-              className="flex h-10 w-full items-center gap-2 rounded-md px-3 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              className="flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               <LogOut className="size-4" />
               יציאה
@@ -43,8 +48,8 @@ export function AppShell({
           </form>
         </div>
       </aside>
-      <div className="pb-20 lg:mr-64 lg:pb-0">
-        <div className="min-h-screen">{children}</div>
+      <div className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:mr-60 lg:pb-0">
+        <div className="min-h-screen lg:mx-auto lg:max-w-[1180px]">{children}</div>
       </div>
       <TeamNav
         role={membership.role}
@@ -52,6 +57,16 @@ export function AppShell({
         variant="mobile"
       />
     </div>
+  );
+}
+
+function KavMark() {
+  return (
+    <span className="relative flex size-8 shrink-0 items-center justify-center rounded-md bg-primary" aria-hidden="true">
+      <span className="absolute right-[9px] top-[8px] h-4 w-0.5 rounded-full bg-white/90" />
+      <span className="absolute right-[14px] top-[8px] h-4 w-0.5 rounded-full bg-white/50" />
+      <span className="absolute right-[19px] top-[8px] h-4 w-0.5 rounded-full bg-white/25" />
+    </span>
   );
 }
 

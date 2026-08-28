@@ -32,46 +32,50 @@ export function TeamNav({
 
   if (variant === "mobile") {
     return (
-      <nav className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/95 px-2 py-2 backdrop-blur lg:hidden">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-1">
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur-md lg:hidden" aria-label="ניווט ראשי">
+        <div className="mx-auto flex max-w-md items-stretch px-1">
           {items.map((item) => {
             const href = `${base}${item.href}`;
-            const active = pathname === href;
+            const active = item.href === "" ? pathname === href : pathname.startsWith(href);
             const Icon = item.icon;
 
             return (
               <Link
                 key={href}
                 href={href}
+                aria-current={active ? "page" : undefined}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-xs font-medium text-muted-foreground",
-                  active && "bg-accent text-accent-foreground",
+                  "relative flex h-[58px] flex-1 flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
+                  active && "font-semibold text-primary",
                 )}
               >
-                <Icon className="size-5" />
+                <span className={cn("absolute top-0 h-0.5 w-8 rounded-full bg-primary transition-opacity", active ? "opacity-100" : "opacity-0")} />
+                <Icon className="size-[19px]" strokeWidth={active ? 2.2 : 1.8} />
                 {item.label}
               </Link>
             );
           })}
         </div>
+        <div className="h-[env(safe-area-inset-bottom)]" />
       </nav>
     );
   }
 
   return (
-    <nav className="grid gap-1">
+    <nav className="grid gap-0.5" aria-label="ניווט ראשי">
       {items.map((item) => {
         const href = `${base}${item.href}`;
-        const active = pathname === href;
+        const active = item.href === "" ? pathname === href : pathname.startsWith(href);
         const Icon = item.icon;
 
         return (
           <Link
             key={href}
             href={href}
+            aria-current={active ? "page" : undefined}
             className={cn(
-              "flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-              active && "bg-accent text-accent-foreground",
+              "flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              active && "bg-accent text-primary",
             )}
           >
             <Icon className="size-4" />
@@ -80,11 +84,11 @@ export function TeamNav({
         );
       })}
       {canManage(role) ? (
-        <><Link
+        <div className="mt-3 border-t pt-3"><Link
           href={`${base}/leave`}
           className={cn(
-            "mt-3 flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            pathname === `${base}/leave` && "bg-accent text-accent-foreground",
+            "flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+            pathname.startsWith(`${base}/leave`) && "bg-accent text-primary",
           )}
         >
           <CalendarOff className="size-4" />
@@ -92,13 +96,13 @@ export function TeamNav({
         </Link><Link
           href={`${base}/settings`}
           className={cn(
-            "mt-3 flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-            pathname === `${base}/settings` && "bg-accent text-accent-foreground",
+            "flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+            pathname.startsWith(`${base}/settings`) && "bg-accent text-primary",
           )}
         >
           <Settings className="size-4" />
           הגדרות
-        </Link></>
+        </Link></div>
       ) : null}
     </nav>
   );
