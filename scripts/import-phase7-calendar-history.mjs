@@ -35,6 +35,7 @@ const supabase = createClient(url, secretKey, { auth: { autoRefreshToken: false,
 const reservePeriod2026 = readJson("kav-2026-reserve-period.json");
 const legacyPeriod2025 = readJson("kav-legacy-2025-period.json");
 const legacyAttendance = readJson("kav-legacy-2025-attendance.json");
+const defaultEquipmentTypes = readJson("kav-default-equipment-types.json");
 
 const report = {
   periodsCreated: [], periodsReused: [],
@@ -42,6 +43,7 @@ const report = {
   eventsCreated: [], eventsSkipped: [],
   holidaysCreated: [], holidaysSkipped: [],
   pendingLeaveImported: [], pendingLeaveSkipped: [],
+  equipmentTypesCreated: [], equipmentTypesSkipped: [],
   equipmentImported: [],
   historicalAttendanceDates: [], historicalPresenceRowsCreated: [], historicalPresenceRowsUpdated: [],
   historicalRotationMembership: [],
@@ -99,6 +101,11 @@ async function main() {
     note: "Legacy sheet 'צלם' inspected: 0 non-empty equipment values for any person. No equipment rows created.",
   });
 
+  // Default equipment TYPES (not actual assigned items — the legacy sheet had none to
+  // import) so a manager can immediately assign a weapon/optic/amral/etc to a person
+  // without first having to configure a type in הגדרות.
+  await createDefaultEquipmentTypes(team.id, defaultEquipmentTypes.equipmentTypes ?? []);
+
   // ---- F/G/H: historical קו כיסופים 2025 period, rotation groups, attendance ----
   const period2025 = await getOrCreatePeriod(team.id, legacyPeriod2025.period);
   await createEvents(team, period2025.id, legacyPeriod2025.milestoneEvents ?? [], "event");
@@ -148,6 +155,22 @@ async function getPeople(teamId) {
   const { data, error } = await supabase.from("people").select("id, full_name").eq("team_id", teamId);
   if (error) throw new Error(`Unable to load people: ${error.message}`);
   return data ?? [];
+}
+
+async function createDefaultEquipmentTypes(teamId, types) {
+  for (const type of types) {
+    const { data: existing, error } = await supabase.from("equipment_types").select("id")
+      .eq("team_id", teamId).eq("name", type.name).maybeSingle();
+    if (error) throw new Error(`Unable to look up equipment type '${type.name}': ${error.message}`);
+    if (existing) { report.equipmentTypesSkipped.push({ name: type.name, reason: "already exists" }); continue; }
+
+    const { error: insertError } = await supabase.from("equipment_types").insert({
+      team_id: teamId, name: type.name, category: type.category,
+      serial_required: Boolean(type.serial_required), is_active: true,
+    });
+    if (insertError) throw new Error(`Unable to create equipment type '${type.name}': ${insertError.message}`);
+    report.equipmentTypesCreated.push({ name: type.name, category: type.category });
+  }
 }
 
 async function getOrCreatePeriod(teamId, period) {

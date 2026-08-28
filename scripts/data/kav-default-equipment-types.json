@@ -1,0 +1,11 @@
+{
+  "note": "ברירת מחדל של סוגי ציוד לצוות, תואמות למבנה המושגי מהגיליון הישן (סוג נשק/צ נשק, סוג כוונת/צ כוונת, סוג אמר\"ל/צ אמר\"ל, נשק נוסף, פק\"ל נוסף, ציוד נוסף). אלו רק סוגי ציוד (תבניות) — לא נתוני ציוד בפועל, כי הגיליון הישן היה ריק. מנהל משייך פרטים בפועל (דגם, מספר סידורי) לכל איש צוות בנפרד דרך פרופיל אישי > ציוד.",
+  "equipmentTypes": [
+    { "name": "נשק ראשי", "category": "WEAPON", "serial_required": true },
+    { "name": "נשק נוסף", "category": "WEAPON", "serial_required": true },
+    { "name": "כוונת", "category": "OPTIC", "serial_required": true },
+    { "name": "אמר\"ל", "category": "AMRAL", "serial_required": true },
+    { "name": "פק\"ל נוסף", "category": "PAKAL", "serial_required": false },
+    { "name": "ציוד נוסף", "category": "OTHER", "serial_required": false }
+  ]
+}
