@@ -32,6 +32,12 @@ export type DashboardData = {
   expectedOnBase: number;
   issues: string[];
   nextTask: Awaited<ReturnType<typeof getNextPersonalTask>>;
+  personalStatus: {
+    attendance: "absent" | "present" | "unreported";
+    fullName: string;
+    isOnLeave: boolean;
+    state: "base" | "home" | null;
+  } | null;
   qualificationReadiness: {
     current: number;
     name: string;
@@ -65,6 +71,7 @@ export async function getDashboardData(
     upcomingEventResult,
     requirementsResult,
     personPakalsResult,
+    currentPersonResult,
   ] = await Promise.all([
     supabase
       .from("people")
@@ -88,12 +95,21 @@ export async function getDashboardData(
       .select("pakal_type_id")
       .eq("team_id", team.id)
       .eq("is_active", true),
+    userId
+      ? supabase
+          .from("people")
+          .select("id, full_name")
+          .eq("team_id", team.id)
+          .eq("auth_user_id", userId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   assertOk(activePeopleResult.error, "active people");
   assertOk(upcomingEventResult.error, "upcoming event");
   assertOk(requirementsResult.error, "pakal requirements");
   assertOk(personPakalsResult.error, "person pakals");
+  assertOk(currentPersonResult.error, "current person");
 
   const [operationalSchedule, operationalDay, nextTask] = await Promise.all([
     getOperationalScheduleSummary(supabase, team, today),
@@ -133,6 +149,11 @@ export async function getDashboardData(
   if (operationalDay.summary.unreported) issues.push(`${operationalDay.summary.unreported} טרם דווחו בנוכחות`);
   if (operationalDay.summary.unexpectedPresent) issues.push(`${operationalDay.summary.unexpectedPresent} נוכחות חריגה`);
 
+  const currentPerson = currentPersonResult.data;
+  const personalResolution = currentPerson
+    ? operationalDay.people.find((person) => person.id === currentPerson.id)?.resolution
+    : null;
+
   return {
     activePeople: activePeopleResult.count ?? 0,
     canManage: manager,
@@ -150,6 +171,14 @@ export async function getDashboardData(
     expectedOnBase: operationalDay.period ? operationalDay.summary.expected : expectedOnBase,
     issues,
     nextTask,
+    personalStatus: currentPerson && personalResolution
+      ? {
+          attendance: personalResolution.attendance,
+          fullName: currentPerson.full_name,
+          isOnLeave: Boolean(personalResolution.leave),
+          state: personalResolution.state,
+        }
+      : null,
     qualificationReadiness: requirements.map((requirement) => ({
       current: pakalCounts.get(requirement.pakal_types.id) ?? 0,
       name: requirement.pakal_types.name,

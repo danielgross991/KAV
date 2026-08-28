@@ -11,6 +11,7 @@ import {
   generateRotationBlocksAction, publishReservePeriodAction, savePhaseAction,
   saveRotationGroupAction, saveRotationOverrideAction, saveScheduleEventAction,
 } from "@/app/[teamSlug]/schedule/actions";
+import { AppPage, EmptyState, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,18 +27,25 @@ export function ScheduleView({ data, initialManage, view }: { data: ScheduleData
   const [manage, setManage] = useState(initialManage);
   const router = useRouter();
   const period = data.selectedPeriod;
-  return <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-    <header className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div><Badge variant="secondary">{data.team.name}</Badge><h1 className="mt-3 text-3xl font-bold tracking-normal">לו״ז מבצעי</h1>{period ? <p className="mt-2 text-sm text-muted-foreground">{period.name} · {shortDate(period.starts_on)}–{shortDate(period.ends_on)}{period.location ? ` · ${period.location}` : ""}</p> : null}</div>
-      <div className="flex flex-wrap gap-2">{data.periods.length ? <select aria-label="תקופת מילואים" className="h-10 rounded-md border bg-background px-3 text-sm" value={period?.id ?? ""} onChange={(event) => router.push(`/${data.team.slug}/schedule?period=${event.target.value}&view=${view}`)}>{data.periods.map((item) => <option key={item.id} value={item.id}>{item.name} · {statusLabel(item.status)}</option>)}</select> : null}{data.canManage ? <Button variant={manage ? "secondary" : "outline"} onClick={() => setManage((value) => !value)}><Plus className="size-4" />ניהול תקופה</Button> : null}</div>
-    </header>
+  return <AppPage>
+    <PageHeader
+      eyebrow={data.team.name}
+      title="לו״ז"
+      subtitle={period ? `${period.name} · ${shortDate(period.starts_on)}–${shortDate(period.ends_on)}${period.location ? ` · ${period.location}` : ""}` : "תכנון תקופות, סבבים ואירועים"}
+      action={data.canManage ? <Button size="icon" variant={manage ? "secondary" : "outline"} aria-label="ניהול תקופה" onClick={() => setManage((value) => !value)}><Plus className="size-4" /></Button> : null}
+    >
+      <div className="space-y-2.5">
+        {data.periods.length ? <select aria-label="תקופת מילואים" className="h-10 w-full rounded-md border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" value={period?.id ?? ""} onChange={(event) => router.push(`/${data.team.slug}/schedule?period=${event.target.value}&view=${view}`)}>{data.periods.map((item) => <option key={item.id} value={item.id}>{item.name} · {statusLabel(item.status)}</option>)}</select> : null}
+        {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={view === "agenda"} href={href(data, "agenda")}>אג׳נדה</Tab><Tab active={view === "month"} href={href(data, "month")}>חודש</Tab><Tab active={view === "rotations"} href={href(data, "rotations")}>סבבים</Tab></nav> : null}
+      </div>
+    </PageHeader>
     {manage && data.canManage ? <Manager data={data} /> : null}
-    {!period ? <Empty /> : <><nav className="mb-4 flex border-b"><Tab active={view === "month"} href={href(data, "month")}>חודש</Tab><Tab active={view === "agenda"} href={href(data, "agenda")}>אג׳נדה</Tab><Tab active={view === "rotations"} href={href(data, "rotations")}>סבבים</Tab></nav>{view === "month" ? <Month data={data} /> : view === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}</>}
-  </main>;
+    {!period ? <Empty /> : view === "month" ? <Month data={data} /> : view === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
+  </AppPage>;
 }
 
-function Empty() { return <section className="grid min-h-72 place-items-center border-y text-center"><div><CalendarDays className="mx-auto size-9 text-muted-foreground" /><h2 className="mt-3 text-lg font-semibold">אין עדיין תקופת מילואים</h2><p className="mt-2 text-sm text-muted-foreground">מנהל יכול ליצור תקופה חדשה ולהתחיל לבנות את הלו״ז.</p></div></section>; }
-function Tab({ active, children, href }: { active: boolean; children: React.ReactNode; href: string }) { return <Link className={cn("border-b-2 px-5 py-3 text-sm font-medium", active ? "border-primary text-primary" : "border-transparent text-muted-foreground")} href={href}>{children}</Link>; }
+function Empty() { return <EmptyState icon={<CalendarDays className="size-4" />} title="אין עדיין תקופת מילואים" description="מנהל יכול ליצור תקופה חדשה ולהתחיל לבנות את הלו״ז." />; }
+function Tab({ active, children, href }: { active: boolean; children: React.ReactNode; href: string }) { return <Link aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:text-foreground")} href={href}>{children}</Link>; }
 function href(data: ScheduleData, view: string) { return `/${data.team.slug}/schedule?period=${data.selectedPeriod?.id}&view=${view}`; }
 
 function Month({ data }: { data: ScheduleData }) {
@@ -49,9 +57,9 @@ function Month({ data }: { data: ScheduleData }) {
 
 function Agenda({ data }: { data: ScheduleData }) {
   const period = data.selectedPeriod!;
-  return <section className="divide-y rounded-lg border bg-card">{eachCalendarDate(period.starts_on, period.ends_on).map((date) => { const day = getDaySchedule(data, date); return <Link className="grid gap-3 p-4 hover:bg-muted/30 md:grid-cols-[12rem_1fr_12rem]" href={`/${data.team.slug}/schedule/${date}?period=${period.id}`} key={date}><div><b>{fullDate(date)}</b>{day.phase ? <div className="mt-1 text-xs text-muted-foreground">{day.phase.name}</div> : null}</div><div className="grid grid-cols-2 gap-3"><Summary label="בבסיס" count={day.expectedBase.length} groups={day.groups.filter((group) => group.block?.state === "base").map((group) => group.name)} /><Summary label="בבית" count={day.expectedHome.length} groups={day.groups.filter((group) => group.block?.state === "home").map((group) => group.name)} /></div><div className="text-sm text-muted-foreground">{day.tasks.slice(0, 2).map((task) => <div className="text-primary" key={task.id}>{time(task.starts_at, data.team.timezone)} · {task.title}</div>)}{day.events.slice(0, 2).map((event) => <div key={event.id}>{event.is_all_day ? "כל היום" : time(event.starts_at, data.team.timezone)} · {event.title}</div>)}</div></Link>; })}</section>;
+  return <div className="space-y-3">{eachCalendarDate(period.starts_on, period.ends_on).map((date) => { const day = getDaySchedule(data, date); const isToday = date === data.today; return <section key={date} aria-label={fullDate(date)}><div className="sticky top-[132px] z-10 -mx-4 flex items-center gap-2 bg-background/95 px-4 py-1.5 backdrop-blur lg:static lg:mx-0 lg:px-0"><h2 className="text-sm font-semibold">{isToday ? "היום · " : ""}{shortWeekDate(date)}</h2><span className="h-px flex-1 bg-border" /><Badge variant={day.groups.some((group) => group.block?.state === "base") ? "success" : "muted"}>{day.expectedBase.length} בבסיס</Badge></div><Link className="mt-1.5 block overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-colors hover:border-primary/30" href={`/${data.team.slug}/schedule/${date}?period=${period.id}`}><div className="grid gap-3 p-3.5 md:grid-cols-[10rem_1fr_15rem]"><div><b className="text-sm">{day.phase?.name ?? "יום מבצעי"}</b><p className="mt-1 text-xs text-muted-foreground">{day.groups.filter((group) => group.block?.state === "base").map((group) => group.name).join(", ") || "אין סבב בבסיס"}</p></div><div className="grid grid-cols-2 gap-3"><Summary label="בבסיס" count={day.expectedBase.length} groups={[]} /><Summary label="בבית" count={day.expectedHome.length} groups={[]} /></div><div className="space-y-1 text-sm text-muted-foreground">{day.tasks.slice(0, 2).map((task) => <div className="truncate font-medium text-primary" key={task.id}>{time(task.starts_at, data.team.timezone)} · {task.title}</div>)}{day.events.slice(0, 2).map((event) => <div className="truncate" key={event.id}>{event.is_all_day ? "כל היום" : time(event.starts_at, data.team.timezone)} · {event.title}</div>)}{!day.tasks.length && !day.events.length ? <span className="text-xs">אין אירועים או משימות</span> : null}</div></div><div className="flex min-h-9 items-center justify-between border-t bg-muted/35 px-3.5 text-sm font-medium text-primary"><span>פירוט היום</span><span aria-hidden>←</span></div></Link></section>; })}</div>;
 }
-function Summary({ count, groups, label }: { count: number; groups: string[]; label: string }) { return <div><div className="text-xs text-muted-foreground">{label}</div><div className="mt-1 text-sm"><b>{groups.join(", ") || "אין"}</b>{groups.length ? ` · ${count} אנשים` : ""}</div></div>; }
+function Summary({ count, groups, label }: { count: number; groups: string[]; label: string }) { return <div><div className="text-xs text-muted-foreground">{label}</div><div className="kav-num mt-1 text-sm font-semibold">{count}{groups.length ? <span className="mr-1 font-normal text-muted-foreground">· {groups.join(", ")}</span> : null}</div></div>; }
 
 function Timeline({ data }: { data: ScheduleData }) {
   const period = data.selectedPeriod!; const days = calendarDayDifference(period.starts_on, period.ends_on) + 1;
@@ -60,7 +68,7 @@ function Timeline({ data }: { data: ScheduleData }) {
 
 function Manager({ data }: { data: ScheduleData }) {
   const create = createReservePeriodAction.bind(null, data.team.slug); const period = data.selectedPeriod;
-  return <section className="mb-6 border-y bg-card/60 py-5"><div className="mb-4 flex justify-between"><div><h2 className="text-lg font-semibold">ניהול תקופת מילואים</h2><p className="text-sm text-muted-foreground">התקופה נשמרת כטיוטה עד לפרסום.</p></div>{period ? <Badge variant="outline">{statusLabel(period.status)}</Badge> : null}</div><details className="border-b py-3" open={!period}><summary className="cursor-pointer font-medium">1. פרטי תקופה</summary><form action={create} className="mt-4 grid gap-3 md:grid-cols-4"><Field name="name" label="שם התקופה" required /><Field name="location" label="מיקום" /><Field name="starts_on" label="תאריך התחלה" type="date" required /><Field name="ends_on" label="תאריך סיום" type="date" required /><div><Button>יצירת תקופה כטיוטה</Button></div></form></details>{period ? <><Phases data={data} /><Groups data={data} /><Assignments data={data} /><Generator data={data} /><Blocks data={data} /><Overrides data={data} /><Events data={data} /><Publish data={data} /></> : null}</section>;
+  return <section className="mb-5 rounded-lg border bg-card p-4 shadow-[0_1px_2px_rgba(20,22,26,0.04)]"><div className="mb-4 flex justify-between gap-3"><div><h2 className="text-base font-semibold">ניהול תקופת מילואים</h2><p className="mt-0.5 text-sm text-muted-foreground">התקופה נשמרת כטיוטה עד לפרסום.</p></div>{period ? <Badge variant="outline">{statusLabel(period.status)}</Badge> : null}</div><details className="border-b py-3" open={!period}><summary className="cursor-pointer font-medium">1. פרטי תקופה</summary><form action={create} className="mt-4 grid gap-3 md:grid-cols-4"><Field name="name" label="שם התקופה" required /><Field name="location" label="מיקום" /><Field name="starts_on" label="תאריך התחלה" type="date" required /><Field name="ends_on" label="תאריך סיום" type="date" required /><div><Button>יצירת תקופה כטיוטה</Button></div></form></details>{period ? <><Phases data={data} /><Groups data={data} /><Assignments data={data} /><Generator data={data} /><Blocks data={data} /><Overrides data={data} /><Events data={data} /><Publish data={data} /></> : null}</section>;
 }
 
 function Phases({ data }: { data: ScheduleData }) {
@@ -115,6 +123,7 @@ function State({ state }: { state: string }) { return <Badge variant={state === 
 function stateLabel(value?: string | null) { return value === "base" ? "בסיס" : value === "home" ? "בית" : "לא הוגדר"; }
 function statusLabel(value: string) { return ({ draft: "טיוטה", published: "פורסם", active: "פעיל", completed: "הושלם", archived: "ארכיון" } as Record<string, string>)[value] ?? value; }
 function shortDate(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
+function shortWeekDate(date: string) { return new Intl.DateTimeFormat("he-IL", { weekday: "short", day: "numeric", month: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function time(iso: string, zone: string) { return new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: zone }).format(new Date(iso)); }
 function timeValue(iso: string, zone: string) { return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", minute: "2-digit", timeZone: zone }).format(new Date(iso)); }

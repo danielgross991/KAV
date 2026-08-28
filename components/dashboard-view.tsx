@@ -1,257 +1,343 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, CalendarOff, Check, ClipboardList, Clock, UserCheck, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CalendarClock,
+  Check,
+  ClipboardList,
+  Clock3,
+  Home,
+  UserCheck,
+  Users,
+} from "lucide-react";
 
+import { AppPage, PageHeader, SectionHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardData } from "@/lib/kav/dashboard";
 
 export function DashboardView({ data }: { data: DashboardData }) {
+  return data.canManage ? <ManagerDashboard data={data} /> : <ViewerDashboard data={data} />;
+}
+
+function ManagerDashboard({ data }: { data: DashboardData }) {
+  const home = Math.max(0, data.activePeople - data.expectedOnBase - data.approvedLeaveToday);
+
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-      <header className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <Badge variant="secondary">{data.team.name}</Badge>
-          <h1 className="mt-3 text-3xl font-bold tracking-normal">מה קורה היום?</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            תמונת מצב מבוססת נתונים חיים מה-Supabase הקיים.
-          </p>
+    <AppPage>
+      <PageHeader
+        eyebrow={data.team.name}
+        title="מה קורה היום?"
+        subtitle={formatToday(data.team.timezone)}
+        action={
+          <Link
+            className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            href={`/${data.team.slug}/settings`}
+            aria-label="הגדרות"
+          >
+            <Clock3 className="size-4" />
+          </Link>
+        }
+      />
+
+      <section className="overflow-hidden rounded-lg bg-primary text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
+        <div className="flex items-center justify-between gap-3 px-4 pt-3.5">
+          <p className="text-xs font-medium text-white/70">תמונת מצב תפעולית</p>
+          {data.currentPeriod ? (
+            <span className="rounded-md border border-white/20 bg-white/10 px-2 py-1 text-xs text-white/85">
+              {data.currentPeriod.name}
+            </span>
+          ) : null}
         </div>
-        <div className="text-sm text-muted-foreground">
-          {new Intl.DateTimeFormat("he-IL", {
-            dateStyle: "full",
-            timeZone: data.team.timezone,
-          }).format(new Date())}
+        <div className="grid grid-cols-3 gap-4 px-4 pb-4 pt-2">
+          <HeroMetric dominant label="צפויים בבסיס" value={data.expectedOnBase} />
+          <HeroMetric label="בבית" value={home} muted />
+          <HeroMetric label="ביציאה" value={data.approvedLeaveToday} info />
         </div>
-      </header>
-
-      {data.canManage ? <div className="mb-4 flex flex-wrap gap-2">
-        <Link className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-accent" href={`/${data.team.slug}/attendance`}><UserCheck className="size-4" />עדכון נוכחות</Link>
-        <Link className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-accent" href={`/${data.team.slug}/leave`}><CalendarOff className="size-4" />ניהול יציאות</Link>
-      </div> : null}
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          icon={<Users className="size-5" />}
-          label="צפויים בבסיס"
-          value={data.expectedOnBase}
-          detail={`${data.activePeople} פעילים בצוות`}
-        />
-        <MetricCard
-          icon={<Clock className="size-5" />}
-          label="חופשה מאושרת"
-          value={data.approvedLeaveToday}
-          detail="משפיע על זמינות יומית"
-        />
-        <MetricCard
-          icon={<Check className="size-5" />}
-          label="נוכחות"
-          value={`${data.attendance.present}/${data.attendance.total}`}
-          detail={data.attendance.unexpectedPresent
-            ? `${data.attendance.unexpectedPresent} נוכחות חריגה`
-            : data.attendance.submitted ? "דווח וסומן" : "טרם הוגש להיום"}
-        />
-        <MetricCard
-          icon={<AlertTriangle className="size-5" />}
-          label="פערים פתוחים"
-          value={data.issues.length}
-          detail={data.issues.length ? "דורש טיפול מנהל" : "אין פערים ידועים"}
-        />
+        <Link
+          href={`/${data.team.slug}/attendance`}
+          className="flex min-h-11 items-center justify-between border-t border-white/15 bg-white/[0.06] px-4 py-2.5 text-sm transition-colors hover:bg-white/10"
+        >
+          <span className="flex items-center gap-2">
+            <UserCheck className="size-4 text-white/70" />
+            <b>נוכחות היום</b>
+            <span className="kav-num text-white/65">{data.attendance.present}/{data.attendance.total}</span>
+          </span>
+          <ArrowLeft className="size-4 text-white/60" />
+        </Link>
       </section>
 
-      <section className="mt-4 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>תקופת מילואים נוכחית</CardTitle>
-            <CardDescription>תקופה וסבבי רוטציה להיום</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.currentPeriod ? (
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-semibold">{data.currentPeriod.name}</h2>
-                  <Badge variant="outline">{data.currentPeriod.status}</Badge>
-                </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {formatDate(data.currentPeriod.startsOn)} -{" "}
-                  {formatDate(data.currentPeriod.endsOn)}
-                  {data.currentPeriod.location ? ` · ${data.currentPeriod.location}` : ""}
-                </p>
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  {data.rotationStatus.map((rotation) => (
-                    <div
-                      key={`${rotation.name}-${rotation.state}`}
-                      className="rounded-lg border bg-muted/30 p-4"
-                    >
-                      <div className="font-medium">{rotation.name}</div>
-                      <Badge className="mt-2" variant={rotation.state === "base" ? "success" : "muted"}>
-                        {stateLabel(rotation.state)}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                title="אין תקופת מילואים פעילה"
-                description="בטבלת reserve_periods לא נמצאה תקופה שמכסה את התאריך הנוכחי."
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>אירוע קרוב</CardTitle>
-            <CardDescription>האירוע העתידי הקרוב ביותר בלו״ז</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.upcomingEvent ? (
-              <div className="flex gap-3">
-                <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-                  <CalendarClock className="size-5" />
-                </span>
-                <div>
-                  <div className="font-medium">{data.upcomingEvent.title}</div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {formatDateTime(data.upcomingEvent.startsAt)}
-                  </p>
-                  <Badge className="mt-3" variant="outline">
-                    {eventTypeLabel(data.upcomingEvent.type)}
-                  </Badge>
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                title="אין אירועים עתידיים"
-                description="לא נמצאו אירועים עתידיים בטבלת schedule_events."
-              />
-            )}
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="mt-4 border-y py-4">
-        <div className="flex items-center gap-2"><ClipboardList className="size-5 text-primary" /><h2 className="font-semibold">המשימה הבאה שלך</h2></div>
-        {data.nextTask ? <Link className="mt-3 grid gap-2 rounded-md border bg-card p-4 hover:border-primary/40 sm:grid-cols-[1fr_auto]" href={`/${data.team.slug}/tasks`}><div><b>{data.nextTask.title}</b><p className="mt-1 text-sm text-muted-foreground">{formatDateTime(data.nextTask.startsAt)}{data.nextTask.teammateNames.length ? ` · עם ${data.nextTask.teammateNames.join(" ו")}` : ""}</p></div><span className="text-sm font-medium text-primary">למשימות</span></Link> : <p className="mt-3 text-sm text-muted-foreground">אין לך משימות קרובות</p>}
-      </section>
-
-      <section className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>כשירות פק״לים</CardTitle>
-            <CardDescription>ספירה מול דרישות הצוות</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {data.qualificationReadiness.length > 0 ? (
-              data.qualificationReadiness.map((item) => {
-                const ready = item.current >= item.required;
-                return (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between rounded-lg border bg-muted/20 p-3"
-                  >
-                    <div className="font-medium">{item.name}</div>
-                    <Badge variant={ready ? "success" : "warning"}>
-                      {item.current} / {item.required}
-                    </Badge>
-                  </div>
-                );
-              })
-            ) : (
-              <EmptyState
-                title="אין דרישות פק״ל"
-                description="לא נמצאו רשומות פעילות ב-team_pakal_requirements."
-              />
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>פערים לטיפול</CardTitle>
-            <CardDescription>בעיות שהמערכת מזהה עבור היום</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {data.issues.length > 0 ? (
-              <div className="grid gap-2">
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
+        <div className="space-y-4">
+          <section>
+            <SectionHeader title="דורש טיפול" hint={`${data.issues.length} פריטים`} />
+            {data.issues.length ? (
+              <div className="space-y-2">
                 {data.issues.map((issue) => (
-                  <div
+                  <Link
                     key={issue}
-                    className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                    href={`/${data.team.slug}/attendance`}
+                    className="flex min-h-14 items-center gap-3 rounded-lg border border-warning/20 bg-warning-soft px-3.5 py-3 text-sm text-warning transition-colors hover:border-warning/40"
                   >
-                    {issue}
-                  </div>
+                    <AlertTriangle className="size-4 shrink-0" />
+                    <span className="min-w-0 flex-1 font-medium">{issue}</span>
+                    <ArrowLeft className="size-4 shrink-0" />
+                  </Link>
                 ))}
               </div>
             ) : (
-              <EmptyState title="אין פערים פתוחים" description="המידע להיום נראה תקין." />
+              <div className="flex min-h-14 items-center gap-3 rounded-lg border bg-card px-3.5 text-sm">
+                <Check className="size-4 text-success" />
+                <span className="font-medium">הכול תקין</span>
+              </div>
             )}
-          </CardContent>
-        </Card>
-      </section>
-    </main>
+          </section>
+
+          <Card>
+            <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+              <div>
+                <CardTitle>נוכחות היום</CardTitle>
+                <p className="kav-num mt-0.5 text-sm text-muted-foreground">
+                  {data.attendance.present}/{data.attendance.total} סומנו כנוכחים
+                </p>
+              </div>
+              <AttendanceStatus data={data} />
+            </CardHeader>
+            <CardContent>
+              <div className="flex h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                <span className="bg-success" style={{ width: ratio(data.attendance.present, data.attendance.total) }} />
+                <span className="bg-destructive" style={{ width: ratio(data.attendance.absent, data.attendance.total) }} />
+              </div>
+              <Link
+                className="mt-3 flex h-9 items-center justify-center rounded-md border bg-card text-sm font-medium transition-colors hover:bg-muted"
+                href={`/${data.team.slug}/attendance`}
+              >
+                {data.attendance.submitted ? "פתח נוכחות" : "השלם דיווח נוכחות"}
+              </Link>
+            </CardContent>
+          </Card>
+
+          <NextTask data={data} />
+        </div>
+
+        <div className="space-y-4">
+          <CurrentPeriod data={data} />
+          <UpcomingEvent data={data} />
+          <QualificationReadiness data={data} />
+        </div>
+      </div>
+    </AppPage>
   );
 }
 
-function MetricCard({
-  detail,
-  icon,
+function ViewerDashboard({ data }: { data: DashboardData }) {
+  const personal = data.personalStatus;
+  const firstName = personal?.fullName.split(" ")[0];
+
+  return (
+    <AppPage className="max-w-[820px]">
+      <PageHeader
+        eyebrow={data.team.name}
+        title={firstName ? `שלום ${firstName}` : "הבית שלי"}
+        subtitle={formatToday(data.team.timezone)}
+      />
+
+      <section className="rounded-lg bg-primary px-4 py-4 text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
+        <div className="flex items-center gap-2 text-xs font-medium text-white/70">
+          {personal?.state === "home" ? <Home className="size-4" /> : <Users className="size-4" />}
+          הסטטוס שלך עכשיו
+        </div>
+        <p className="mt-1.5 text-[1.8rem] font-bold leading-9">{personalStatusLabel(personal)}</p>
+        <div className="mt-3 flex flex-wrap gap-2 border-t border-white/15 pt-3">
+          {personal ? <Badge className="border-white/20 bg-white/10 text-white">{attendanceLabel(personal.attendance)}</Badge> : null}
+          {data.currentPeriod ? <Badge className="border-white/20 bg-white/10 text-white">{data.currentPeriod.name}</Badge> : null}
+        </div>
+      </section>
+
+      <div className="mt-4 space-y-4">
+        <NextTask data={data} personal />
+        <UpcomingEvent data={data} />
+        <CurrentPeriod data={data} compact />
+      </div>
+    </AppPage>
+  );
+}
+
+function HeroMetric({
+  dominant,
+  info,
   label,
+  muted,
   value,
 }: {
-  detail: string;
-  icon: React.ReactNode;
+  dominant?: boolean;
+  info?: boolean;
   label: string;
-  value: number | string;
+  muted?: boolean;
+  value: number;
 }) {
   return (
+    <div className="min-w-0">
+      <p className={`kav-num font-bold ${dominant ? "text-[2.1rem] leading-9" : "text-2xl leading-8"} ${muted ? "text-white/60" : info ? "text-blue-200" : "text-white"}`}>
+        {value}
+      </p>
+      <p className="mt-0.5 truncate text-xs text-white/65">{label}</p>
+    </div>
+  );
+}
+
+function AttendanceStatus({ data }: { data: DashboardData }) {
+  if (data.attendance.absent) return <Badge variant="danger">{data.attendance.absent} לא נוכחים</Badge>;
+  if (!data.attendance.submitted) return <Badge variant="warning">טרם הושלם</Badge>;
+  return <Badge variant="success">הושלם</Badge>;
+}
+
+function CurrentPeriod({ data, compact = false }: { data: DashboardData; compact?: boolean }) {
+  return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between gap-3 space-y-0">
-        <CardTitle className="text-sm text-muted-foreground">{label}</CardTitle>
-        <span className="text-primary">{icon}</span>
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
+        <div>
+          <CardTitle>סבבים</CardTitle>
+          <p className="mt-0.5 text-sm text-muted-foreground">
+            {data.currentPeriod ? `${shortDate(data.currentPeriod.startsOn)}–${shortDate(data.currentPeriod.endsOn)}` : "אין תקופה פעילה"}
+          </p>
+        </div>
+        {data.currentPeriod ? <Badge variant="outline">{statusLabel(data.currentPeriod.status)}</Badge> : null}
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
-        <p className="mt-2 text-sm text-muted-foreground">{detail}</p>
+        {data.currentPeriod ? (
+          <div className="divide-y">
+            {data.rotationStatus.slice(0, compact ? 2 : 4).map((rotation) => (
+              <div className="flex items-center justify-between gap-3 py-2.5 first:pt-0 last:pb-0" key={`${rotation.name}-${rotation.state}`}>
+                <span className="flex items-center gap-2.5 text-sm font-medium">
+                  <span className={`h-8 w-1 rounded-full ${rotation.state === "base" ? "bg-success" : "bg-border"}`} />
+                  {rotation.name}
+                </span>
+                <Badge variant={rotation.state === "base" ? "success" : "muted"}>{stateLabel(rotation.state)}</Badge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">אין תקופת מילואים פעילה להיום.</p>
+        )}
       </CardContent>
     </Card>
   );
 }
 
-function EmptyState({ description, title }: { description: string; title: string }) {
+function UpcomingEvent({ data }: { data: DashboardData }) {
   return (
-    <div className="rounded-lg border border-dashed p-5">
-      <div className="font-medium">{title}</div>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
-    </div>
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle>הקרוב</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {data.upcomingEvent ? (
+          <div className="flex gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-info-soft text-info">
+              <CalendarClock className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{data.upcomingEvent.title}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{formatDateTime(data.upcomingEvent.startsAt, data.team.timezone)}</p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">אין אירועים קרובים.</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
-function formatDate(value: string) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium" }).format(new Date(value));
+function NextTask({ data, personal = false }: { data: DashboardData; personal?: boolean }) {
+  return (
+    <section>
+      <SectionHeader title={personal ? "המשימה הבאה שלי" : "המשימה הבאה שלך"} />
+      {data.nextTask ? (
+        <Link
+          href={`/${data.team.slug}/tasks`}
+          className="flex min-h-20 items-center gap-3 rounded-lg border bg-card p-3.5 shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-colors hover:border-primary/35"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-accent text-primary">
+            <ClipboardList className="size-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <b className="block truncate text-sm">{data.nextTask.title}</b>
+            <span className="mt-1 block text-sm text-muted-foreground">
+              {formatDateTime(data.nextTask.startsAt, data.team.timezone)}
+              {data.nextTask.teammateNames.length ? ` · עם ${data.nextTask.teammateNames.join(" ו")}` : ""}
+            </span>
+          </span>
+          <ArrowLeft className="size-4 shrink-0 text-muted-foreground" />
+        </Link>
+      ) : (
+        <div className="flex min-h-16 items-center gap-3 rounded-lg border bg-card px-3.5 text-sm text-muted-foreground">
+          <ClipboardList className="size-4" />
+          אין לך משימות קרובות
+        </div>
+      )}
+    </section>
+  );
 }
 
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("he-IL", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+function QualificationReadiness({ data }: { data: DashboardData }) {
+  if (!data.qualificationReadiness.length) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-3"><CardTitle>כשירות פק״לים</CardTitle></CardHeader>
+      <CardContent className="divide-y">
+        {data.qualificationReadiness.map((item) => {
+          const ready = item.current >= item.required;
+          return (
+            <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0" key={item.name}>
+              <span className="text-sm font-medium">{item.name}</span>
+              <Badge variant={ready ? "success" : "warning"}>{item.current}/{item.required}</Badge>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+function personalStatusLabel(personal: DashboardData["personalStatus"]) {
+  if (!personal) return "אין סטטוס זמין";
+  if (personal.isOnLeave) return "אתה ביציאה";
+  if (personal.state === "base") return "אתה בבסיס";
+  if (personal.state === "home") return "אתה בבית";
+  return "אין תכנון פעיל";
+}
+
+function attendanceLabel(value: "absent" | "present" | "unreported") {
+  if (value === "present") return "נוכח";
+  if (value === "absent") return "לא נוכח";
+  return "טרם דווח";
+}
+
+function ratio(value: number, total: number) {
+  return total ? `${Math.min(100, (value / total) * 100)}%` : "0%";
+}
+
+function formatToday(timeZone: string) {
+  return new Intl.DateTimeFormat("he-IL", { dateStyle: "full", timeZone }).format(new Date());
+}
+
+function shortDate(value: string) {
+  return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+}
+
+function formatDateTime(value: string, timeZone: string) {
+  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(value));
 }
 
 function stateLabel(state: string) {
-  if (["base", "on_base", "in_base"].includes(state)) return "בבסיס";
-  if (["home", "off_base"].includes(state)) return "בבית";
-  return state;
+  return ["base", "on_base", "in_base"].includes(state) ? "בבסיס" : ["home", "off_base"].includes(state) ? "בבית" : state;
 }
 
-function eventTypeLabel(type: string) {
-  const labels: Record<string, string> = {
-    briefing: "תדריך",
-    changeover: "החלפה",
-    family: "משפחה",
-    processing: "זיכויים",
-    training: "אימון",
-  };
-
-  return labels[type] ?? "אירוע";
+function statusLabel(status: string) {
+  if (status === "active") return "פעילה";
+  if (status === "published") return "פורסמה";
+  if (status === "draft") return "טיוטה";
+  return status;
 }
