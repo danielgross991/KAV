@@ -3,11 +3,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { getOperationalScheduleSummary } from "@/lib/kav/schedule";
+import { getOperationalDay } from "@/lib/kav/operations";
 import type { TeamSummary } from "@/lib/kav/teams";
 
 type Supabase = SupabaseClient<Database>;
 
 export type DashboardData = {
+  canManage: boolean;
   activePeople: number;
   approvedLeaveToday: number;
   attendance: {
@@ -15,6 +17,7 @@ export type DashboardData = {
     present: number;
     submitted: boolean;
     total: number;
+    unexpectedPresent: number;
   };
   currentPeriod:
     | {
@@ -49,14 +52,13 @@ export type DashboardData = {
 export async function getDashboardData(
   supabase: Supabase,
   team: TeamSummary,
+  manager = false,
 ): Promise<DashboardData> {
   const today = getDateInTimeZone(team.timezone);
   const now = new Date().toISOString();
 
   const [
     activePeopleResult,
-    approvedLeaveResult,
-    attendanceDayResult,
     upcomingEventResult,
     requirementsResult,
     personPakalsResult,
@@ -66,20 +68,6 @@ export async function getDashboardData(
       .select("id", { count: "exact", head: true })
       .eq("team_id", team.id)
       .eq("is_active", true),
-    supabase
-      .from("leave_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("team_id", team.id)
-      .in("status", ["approved", "partially_approved"])
-      .lte("starts_on", today)
-      .gte("ends_on", today),
-    supabase
-      .from("attendance_days")
-      .select("id, status")
-      .eq("team_id", team.id)
-      .eq("attendance_date", today)
-      .limit(1)
-      .maybeSingle(),
     supabase
       .from("schedule_events")
       .select("title, event_type, starts_at")
@@ -100,20 +88,22 @@ export async function getDashboardData(
   ]);
 
   assertOk(activePeopleResult.error, "active people");
-  assertOk(approvedLeaveResult.error, "approved leave");
-  assertOk(attendanceDayResult.error, "attendance day");
   assertOk(upcomingEventResult.error, "upcoming event");
   assertOk(requirementsResult.error, "pakal requirements");
   assertOk(personPakalsResult.error, "person pakals");
 
-  const operationalSchedule = await getOperationalScheduleSummary(supabase, team, today);
+  const [operationalSchedule, operationalDay] = await Promise.all([
+    getOperationalScheduleSummary(supabase, team, today),
+    getOperationalDay(supabase, team, today),
+  ]);
   const currentPeriod = operationalSchedule.period;
-  const attendance = await getAttendanceSummary(
-    supabase,
-    team.id,
-    attendanceDayResult.data?.id,
-    attendanceDayResult.data?.status === "submitted",
-  );
+  const attendance = {
+    absent: operationalDay.summary.absent,
+    present: operationalDay.summary.expectedPresent,
+    submitted: operationalDay.attendanceDay?.status === "submitted",
+    total: operationalDay.summary.expected,
+    unexpectedPresent: operationalDay.summary.unexpectedPresent,
+  };
   const rotationStatus = operationalSchedule.rotationStatus;
   const expectedOnBase = operationalSchedule.expectedOnBase;
 
@@ -135,10 +125,14 @@ export async function getDashboardData(
   if (currentPeriod && rotationStatus.length === 0) {
     issues.push("אין סבבי רוטציה פעילים להיום");
   }
+  if (operationalDay.summary.absent) issues.push(`${operationalDay.summary.absent} פערי נוכחות`);
+  if (operationalDay.summary.unreported) issues.push(`${operationalDay.summary.unreported} טרם דווחו בנוכחות`);
+  if (operationalDay.summary.unexpectedPresent) issues.push(`${operationalDay.summary.unexpectedPresent} נוכחות חריגה`);
 
   return {
     activePeople: activePeopleResult.count ?? 0,
-    approvedLeaveToday: approvedLeaveResult.count ?? 0,
+    canManage: manager,
+    approvedLeaveToday: operationalDay.summary.leave,
     attendance,
     currentPeriod: currentPeriod
       ? {
@@ -149,7 +143,7 @@ export async function getDashboardData(
           status: currentPeriod.status,
         }
       : null,
-    expectedOnBase,
+    expectedOnBase: operationalDay.period ? operationalDay.summary.expected : expectedOnBase,
     issues,
     qualificationReadiness: requirements.map((requirement) => ({
       current: pakalCounts.get(requirement.pakal_types.id) ?? 0,
@@ -165,35 +159,6 @@ export async function getDashboardData(
           type: upcomingEventResult.data.event_type,
         }
       : null,
-  };
-}
-
-async function getAttendanceSummary(
-  supabase: Supabase,
-  teamId: string,
-  attendanceDayId: string | undefined,
-  submitted: boolean,
-) {
-  if (!attendanceDayId) {
-    return { absent: 0, present: 0, submitted: false, total: 0 };
-  }
-
-  const { data, error } = await supabase
-    .from("attendance_entries")
-    .select("is_present")
-    .eq("team_id", teamId)
-    .eq("attendance_day_id", attendanceDayId);
-
-  assertOk(error, "attendance entries");
-
-  const entries = data ?? [];
-  const present = entries.filter((entry) => entry.is_present).length;
-
-  return {
-    absent: entries.length - present,
-    present,
-    submitted,
-    total: entries.length,
   };
 }
 

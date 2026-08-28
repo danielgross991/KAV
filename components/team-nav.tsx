@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, ClipboardList, Home, Settings, UsersRound, UserCheck } from "lucide-react";
+import { CalendarDays, CalendarOff, ClipboardList, Home, Settings, UsersRound, UserCheck } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
@@ -80,7 +80,16 @@ export function TeamNav({
         );
       })}
       {canManage(role) ? (
-        <Link
+        <><Link
+          href={`${base}/leave`}
+          className={cn(
+            "mt-3 flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+            pathname === `${base}/leave` && "bg-accent text-accent-foreground",
+          )}
+        >
+          <CalendarOff className="size-4" />
+          יציאות
+        </Link><Link
           href={`${base}/settings`}
           className={cn(
             "mt-3 flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground",
@@ -89,7 +98,7 @@ export function TeamNav({
         >
           <Settings className="size-4" />
           הגדרות
-        </Link>
+        </Link></>
       ) : null}
     </nav>
   );

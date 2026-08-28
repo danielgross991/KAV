@@ -1,4 +1,5 @@
-import { AlertTriangle, CalendarClock, Check, Clock, Users } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, CalendarClock, CalendarOff, Check, Clock, UserCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,11 @@ export function DashboardView({ data }: { data: DashboardData }) {
         </div>
       </header>
 
+      {data.canManage ? <div className="mb-4 flex flex-wrap gap-2">
+        <Link className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-accent" href={`/${data.team.slug}/attendance`}><UserCheck className="size-4" />עדכון נוכחות</Link>
+        <Link className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-accent" href={`/${data.team.slug}/leave`}><CalendarOff className="size-4" />ניהול יציאות</Link>
+      </div> : null}
+
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           icon={<Users className="size-5" />}
@@ -40,7 +46,9 @@ export function DashboardView({ data }: { data: DashboardData }) {
           icon={<Check className="size-5" />}
           label="נוכחות"
           value={`${data.attendance.present}/${data.attendance.total}`}
-          detail={data.attendance.submitted ? "דווח וסומן" : "טרם הוגש להיום"}
+          detail={data.attendance.unexpectedPresent
+            ? `${data.attendance.unexpectedPresent} נוכחות חריגה`
+            : data.attendance.submitted ? "דווח וסומן" : "טרם הוגש להיום"}
         />
         <MetricCard
           icon={<AlertTriangle className="size-5" />}
