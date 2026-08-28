@@ -1,10 +1,27 @@
-import { PhasePlaceholder } from "@/components/phase-placeholder";
+import { TasksView } from "@/components/tasks-view";
+import { requireAuth } from "@/lib/kav/auth";
+import { getTasksData } from "@/lib/kav/tasks";
+import { requireTeamAccess } from "@/lib/kav/teams";
 
-export default function TasksPage() {
-  return (
-    <PhasePlaceholder
-      title="משימות"
-      description="מנוע השיבוץ השבועי לא יושם בשלב זה בהתאם לבריף. המסלול מוגן ומוכן לפיתוח הבא."
-    />
-  );
+type TasksPageProps = {
+  params: Promise<{ teamSlug: string }>;
+  searchParams: Promise<{ period?: string; proposal?: string; tab?: string; task?: string; view?: string; week?: string }>;
+};
+
+export default async function TasksPage({ params, searchParams }: TasksPageProps) {
+  const [{ teamSlug }, query] = await Promise.all([params, searchParams]);
+  const { supabase, userId } = await requireAuth();
+  const membership = await requireTeamAccess(supabase, userId, teamSlug);
+  const data = await getTasksData(supabase, membership, userId, {
+    periodId: query.period,
+    selectedTaskId: query.task,
+    week: query.week,
+  });
+  return <TasksView
+    data={data}
+    proposalRequested={query.proposal === "1"}
+    selectedTab={["people", "problems"].includes(query.tab ?? "") ? query.tab! : "tasks"}
+    selectedTaskId={query.task}
+    templatesView={query.view === "templates"}
+  />;
 }
