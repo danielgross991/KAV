@@ -21,32 +21,43 @@ export type Database = {
     Tables: {
       attendance_days: Row<{
         attendance_date: string;
+        created_at: string;
         id: string;
         reserve_period_id: string;
         status: string;
         submitted_at: string | null;
         submitted_by: string | null;
         team_id: string;
+        updated_at: string;
       }>;
       attendance_entries: Row<{
         attendance_day_id: string;
         id: string;
         is_present: boolean;
+        notes: string | null;
         person_id: string;
         source: string;
         team_id: string;
+        updated_at: string;
+        updated_by: string | null;
       }>;
       leave_requests: Row<{
         approved_ends_on: string | null;
         approved_starts_on: string | null;
+        created_at: string;
+        created_by: string | null;
+        decided_at: string | null;
+        decided_by: string | null;
         ends_on: string;
         id: string;
+        manager_notes: string | null;
         person_id: string;
         reason: string | null;
         reserve_period_id: string;
         starts_on: string;
         status: string;
         team_id: string;
+        updated_at: string;
       }>;
       pakal_types: Row<{
         created_at: string;

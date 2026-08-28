@@ -15,6 +15,24 @@ export type RotationOverrideInput = DateRange & {
   personId: string;
   toGroupId: string;
 };
+export type LeaveStatus = "pending" | "approved" | "partially_approved" | "rejected";
+export type AttendanceState = "present" | "absent" | "unreported";
+export type LeaveInput = DateRange & {
+  id: string;
+  approvedStartsOn?: string | null;
+  approvedEndsOn?: string | null;
+  personId: string;
+  status: LeaveStatus | string;
+};
+export type AttendanceInput = { personId: string; isPresent: boolean };
+
+export type OperationalPersonResolution = ReturnType<typeof resolvePersonSchedule> & {
+  attendance: AttendanceState;
+  discrepancy: "attendance-gap" | "unexpected-presence" | "unreported" | null;
+  expectedAtBase: boolean;
+  leave: LeaveInput | null;
+  plannedState: RotationState | null;
+};
 export type OperationalReservePeriod = {
   ends_on: string;
   starts_on: string;
@@ -103,6 +121,66 @@ export function resolvePersonSchedule(input: {
     block: matchingBlocks[0] ?? null,
     override,
   };
+}
+
+export function resolveOperationalPerson(input: {
+  personId: string;
+  date: string;
+  memberships: RotationMembershipInput[];
+  blocks: RotationBlockInput[];
+  overrides: RotationOverrideInput[];
+  leaves: LeaveInput[];
+  attendanceEntries: AttendanceInput[];
+}): OperationalPersonResolution {
+  const rotation = resolvePersonSchedule(input);
+  const defaultBlock = rotation.defaultGroupId
+    ? input.blocks.find((block) => block.groupId === rotation.defaultGroupId && contains(block, input.date)) ?? null
+    : null;
+  const activeLeaves = input.leaves.filter((leave) =>
+    leave.personId === input.personId && isApprovedLeaveOnDate(leave, input.date),
+  );
+  if (activeLeaves.length > 1) throw new Error("Person has overlapping approved leave");
+  const attendanceEntries = input.attendanceEntries.filter((entry) => entry.personId === input.personId);
+  if (attendanceEntries.length > 1) throw new Error("Person has duplicate attendance entries");
+  const attendance = attendanceEntries[0]
+    ? attendanceEntries[0].isPresent ? "present" : "absent"
+    : "unreported";
+  const leave = activeLeaves[0] ?? null;
+  const expectedAtBase = rotation.state === "base" && !leave;
+  const discrepancy = expectedAtBase
+    ? attendance === "absent" ? "attendance-gap" : attendance === "unreported" ? "unreported" : null
+    : attendance === "present" ? "unexpected-presence" : null;
+
+  return {
+    ...rotation,
+    plannedState: defaultBlock?.state ?? null,
+    leave,
+    expectedAtBase,
+    attendance,
+    discrepancy,
+  };
+}
+
+export function isApprovedLeaveOnDate(leave: LeaveInput, date: string): boolean {
+  if (leave.status !== "approved" && leave.status !== "partially_approved") return false;
+  if (!leave.approvedStartsOn || !leave.approvedEndsOn) return false;
+  return leave.approvedStartsOn <= date && leave.approvedEndsOn >= date;
+}
+
+export function validateLeaveRange(input: {
+  requested: DateRange;
+  approved?: DateRange | null;
+  period: DateRange;
+}): string[] {
+  const issues: string[] = [];
+  if (input.requested.endsOn < input.requested.startsOn) issues.push("invalid-requested-range");
+  if (!inside(input.requested, input.period)) issues.push("requested-outside-period");
+  if (input.approved) {
+    if (input.approved.endsOn < input.approved.startsOn) issues.push("invalid-approved-range");
+    if (!inside(input.approved, input.requested)) issues.push("approved-outside-requested");
+    if (!inside(input.approved, input.period)) issues.push("approved-outside-period");
+  }
+  return [...new Set(issues)];
 }
 
 export type PublicationIssue = {
