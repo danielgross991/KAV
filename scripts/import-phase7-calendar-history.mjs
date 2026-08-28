@@ -21,6 +21,7 @@ import { dirname, join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 
 import { localDateTimeToIso } from "../lib/kav/dates.ts";
+import { buildNameIndex, resolvePersonId as resolvePersonIdPure } from "./lib/name-resolution.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = join(__dirname, "data");
@@ -44,8 +45,35 @@ const report = {
   equipmentImported: [],
   historicalAttendanceDates: [], historicalPresenceRowsCreated: [], historicalPresenceRowsUpdated: [],
   historicalRotationMembership: [],
-  skippedRows: [], ambiguousNames: [], missingDates: [], unresolvedMappings: [],
+  skippedRows: [], ambiguousNames: [], missingDates: [],
+  // One entry per unique unresolved legacy name (not one per date/occurrence — a name that
+  // fails to resolve across 72 attendance days would otherwise flood this with 72 near-
+  // identical rows). Each entry lists every context it was skipped from and a total count.
+  unresolvedMappings: [],
 };
+
+const unresolvedByName = new Map();
+
+function recordUnresolved(name, context) {
+  const entry = unresolvedByName.get(name) ?? { name, contexts: new Set(), occurrences: 0 };
+  entry.contexts.add(context);
+  entry.occurrences += 1;
+  unresolvedByName.set(name, entry);
+}
+
+function resolvePersonId(nameToId, name, context) {
+  const id = resolvePersonIdPure(nameToId, name);
+  if (!id) recordUnresolved(name, context);
+  return id;
+}
+
+function finalizeUnresolvedMappings() {
+  report.unresolvedMappings = [...unresolvedByName.values()].map((entry) => ({
+    name: entry.name,
+    occurrences: entry.occurrences,
+    contexts: [...entry.contexts],
+  }));
+}
 
 async function main() {
   const team = await getTeamBySlug(teamSlug);
@@ -75,12 +103,38 @@ async function main() {
   const period2025 = await getOrCreatePeriod(team.id, legacyPeriod2025.period);
   await createEvents(team, period2025.id, legacyPeriod2025.milestoneEvents ?? [], "event");
   await createHistoricalRotationGroups(team.id, period2025.id, legacyPeriod2025.rotationGroups ?? [], nameToId);
-  for (const excluded of legacyPeriod2025.excludedFromRoster ?? []) {
-    report.ambiguousNames.push(excluded);
+  for (const placeholder of legacyPeriod2025.placeholderNamesExcluded ?? []) {
+    report.ambiguousNames.push(placeholder);
   }
+  reportKnownUnresolvedHistoricalPeople(nameToId, legacyPeriod2025.unresolvedHistoricalPeople ?? []);
   await importHistoricalAttendance(team.id, period2025.id, legacyAttendance, nameToId, legacyPeriod2025.period);
 
+  finalizeUnresolvedMappings();
   printReport();
+}
+
+// Cross-checks the static "known unresolved historical person" metadata (scripts/data/
+// kav-legacy-2025-period.json) against what ACTUALLY resolves right now against the live
+// `people` table, rather than just trusting the metadata's claim. If someone later creates
+// a person record and this name suddenly DOES resolve, that must be surfaced loudly (their
+// historical attendance would then start importing on the next run) rather than silently
+// changing behavior.
+function reportKnownUnresolvedHistoricalPeople(nameToId, knownUnresolved) {
+  for (const person of knownUnresolved) {
+    const id = resolvePersonIdPure(nameToId, person.legacy_name);
+    if (id) {
+      report.ambiguousNames.push({
+        legacy_name: person.legacy_name,
+        WARNING: `This name now resolves to person ${id} — metadata previously declared it unresolved/skipped. `
+          + "Their historical attendance/rotation membership WILL be imported this run. Confirm this is intended.",
+      });
+    } else {
+      report.ambiguousNames.push({
+        legacy_name: person.legacy_name,
+        status: "confirmed unresolved — no canonical Team Lidor person record exists; nothing imported for this name",
+      });
+    }
+  }
 }
 
 async function getTeamBySlug(slug) {
@@ -94,27 +148,6 @@ async function getPeople(teamId) {
   const { data, error } = await supabase.from("people").select("id, full_name").eq("team_id", teamId);
   if (error) throw new Error(`Unable to load people: ${error.message}`);
   return data ?? [];
-}
-
-function buildNameIndex(people, nameVariants) {
-  const byName = new Map(people.map((person) => [person.full_name.trim(), person.id]));
-  for (const variant of nameVariants) {
-    const canonicalId = byName.get(variant.canonical.trim());
-    if (!canonicalId) continue;
-    for (const legacyName of variant.legacy_variants) {
-      if (!byName.has(legacyName.trim())) byName.set(legacyName.trim(), canonicalId);
-    }
-  }
-  return byName;
-}
-
-function resolvePersonId(nameToId, name, context) {
-  const id = nameToId.get(name.trim());
-  if (!id) {
-    report.unresolvedMappings.push({ name, context });
-    return null;
-  }
-  return id;
 }
 
 async function getOrCreatePeriod(teamId, period) {
@@ -309,6 +342,7 @@ function requiredEnv(name) {
 main().catch((error) => {
   console.error("Import failed:", error);
   console.log("\nPartial report so far:\n");
+  finalizeUnresolvedMappings();
   printReport();
   process.exitCode = 1;
 });

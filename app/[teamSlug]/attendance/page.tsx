@@ -54,7 +54,7 @@ export default async function AttendancePage({ params, searchParams }: {
             </div>
             <div className="flex flex-col gap-2 border-t border-white/15 p-3 sm:flex-row">
               <form action={markExpectedPresentAction.bind(null, teamSlug)} className="flex-1"><input type="hidden" name="date" value={date} /><Button className="w-full border-white/20 bg-white/10 text-white hover:bg-white/15"><Check className="size-4" />סמן את כל הצפויים כנוכחים</Button></form>
-              <form action={submitAttendanceAction.bind(null, teamSlug)} className="flex-1"><input type="hidden" name="date" value={date} /><Button className="w-full border-white/30 bg-white text-primary hover:bg-white/90" variant="outline"><Send className="size-4" />{day.attendanceDay?.status === "submitted" ? "דווח" : "סיום ודיווח"}</Button></form>
+              <form action={submitAttendanceAction.bind(null, teamSlug)} className="flex-1"><input type="hidden" name="date" value={date} /><Button className="w-full border-white/30 bg-white text-primary hover:bg-white/90" variant="outline"><Send className="size-4" />{day.attendanceDayStatus === "submitted" ? "דווח" : "סיום ודיווח"}</Button></form>
             </div>
           </section>
 

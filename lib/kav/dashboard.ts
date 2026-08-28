@@ -124,7 +124,7 @@ export async function getDashboardData(
   const attendance = {
     absent: operationalDay.summary.absent,
     present: operationalDay.summary.expectedPresent,
-    submitted: operationalDay.attendanceDay?.status === "submitted",
+    submitted: operationalDay.attendanceDayStatus === "submitted",
     total: operationalDay.summary.expected,
     unexpectedPresent: operationalDay.summary.unexpectedPresent,
   };

@@ -356,6 +356,42 @@ export type Database = {
           status: string;
         }[];
       };
+      get_team_attendance_entries: {
+        Args: {
+          range_ends_on: string;
+          range_starts_on: string;
+          target_reserve_period_id: string;
+          target_team_id: string;
+        };
+        Returns: {
+          attendance_date: string;
+          is_present: boolean;
+          person_id: string;
+        }[];
+      };
+      get_team_attendance_day_status: {
+        Args: {
+          range_ends_on: string;
+          range_starts_on: string;
+          target_reserve_period_id: string;
+          target_team_id: string;
+        };
+        Returns: {
+          attendance_date: string;
+          status: string;
+        }[];
+      };
+      get_person_attendance_summary: {
+        Args: {
+          target_person_id: string;
+          target_team_id: string;
+        };
+        Returns: {
+          present_count: number;
+          reserve_period_id: string;
+          total_count: number;
+        }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

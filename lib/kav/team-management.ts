@@ -229,7 +229,13 @@ export async function getPersonProfileData(
     ? await selectMaybePrivateDetails(supabase, membership.team.id, person.id)
     : null;
 
-  const [rotationGroups, rotationMembers, attendanceDays, attendanceEntries] = await Promise.all([
+  // Attendance is reached only through the get_person_attendance_summary RPC (see
+  // supabase/migrations/20260828150500_phase7_safe_operational_facts_rpcs.sql) — it is a
+  // SECURITY DEFINER function that returns already-aggregated present/total counts per
+  // reserve period (self-or-manager authorized inside the function), never raw daily rows.
+  // attendance_days/attendance_entries are manager-only-SELECT in production; a direct
+  // table read here would silently return nothing for a viewer looking at their own profile.
+  const [rotationGroups, rotationMembers, attendanceSummaryResult] = await Promise.all([
     selectOrThrow(
       supabase.from("rotation_groups").select("id, reserve_period_id, name").eq("team_id", membership.team.id),
       "לא ניתן לטעון קבוצות רוטציה",
@@ -242,22 +248,15 @@ export async function getPersonProfileData(
         .eq("person_id", person.id),
       "לא ניתן לטעון שיוכי רוטציה",
     ),
-    selectOrThrow(
-      supabase
-        .from("attendance_days")
-        .select("id, reserve_period_id")
-        .eq("team_id", membership.team.id),
-      "לא ניתן לטעון ימי נוכחות",
-    ),
-    selectOrThrow(
-      supabase
-        .from("attendance_entries")
-        .select("id, attendance_day_id, person_id, is_present")
-        .eq("team_id", membership.team.id)
-        .eq("person_id", person.id),
-      "לא ניתן לטעון נוכחות",
-    ),
+    supabase.rpc("get_person_attendance_summary", {
+      target_team_id: membership.team.id,
+      target_person_id: person.id,
+    }),
   ]);
+
+  if (attendanceSummaryResult.error) {
+    throw new Error(`לא ניתן לטעון סיכום נוכחות: ${attendanceSummaryResult.error.message}`);
+  }
 
   const pakalById = new Map(pakalTypes.map((pakal) => [pakal.id, pakal]));
   const equipmentTypeById = new Map(equipmentTypes.map((type) => [type.id, type]));
@@ -267,18 +266,12 @@ export async function getPersonProfileData(
   const activePakals = personPakals.filter((pakal) => pakal.is_active);
   const assignedCounts = countActivePakals(activePakals);
   const rotationGroupById = new Map(rotationGroups.map((group) => [group.id, group]));
-  const attendanceDayById = new Map(attendanceDays.map((day) => [day.id, day]));
-  const attendanceByPeriodId = new Map<string, { present: number; total: number }>();
-
-  for (const entry of attendanceEntries) {
-    const day = attendanceDayById.get(entry.attendance_day_id);
-    if (!day) continue;
-
-    const current = attendanceByPeriodId.get(day.reserve_period_id) ?? { present: 0, total: 0 };
-    current.total += 1;
-    if (entry.is_present) current.present += 1;
-    attendanceByPeriodId.set(day.reserve_period_id, current);
-  }
+  const attendanceByPeriodId = new Map<string, { present: number; total: number }>(
+    (attendanceSummaryResult.data ?? []).map((item) => [
+      item.reserve_period_id,
+      { present: item.present_count, total: item.total_count },
+    ]),
+  );
 
   // Equipment serial numbers/models are sensitive: a manager sees all team equipment,
   // but a viewer may only see their own issued equipment. The RLS policy on

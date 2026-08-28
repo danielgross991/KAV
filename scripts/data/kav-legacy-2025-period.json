@@ -46,14 +46,17 @@
       ]
     }
   ],
-  "excludedFromRoster": [
+  "unresolvedHistoricalPeople": [
     {
       "legacy_name": "גושו טדסה",
-      "why": "מופיע בגיליונות 'נוכחים' ו'צלם' של הקובץ הישן (עם מספר אישי ונתוני נוכחות אמיתיים), אך אינו מופיע ברשימת אף אחד מהסבבים בהנחיות המשימה, וגם לא ברשימת 17 האנשים בגיליון 'כללי' (סיכום/אלופי הבית). מיובאת הנוכחות ההיסטורית שלו (הוא אדם אמיתי, לא placeholder), אך אינו משויך לאף סבב היסטורי — לא הומצא שיוך."
-    },
+      "status": "SKIPPED — no canonical Team Lidor person record",
+      "why": "מופיע בגיליונות 'נוכחים' ו'צלם' של הקובץ הישן (עם מספר אישי ונתוני נוכחות אמיתיים), אך אינו מופיע ברשימת אף אחד מהסבבים בהנחיות המשימה, וגם לא ברשימת 17 האנשים בגיליון 'כללי' (סיכום/אלופי הבית). Production currently holds the canonical 17-person Team Lidor roster and does NOT contain a 'גושו טדסה' person record. The import script resolves people ONLY against the current `people` table — it does not create new person records automatically — so his name never matches, and ALL of his historical data (attendance rows AND rotation group membership) is skipped, not imported. This is intentional: do not auto-create a production person for him. His raw attendance is left untouched in kav-legacy-2025-attendance.json in case a manager later decides to create an inactive historical-only person and re-run the (idempotent) import."
+    }
+  ],
+  "placeholderNamesExcluded": [
     {
       "legacy_name": "יחיד ומיוחד",
-      "why": "טקסט placeholder בעמודת 'סבב ירוק' בגיליון 'כללי' (לא שם של אדם אמיתי) — הודר לפי הנחיה מפורשת במשימה."
+      "why": "טקסט placeholder בעמודת 'סבב ירוק' בגיליון 'כללי' (לא שם של אדם אמיתי, ואינו מופיע בגיליון הנוכחים כלל) — הודר לפי הנחיה מפורשת במשימה. אין נתוני נוכחות עבורו כלל, כך שאין כאן דילוג על מידע קיים."
     }
   ],
   "nameVariants": [

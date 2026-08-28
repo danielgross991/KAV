@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone, overlapsCalendarDayInTimeZone } from "@/lib/kav/dates";
-import { getApprovedLeaveWindows } from "@/lib/kav/operations";
+import { getApprovedLeaveWindows, getAttendanceEntriesByDate } from "@/lib/kav/operations";
 import {
   resolveOperationalPerson,
   resolvePersonSchedule,
@@ -19,8 +19,7 @@ type Client = SupabaseClient<Database>;
 type Row<Name extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][Name]["Row"];
 
 export type ScheduleData = {
-  attendanceDays: Row<"attendance_days">[];
-  attendanceEntries: Row<"attendance_entries">[];
+  attendanceByDate: Map<string, { isPresent: boolean; personId: string }[]>;
   blocks: Row<"rotation_blocks">[];
   canManage: boolean;
   config: Row<"rotation_generation_configs"> | null;
@@ -67,13 +66,13 @@ export async function getScheduleData(
 
   if (!selectedPeriod) {
     return {
-      attendanceDays: [], attendanceEntries: [], blocks: [], canManage: canManage(membership.role), config: null, events: [], groups: [], leaves: [],
+      attendanceByDate: new Map(), blocks: [], canManage: canManage(membership.role), config: null, events: [], groups: [], leaves: [],
       memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
       selectedPeriod: null, team, tasks: [], today, validationIssues: [], viewerPersonId,
     };
   }
 
-  const [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, leaves, attendanceDaysResult, tasksResult] = await Promise.all([
+  const [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, leaves, attendanceByDate, tasksResult] = await Promise.all([
     supabase.from("period_phases").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("sort_order"),
     supabase.from("rotation_groups").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("sort_order"),
     supabase.from("rotation_blocks").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_on"),
@@ -81,10 +80,10 @@ export async function getScheduleData(
     supabase.from("schedule_events").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
     supabase.from("rotation_generation_configs").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).maybeSingle(),
     getApprovedLeaveWindows(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
-    supabase.from("attendance_days").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id),
+    getAttendanceEntriesByDate(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
     supabase.from("task_instances").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
   ]);
-  [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, attendanceDaysResult, tasksResult].forEach((result) => assertOk(result.error, "schedule"));
+  [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, tasksResult].forEach((result) => assertOk(result.error, "schedule"));
 
   const groups = groupsResult.data ?? [];
   const groupIds = groups.map((group) => group.id);
@@ -92,11 +91,6 @@ export async function getScheduleData(
     ? await supabase.from("rotation_members").select("*").eq("team_id", team.id).in("rotation_group_id", groupIds)
     : { data: [], error: null };
   assertOk(membershipsResult.error, "rotation memberships");
-  const attendanceDayIds = (attendanceDaysResult.data ?? []).map((day) => day.id);
-  const attendanceEntriesResult = attendanceDayIds.length
-    ? await supabase.from("attendance_entries").select("*").eq("team_id", team.id).in("attendance_day_id", attendanceDayIds)
-    : { data: [], error: null };
-  assertOk(attendanceEntriesResult.error, "attendance entries");
 
   const phases = phasesResult.data ?? [];
   const blocks = blocksResult.data ?? [];
@@ -123,7 +117,7 @@ export async function getScheduleData(
   });
 
   return {
-    attendanceDays: attendanceDaysResult.data ?? [], attendanceEntries: attendanceEntriesResult.data ?? [],
+    attendanceByDate,
     blocks, canManage: canManage(membership.role), config: configResult.data, events: eventsResult.data ?? [],
     groups, leaves, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
     selectedPeriod, team, tasks: tasksResult.data ?? [], today, validationIssues, viewerPersonId,
@@ -144,11 +138,7 @@ export function getDaySchedule(data: ScheduleData, date: string) {
     personId: item.person_id, fromGroupId: item.from_rotation_group_id,
     toGroupId: item.to_rotation_group_id, startsOn: item.starts_on, endsOn: item.ends_on,
   }] : []);
-  const attendanceDay = data.attendanceDays.find((day) => day.attendance_date === date);
-  const attendanceEntries = attendanceDay
-    ? data.attendanceEntries.filter((entry) => entry.attendance_day_id === attendanceDay.id)
-      .map((entry) => ({ personId: entry.person_id, isPresent: entry.is_present }))
-    : [];
+  const attendanceEntries = data.attendanceByDate.get(date) ?? [];
   const people = data.people.map((person) => ({
     ...person,
     resolution: resolveOperationalPerson({
