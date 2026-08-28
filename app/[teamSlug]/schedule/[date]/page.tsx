@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { ArrowRight, CalendarClock, Check, CircleMinus, Home, MapPin, Users } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, CircleMinus, ClipboardList, Home, MapPin, Users } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { requireAuth } from "@/lib/kav/auth";
 import { getDaySchedule, getScheduleData } from "@/lib/kav/schedule";
+import { getTaskDaySchedule } from "@/lib/kav/tasks";
 import { requireTeamAccess } from "@/lib/kav/teams";
 
 type DayPageProps = {
@@ -22,6 +23,7 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
   const period = data.selectedPeriod;
   if (!period || date < period.starts_on || date > period.ends_on) notFound();
   const day = getDaySchedule(data, date);
+  const taskDay = await getTaskDaySchedule(supabase, membership, date, period.id);
   const personName = new Map(data.people.map((person) => [person.id, person.full_name]));
   const groupName = new Map(data.groups.map((group) => [group.id, group.name]));
 
@@ -31,6 +33,7 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
     <section className="grid gap-4 border-b py-5 sm:grid-cols-2">{day.groups.map((group) => <div className="rounded-md border bg-card p-4" key={group.id}><div className="flex items-center justify-between"><h2 className="font-semibold">{group.name}</h2><Badge variant={group.block?.state === "base" ? "success" : "secondary"}>{stateLabel(group.block?.state)}</Badge></div>{group.block ? <p className="mt-2 text-xs text-muted-foreground">{shortDate(group.block.starts_on)}–{shortDate(group.block.ends_on)}</p> : null}</div>)}</section>
     <section className="border-b py-5"><h2 className="font-semibold">תכנון</h2><div className="mt-4 grid gap-6 md:grid-cols-2"><People title="צפויים בבסיס" icon={<Users className="size-5" />} people={day.expectedBase.map((person) => person.full_name)} /><People title="צפויים בבית" icon={<Home className="size-5" />} people={day.expectedHome.map((person) => person.full_name)} /></div></section>
     {data.canManage ? <section className="grid gap-6 border-b py-5 md:grid-cols-2"><div><h2 className="font-semibold">חריגים</h2><div className="mt-3 space-y-2">{day.approvedLeave.map((person) => <div className="rounded-md border bg-card p-3 text-sm" key={person.id}><b>{person.full_name}</b><p className="mt-1 text-muted-foreground">יציאה מאושרת</p></div>)}{day.overrides.map((override) => <div className="rounded-md border bg-card p-3 text-sm" key={override.id}><b>{personName.get(override.person_id)}</b><div className="mt-1 text-muted-foreground">שינוי סבב · {override.from_rotation_group_id ? `${groupName.get(override.from_rotation_group_id)} ← ` : ""}{override.to_rotation_group_id ? groupName.get(override.to_rotation_group_id) : "ללא סבב"}</div></div>)}{!day.approvedLeave.length && !day.overrides.length ? <p className="text-sm text-muted-foreground">אין חריגים ביום זה.</p> : null}</div></div><div><h2 className="font-semibold">נוכחות בפועל</h2>{day.attendance ? <div className="mt-3 grid grid-cols-3 gap-2"><Count icon={<Check className="size-4" />} label="נוכחים" value={day.attendance.present.length} /><Count icon={<CircleMinus className="size-4" />} label="לא נוכחים" value={day.attendance.absent.length} /><Count icon={<CalendarClock className="size-4" />} label="טרם דווחו" value={day.attendance.unreported.length} /></div> : null}</div></section> : null}
+    <section className="border-b py-5"><h2 className="flex items-center gap-2 font-semibold"><ClipboardList className="size-5" />משימות</h2><div className="mt-3 space-y-2">{taskDay.tasks.length ? taskDay.tasks.map((task) => { const requirements = taskDay.requirements.filter((item) => item.task_instance_id === task.id); const assignments = taskDay.assignments.filter((item) => item.task_instance_id === task.id); const names = new Map(taskDay.people.map((person) => [person.id, person.full_name])); return <Link className="block rounded-md border bg-card p-3 text-sm hover:border-primary/40" href={`/${teamSlug}/tasks?week=${date}&period=${period.id}&task=${task.id}`} key={task.id}><div className="flex items-center justify-between gap-2"><b>{task.title}</b><Badge variant={taskDay.publicationStatus === "published" ? "success" : "secondary"}>{taskDay.publicationStatus === "published" ? "פורסם" : "טיוטה"}</Badge></div><div className="mt-1 text-muted-foreground">{formatTime(task.starts_at, data.team.timezone)}–{formatTime(task.ends_at, data.team.timezone)} · {assignments.length}/{requirements.reduce((sum, item) => sum + item.required_count, 0)} מאויש</div>{assignments.length ? <p className="mt-2">{assignments.map((item) => names.get(item.person_id)).filter(Boolean).join(", ")}</p> : null}</Link>; }) : <p className="text-sm text-muted-foreground">אין משימות ביום זה.</p>}</div></section>
     <section className="py-5"><h2 className="flex items-center gap-2 font-semibold"><CalendarClock className="size-5" />אירועים</h2><div className="mt-3 space-y-2">{day.events.length ? day.events.map((event) => <div className="rounded-md border bg-card p-3 text-sm" key={event.id}><b>{event.title}</b><div className="mt-1 text-muted-foreground">{event.is_all_day ? "כל היום" : formatTime(event.starts_at, data.team.timezone)}{event.location ? ` · ${event.location}` : ""}</div>{event.notes ? <p className="mt-2">{event.notes}</p> : null}</div>) : <p className="text-sm text-muted-foreground">אין אירועים ביום זה.</p>}</div></section>
   </main>;
 }

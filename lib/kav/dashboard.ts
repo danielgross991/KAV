@@ -4,6 +4,7 @@ import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { getOperationalScheduleSummary } from "@/lib/kav/schedule";
 import { getOperationalDay } from "@/lib/kav/operations";
+import { getNextPersonalTask } from "@/lib/kav/tasks";
 import type { TeamSummary } from "@/lib/kav/teams";
 
 type Supabase = SupabaseClient<Database>;
@@ -30,6 +31,7 @@ export type DashboardData = {
     | null;
   expectedOnBase: number;
   issues: string[];
+  nextTask: Awaited<ReturnType<typeof getNextPersonalTask>>;
   qualificationReadiness: {
     current: number;
     name: string;
@@ -53,6 +55,7 @@ export async function getDashboardData(
   supabase: Supabase,
   team: TeamSummary,
   manager = false,
+  userId?: string,
 ): Promise<DashboardData> {
   const today = getDateInTimeZone(team.timezone);
   const now = new Date().toISOString();
@@ -92,9 +95,10 @@ export async function getDashboardData(
   assertOk(requirementsResult.error, "pakal requirements");
   assertOk(personPakalsResult.error, "person pakals");
 
-  const [operationalSchedule, operationalDay] = await Promise.all([
+  const [operationalSchedule, operationalDay, nextTask] = await Promise.all([
     getOperationalScheduleSummary(supabase, team, today),
     getOperationalDay(supabase, team, today),
+    userId ? getNextPersonalTask(supabase, team, userId) : Promise.resolve(null),
   ]);
   const currentPeriod = operationalSchedule.period;
   const attendance = {
@@ -145,6 +149,7 @@ export async function getDashboardData(
       : null,
     expectedOnBase: operationalDay.period ? operationalDay.summary.expected : expectedOnBase,
     issues,
+    nextTask,
     qualificationReadiness: requirements.map((requirement) => ({
       current: pakalCounts.get(requirement.pakal_types.id) ?? 0,
       name: requirement.pakal_types.name,

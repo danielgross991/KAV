@@ -12,7 +12,7 @@ export default async function TeamDashboardPage({ params }: TeamDashboardProps) 
   const { teamSlug } = await params;
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
-  const data = await getDashboardData(supabase, membership.team, canManage(membership.role));
+  const data = await getDashboardData(supabase, membership.team, canManage(membership.role), userId);
 
   return <DashboardView data={data} />;
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarClock, CalendarOff, Check, Clock, UserCheck, Users } from "lucide-react";
+import { AlertTriangle, CalendarClock, CalendarOff, Check, ClipboardList, Clock, UserCheck, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -128,6 +128,11 @@ export function DashboardView({ data }: { data: DashboardData }) {
             )}
           </CardContent>
         </Card>
+      </section>
+
+      <section className="mt-4 border-y py-4">
+        <div className="flex items-center gap-2"><ClipboardList className="size-5 text-primary" /><h2 className="font-semibold">המשימה הבאה שלך</h2></div>
+        {data.nextTask ? <Link className="mt-3 grid gap-2 rounded-md border bg-card p-4 hover:border-primary/40 sm:grid-cols-[1fr_auto]" href={`/${data.team.slug}/tasks`}><div><b>{data.nextTask.title}</b><p className="mt-1 text-sm text-muted-foreground">{formatDateTime(data.nextTask.startsAt)}{data.nextTask.teammateNames.length ? ` · עם ${data.nextTask.teammateNames.join(" ו")}` : ""}</p></div><span className="text-sm font-medium text-primary">למשימות</span></Link> : <p className="mt-3 text-sm text-muted-foreground">אין לך משימות קרובות</p>}
       </section>
 
       <section className="mt-4 grid gap-4 lg:grid-cols-2">
