@@ -24,7 +24,7 @@ export default async function SettingsPage({ params, searchParams }: SettingsPag
     getTeamManagementData(supabase, membership),
     supabase
       .from("equipment_types")
-      .select("id, team_id, name, serial_required, is_active, created_at")
+      .select("id, team_id, name, category, serial_required, is_active, created_at")
       .eq("team_id", membership.team.id)
       .order("name", { ascending: true }),
   ]);

@@ -21,7 +21,7 @@ export type OperationalPerson = Pick<Row<"people">, "full_name" | "id" | "is_act
 export type OperationalDay = {
   attendanceDay: Row<"attendance_days"> | null;
   date: string;
-  leaves: Row<"leave_requests">[];
+  leaves: LeaveInput[];
   people: OperationalPerson[];
   period: Row<"reserve_periods"> | null;
   summary: {
@@ -40,6 +40,33 @@ export type OperationalRange = {
   resolve: (personId: string, date: string) => ReturnType<typeof resolveOperationalPerson>;
 };
 
+export async function getApprovedLeaveWindows(
+  supabase: Client,
+  teamId: string,
+  reservePeriodId: string,
+  startsOn: string,
+  endsOn: string,
+): Promise<LeaveInput[]> {
+  const { data, error } = await supabase.rpc("get_team_approved_leave_windows", {
+    target_team_id: teamId,
+    target_reserve_period_id: reservePeriodId,
+  });
+  assertOk(error, "approved leave windows");
+
+  return (data ?? [])
+    .filter((item) => item.approved_starts_on !== null && item.approved_ends_on !== null
+      && item.approved_starts_on <= endsOn && item.approved_ends_on >= startsOn)
+    .map((item) => ({
+      id: item.id,
+      personId: item.person_id,
+      status: item.status,
+      startsOn: item.starts_on,
+      endsOn: item.ends_on,
+      approvedStartsOn: item.approved_starts_on,
+      approvedEndsOn: item.approved_ends_on,
+    }));
+}
+
 export async function getOperationalRange(
   supabase: Client,
   team: TeamSummary,
@@ -55,12 +82,11 @@ export async function getOperationalRange(
       .lte("starts_on", endsOn).gte("ends_on", startsOn),
     supabase.from("rotation_overrides").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
       .lte("starts_on", endsOn).gte("ends_on", startsOn),
-    supabase.from("leave_requests").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
-      .in("status", ["approved", "partially_approved"]).lte("approved_starts_on", endsOn).gte("approved_ends_on", startsOn),
+    getApprovedLeaveWindows(supabase, team.id, period.id, startsOn, endsOn),
     supabase.from("attendance_days").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
       .gte("attendance_date", startsOn).lte("attendance_date", endsOn),
   ]);
-  [peopleResult, groupsResult, blocksResult, overridesResult, leavesResult, attendanceDaysResult]
+  [peopleResult, groupsResult, blocksResult, overridesResult, attendanceDaysResult]
     .forEach((result) => assertOk(result.error, "operational range"));
 
   const groupIds = (groupsResult.data ?? []).map((group) => group.id);
@@ -97,15 +123,7 @@ export async function getOperationalRange(
     startsOn: item.starts_on,
     endsOn: item.ends_on,
   }] : []);
-  const leaves: LeaveInput[] = (leavesResult.data ?? []).map((item) => ({
-    id: item.id,
-    personId: item.person_id,
-    status: item.status,
-    startsOn: item.starts_on,
-    endsOn: item.ends_on,
-    approvedStartsOn: item.approved_starts_on,
-    approvedEndsOn: item.approved_ends_on,
-  }));
+  const leaves = leavesResult;
 
   return {
     people: peopleResult.data ?? [],
@@ -144,18 +162,17 @@ export async function getOperationalDay(
     : selectOperationalReservePeriod(periods ?? [], date);
   if (!period) return emptyDay(date);
 
-  const [groupsResult, blocksResult, overridesResult, leavesResult, attendanceDayResult] = await Promise.all([
+  const [groupsResult, blocksResult, overridesResult, leaves, attendanceDayResult] = await Promise.all([
     supabase.from("rotation_groups").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id),
     supabase.from("rotation_blocks").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
       .lte("starts_on", date).gte("ends_on", date),
     supabase.from("rotation_overrides").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
       .lte("starts_on", date).gte("ends_on", date),
-    supabase.from("leave_requests").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
-      .in("status", ["approved", "partially_approved"]).lte("approved_starts_on", date).gte("approved_ends_on", date),
+    getApprovedLeaveWindows(supabase, team.id, period.id, date, date),
     supabase.from("attendance_days").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
       .eq("attendance_date", date).maybeSingle(),
   ]);
-  [groupsResult, blocksResult, overridesResult, leavesResult, attendanceDayResult]
+  [groupsResult, blocksResult, overridesResult, attendanceDayResult]
     .forEach((result) => assertOk(result.error, "operational day"));
 
   const groupIds = (groupsResult.data ?? []).map((group) => group.id);
@@ -184,11 +201,6 @@ export async function getOperationalDay(
     personId: item.person_id, fromGroupId: item.from_rotation_group_id,
     toGroupId: item.to_rotation_group_id, startsOn: item.starts_on, endsOn: item.ends_on,
   }] : []);
-  const leaves: LeaveInput[] = (leavesResult.data ?? []).map((item) => ({
-    id: item.id, personId: item.person_id, status: item.status,
-    startsOn: item.starts_on, endsOn: item.ends_on,
-    approvedStartsOn: item.approved_starts_on, approvedEndsOn: item.approved_ends_on,
-  }));
   const attendanceEntries: AttendanceInput[] = (attendanceResult.data ?? []).map((item) => ({
     personId: item.person_id, isPresent: item.is_present,
   }));
@@ -202,7 +214,7 @@ export async function getOperationalDay(
   return {
     attendanceDay: attendanceDayResult.data,
     date,
-    leaves: leavesResult.data ?? [],
+    leaves,
     people: resolvedPeople,
     period,
     summary: {

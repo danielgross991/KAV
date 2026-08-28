@@ -20,7 +20,7 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
-  const data = await getScheduleData(supabase, membership, query.period);
+  const data = await getScheduleData(supabase, membership, query.period, userId);
   const period = data.selectedPeriod;
   if (!period || date < period.starts_on || date > period.ends_on) notFound();
   const day = getDaySchedule(data, date);
@@ -130,12 +130,15 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
       <section className="mt-5">
         <SectionHeader title="אירועים" hint={`${day.events.length}`} />
         <Card className="divide-y overflow-hidden">
-          {day.events.map((event) => (
-            <div className="flex gap-3 p-3.5" key={event.id}>
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-warning-soft text-warning"><CalendarClock className="size-4" /></span>
-              <div className="min-w-0"><b className="block truncate text-sm">{event.title}</b><p className="mt-1 text-xs text-muted-foreground">{event.is_all_day ? "כל היום" : formatTime(event.starts_at, data.team.timezone)}{event.location ? ` · ${event.location}` : ""}</p>{event.notes ? <p className="mt-2 text-sm">{event.notes}</p> : null}</div>
-            </div>
-          ))}
+          {day.events.map((event) => {
+            const isHoliday = event.event_type === "holiday";
+            return (
+              <div className="flex gap-3 p-3.5" key={event.id}>
+                <span className={`flex size-9 shrink-0 items-center justify-center rounded-md ${isHoliday ? "bg-special-soft text-special" : "bg-warning-soft text-warning"}`}><CalendarClock className="size-4" /></span>
+                <div className="min-w-0"><b className="block truncate text-sm">{event.title}</b><p className="mt-1 text-xs text-muted-foreground">{event.is_all_day ? "כל היום" : formatTime(event.starts_at, data.team.timezone)}{event.location ? ` · ${event.location}` : ""}</p>{event.notes ? <p className="mt-2 text-sm">{event.notes}</p> : null}</div>
+              </div>
+            );
+          })}
           {!day.events.length ? <p className="p-3.5 text-sm text-muted-foreground">אין אירועים ביום זה.</p> : null}
         </Card>
       </section>

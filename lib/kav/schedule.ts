@@ -2,11 +2,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone, overlapsCalendarDayInTimeZone } from "@/lib/kav/dates";
+import { getApprovedLeaveWindows } from "@/lib/kav/operations";
 import {
-  resolvePersonSchedule,
   resolveOperationalPerson,
+  resolvePersonSchedule,
   selectOperationalReservePeriod,
   validateScheduleForPublication,
+  type LeaveInput,
   type PublicationIssue,
   type RotationState,
 } from "@/lib/kav/schedule-domain";
@@ -24,7 +26,7 @@ export type ScheduleData = {
   config: Row<"rotation_generation_configs"> | null;
   events: Row<"schedule_events">[];
   groups: Row<"rotation_groups">[];
-  leaves: Row<"leave_requests">[];
+  leaves: LeaveInput[];
   memberships: Row<"rotation_members">[];
   overrides: Row<"rotation_overrides">[];
   people: Pick<Row<"people">, "full_name" | "id" | "is_active">[];
@@ -35,21 +37,28 @@ export type ScheduleData = {
   tasks: Row<"task_instances">[];
   today: string;
   validationIssues: PublicationIssue[];
+  viewerPersonId: string | null;
 };
 
 export async function getScheduleData(
   supabase: Client,
   membership: TeamMembership,
   selectedPeriodId?: string,
+  userId?: string,
 ): Promise<ScheduleData> {
   const team = membership.team;
   const today = getDateInTimeZone(team.timezone);
-  const [{ data: periods, error: periodsError }, { data: people, error: peopleError }] = await Promise.all([
+  const [{ data: periods, error: periodsError }, { data: people, error: peopleError }, viewerPerson] = await Promise.all([
     supabase.from("reserve_periods").select("*").eq("team_id", team.id).order("starts_on", { ascending: false }),
     supabase.from("people").select("id, full_name, is_active").eq("team_id", team.id).order("display_order").order("full_name"),
+    userId
+      ? supabase.from("people").select("id").eq("team_id", team.id).eq("auth_user_id", userId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
   assertOk(periodsError, "reserve periods");
   assertOk(peopleError, "people");
+  assertOk(viewerPerson.error, "viewer person");
+  const viewerPersonId = viewerPerson.data?.id ?? null;
 
   const allPeriods = periods ?? [];
   const selectedPeriod =
@@ -60,22 +69,22 @@ export async function getScheduleData(
     return {
       attendanceDays: [], attendanceEntries: [], blocks: [], canManage: canManage(membership.role), config: null, events: [], groups: [], leaves: [],
       memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
-      selectedPeriod: null, team, tasks: [], today, validationIssues: [],
+      selectedPeriod: null, team, tasks: [], today, validationIssues: [], viewerPersonId,
     };
   }
 
-  const [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, leavesResult, attendanceDaysResult, tasksResult] = await Promise.all([
+  const [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, leaves, attendanceDaysResult, tasksResult] = await Promise.all([
     supabase.from("period_phases").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("sort_order"),
     supabase.from("rotation_groups").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("sort_order"),
     supabase.from("rotation_blocks").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_on"),
     supabase.from("rotation_overrides").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_on"),
     supabase.from("schedule_events").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
     supabase.from("rotation_generation_configs").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).maybeSingle(),
-    supabase.from("leave_requests").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id),
+    getApprovedLeaveWindows(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
     supabase.from("attendance_days").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id),
     supabase.from("task_instances").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
   ]);
-  [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, leavesResult, attendanceDaysResult, tasksResult].forEach((result) => assertOk(result.error, "schedule"));
+  [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, attendanceDaysResult, tasksResult].forEach((result) => assertOk(result.error, "schedule"));
 
   const groups = groupsResult.data ?? [];
   const groupIds = groups.map((group) => group.id);
@@ -116,8 +125,8 @@ export async function getScheduleData(
   return {
     attendanceDays: attendanceDaysResult.data ?? [], attendanceEntries: attendanceEntriesResult.data ?? [],
     blocks, canManage: canManage(membership.role), config: configResult.data, events: eventsResult.data ?? [],
-    groups, leaves: leavesResult.data ?? [], memberships, overrides, people: people ?? [], periods: allPeriods, phases,
-    selectedPeriod, team, tasks: tasksResult.data ?? [], today, validationIssues,
+    groups, leaves, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
+    selectedPeriod, team, tasks: tasksResult.data ?? [], today, validationIssues, viewerPersonId,
   };
 }
 
@@ -140,18 +149,11 @@ export function getDaySchedule(data: ScheduleData, date: string) {
     ? data.attendanceEntries.filter((entry) => entry.attendance_day_id === attendanceDay.id)
       .map((entry) => ({ personId: entry.person_id, isPresent: entry.is_present }))
     : [];
-  const leaveInputs = data.leaves.map((leave) => ({
-    id: leave.id, personId: leave.person_id, status: leave.status,
-    startsOn: leave.starts_on, endsOn: leave.ends_on,
-    approvedStartsOn: leave.approved_starts_on, approvedEndsOn: leave.approved_ends_on,
-  }));
   const people = data.people.map((person) => ({
     ...person,
-    resolution: data.canManage ? resolveOperationalPerson({
+    resolution: resolveOperationalPerson({
       personId: person.id, date, memberships: membershipInputs, blocks: blockInputs,
-      overrides: overrideInputs, leaves: leaveInputs, attendanceEntries,
-    }) : resolvePersonSchedule({
-      personId: person.id, date, memberships: membershipInputs, blocks: blockInputs, overrides: overrideInputs,
+      overrides: overrideInputs, leaves: data.leaves, attendanceEntries,
     }),
   }));
   const groups = data.groups.map((group) => ({
@@ -167,16 +169,16 @@ export function getDaySchedule(data: ScheduleData, date: string) {
     tasks: data.tasks.filter((task) => overlapsCalendarDayInTimeZone(
       data.team.timezone, date, task.starts_at, task.ends_at,
     )),
-    expectedBase: people.filter((person) => person.is_active && (
-      "expectedAtBase" in person.resolution ? person.resolution.expectedAtBase : person.resolution.state === "base"
-    )),
+    expectedBase: people.filter((person) => person.is_active && person.resolution.expectedAtBase),
     expectedHome: people.filter((person) => person.is_active && person.resolution.state === "home"),
     overrides: data.overrides.filter((item) => item.starts_on <= date && item.ends_on >= date),
-    approvedLeave: data.canManage ? people.filter((person) => "leave" in person.resolution && person.resolution.leave) : [],
+    // Team-wide leave/attendance breakdowns stay manager-only: viewers understand their
+    // own effective status (via `people[].resolution` above) but not the whole team's.
+    approvedLeave: data.canManage ? people.filter((person) => person.resolution.leave) : [],
     attendance: data.canManage ? {
-      present: people.filter((person) => "attendance" in person.resolution && person.resolution.attendance === "present"),
-      absent: people.filter((person) => "attendance" in person.resolution && person.resolution.attendance === "absent"),
-      unreported: people.filter((person) => "discrepancy" in person.resolution && person.resolution.discrepancy === "unreported"),
+      present: people.filter((person) => person.resolution.attendance === "present"),
+      absent: people.filter((person) => person.resolution.attendance === "absent"),
+      unreported: people.filter((person) => person.resolution.discrepancy === "unreported"),
     } : null,
   };
 }

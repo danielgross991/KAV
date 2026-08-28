@@ -297,6 +297,7 @@ export type Database = {
         team_id: string;
       }>;
       equipment_types: Row<{
+        category: "WEAPON" | "OPTIC" | "AMRAL" | "PAKAL" | "OTHER";
         created_at: string;
         id: string;
         is_active: boolean;
@@ -339,6 +340,21 @@ export type Database = {
           target_team_id: string;
         };
         Returns: undefined;
+      };
+      get_team_approved_leave_windows: {
+        Args: {
+          target_reserve_period_id: string;
+          target_team_id: string;
+        };
+        Returns: {
+          approved_ends_on: string | null;
+          approved_starts_on: string | null;
+          ends_on: string;
+          id: string;
+          person_id: string;
+          starts_on: string;
+          status: string;
+        }[];
       };
     };
     Enums: Record<string, never>;

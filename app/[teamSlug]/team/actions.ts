@@ -8,8 +8,10 @@ import { getDateInTimeZone } from "@/lib/kav/dates";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
 const EQUIPMENT_STATUSES = ["assigned", "returned", "lost", "damaged"] as const;
+const EQUIPMENT_CATEGORIES = ["WEAPON", "OPTIC", "AMRAL", "PAKAL", "OTHER"] as const;
 
 type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number];
+type EquipmentCategory = (typeof EQUIPMENT_CATEGORIES)[number];
 
 export async function createPersonAction(teamSlug: string, formData: FormData) {
   const { membership, supabase } = await requireManager(teamSlug);
@@ -196,9 +198,11 @@ export async function updateRequirementAction(teamSlug: string, formData: FormDa
 export async function createEquipmentTypeAction(teamSlug: string, formData: FormData) {
   const { membership, supabase } = await requireManager(teamSlug);
   const name = requiredText(formData, "name", "שם סוג ציוד");
+  const category = equipmentCategory(formData);
   const serialRequired = formData.get("serial_required") === "on";
 
   const { error } = await supabase.from("equipment_types").insert({
+    category,
     is_active: true,
     name,
     serial_required: serialRequired,
@@ -220,12 +224,14 @@ export async function updateEquipmentTypeAction(
 ) {
   const { membership, supabase } = await requireManager(teamSlug);
   const name = requiredText(formData, "name", "שם סוג ציוד");
+  const category = equipmentCategory(formData);
   const serialRequired = formData.get("serial_required") === "on";
   const isActive = formData.get("is_active") === "on";
 
   const { error } = await supabase
     .from("equipment_types")
     .update({
+      category,
       is_active: isActive,
       name,
       serial_required: serialRequired,
@@ -488,4 +494,13 @@ function equipmentStatus(formData: FormData): EquipmentStatus {
   }
 
   return "assigned";
+}
+
+function equipmentCategory(formData: FormData): EquipmentCategory {
+  const value = formData.get("category");
+  if (typeof value === "string" && EQUIPMENT_CATEGORIES.includes(value as EquipmentCategory)) {
+    return value as EquipmentCategory;
+  }
+
+  return "OTHER";
 }

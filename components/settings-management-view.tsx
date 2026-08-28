@@ -12,6 +12,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { EquipmentType, PakalType, TeamManagementData } from "@/lib/kav/team-management";
 
+const equipmentCategoryLabels: Record<EquipmentType["category"], string> = {
+  WEAPON: "נשק",
+  OPTIC: "כוונת",
+  AMRAL: "אמר״ל",
+  PAKAL: "פק״ל",
+  OTHER: "אחר",
+};
+const equipmentCategoryOrder: EquipmentType["category"][] = ["WEAPON", "OPTIC", "AMRAL", "PAKAL", "OTHER"];
+
 export function SettingsManagementView({
   data,
   equipmentTypes,
@@ -72,6 +81,7 @@ export function SettingsManagementView({
             <CardContent>
               <form action={createEquipmentType} className="grid gap-3">
                 <Field label="שם סוג ציוד" name="name" required />
+                <CategorySelect />
                 <label className="flex items-center gap-2 text-sm">
                   <input name="serial_required" type="checkbox" />
                   נדרש מספר סידורי
@@ -140,10 +150,23 @@ export function SettingsManagementView({
             {equipmentTypes.length === 0 ? (
               <EmptyState title="אין סוגי ציוד" description="הוספת סוג ציוד תאפשר שיוך ציוד בפרופיל איש צוות." />
             ) : (
-              <div className="grid gap-2">
-                {equipmentTypes.map((type) => (
-                  <EquipmentTypeForm key={type.id} teamSlug={data.team.slug} type={type} />
-                ))}
+              <div className="grid gap-4">
+                {equipmentCategoryOrder.flatMap((category) => {
+                  const items = equipmentTypes.filter((type) => type.category === category);
+                  if (!items.length) return [];
+                  return (
+                    <div key={category}>
+                      <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                        {equipmentCategoryLabels[category]}
+                      </p>
+                      <div className="grid gap-2">
+                        {items.map((type) => (
+                          <EquipmentTypeForm key={type.id} teamSlug={data.team.slug} type={type} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -171,6 +194,7 @@ function EquipmentTypeForm({ teamSlug, type }: { teamSlug: string; type: Equipme
       </summary>
       <form action={save} className="mt-4 grid gap-3 border-t pt-4">
         <Field defaultValue={type.name} label="שם סוג ציוד" name="name" required />
+        <CategorySelect defaultValue={type.category} />
         <label className="flex items-center gap-2 text-sm">
           <input name="serial_required" type="checkbox" defaultChecked={type.serial_required} />
           נדרש מספר סידורי
@@ -212,6 +236,26 @@ function PakalTypeForm({ pakal, teamSlug }: { pakal: PakalType; teamSlug: string
         <Button type="submit">שמירה</Button>
       </form>
     </details>
+  );
+}
+
+function CategorySelect({ defaultValue }: { defaultValue?: EquipmentType["category"] }) {
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor="category">קטגוריית ציוד</Label>
+      <select
+        className="h-11 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        defaultValue={defaultValue ?? "OTHER"}
+        id="category"
+        name="category"
+      >
+        {equipmentCategoryOrder.map((category) => (
+          <option key={category} value={category}>
+            {equipmentCategoryLabels[category]}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
 

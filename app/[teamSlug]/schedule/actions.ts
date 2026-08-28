@@ -11,7 +11,7 @@ import { generateRotationBlocks, overlaps, validateScheduleForPublication, type 
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
 const PHASE_TYPES = ["preparation", "line", "stand_down", "processing", "other"];
-const EVENT_TYPES = ["briefing", "training", "family", "processing", "changeover", "other"];
+const EVENT_TYPES = ["briefing", "training", "family", "processing", "changeover", "holiday", "other"];
 
 export async function createReservePeriodAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);

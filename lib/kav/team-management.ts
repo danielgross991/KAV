@@ -55,7 +55,7 @@ export type PersonPakalItem = TableRow<"person_pakals"> & {
 };
 
 export type PersonEquipmentItem = TableRow<"person_equipment"> & {
-  equipmentType: Pick<TableRow<"equipment_types">, "id" | "name" | "serial_required"> | null;
+  equipmentType: Pick<TableRow<"equipment_types">, "id" | "name" | "category" | "serial_required"> | null;
 };
 
 export type ReserveHistoryItem = {
@@ -146,6 +146,7 @@ export async function getPersonProfileData(
   supabase: Client,
   membership: TeamMembership,
   personId: string,
+  viewerUserId?: string,
 ): Promise<PersonProfileData> {
   const canManageTeam = canManage(membership.role);
   if (!isUuid(personId)) {
@@ -198,7 +199,7 @@ export async function getPersonProfileData(
       selectOrThrow(
         supabase
           .from("equipment_types")
-          .select("id, team_id, name, serial_required, is_active, created_at")
+          .select("id, team_id, name, category, serial_required, is_active, created_at")
           .eq("team_id", membership.team.id)
           .order("name", { ascending: true }),
         "לא ניתן לטעון סוגי ציוד",
@@ -279,12 +280,21 @@ export async function getPersonProfileData(
     attendanceByPeriodId.set(day.reserve_period_id, current);
   }
 
+  // Equipment serial numbers/models are sensitive: a manager sees all team equipment,
+  // but a viewer may only see their own issued equipment. The RLS policy on
+  // person_equipment enforces this at the database layer; this mirrors it so the
+  // app never renders another person's equipment even if the query already
+  // returned rows (e.g. before the enforcing migration lands in this environment).
+  const canViewThisPersonEquipment = canManageTeam || person.auth_user_id === viewerUserId;
+
   return {
     canManageTeam,
-    equipment: equipment.map((item) => ({
-      ...item,
-      equipmentType: equipmentTypeById.get(item.equipment_type_id) ?? null,
-    })),
+    equipment: canViewThisPersonEquipment
+      ? equipment.map((item) => ({
+          ...item,
+          equipmentType: equipmentTypeById.get(item.equipment_type_id) ?? null,
+        }))
+      : [],
     equipmentTypes,
     pakalTypes: pakalTypes.map((pakal) => ({
       ...pakal,

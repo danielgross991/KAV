@@ -4,6 +4,7 @@ import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { getOperationalScheduleSummary } from "@/lib/kav/schedule";
 import { getOperationalDay } from "@/lib/kav/operations";
+import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
 import { getNextPersonalTask } from "@/lib/kav/tasks";
 import type { TeamSummary } from "@/lib/kav/teams";
 
@@ -30,6 +31,8 @@ export type DashboardData = {
       }
     | null;
   expectedOnBase: number;
+  homeLeaderboard: PersonAttendanceStats[];
+  attendanceStats: PersonAttendanceStats[];
   issues: string[];
   nextTask: Awaited<ReturnType<typeof getNextPersonalTask>>;
   personalStatus: {
@@ -111,10 +114,11 @@ export async function getDashboardData(
   assertOk(personPakalsResult.error, "person pakals");
   assertOk(currentPersonResult.error, "current person");
 
-  const [operationalSchedule, operationalDay, nextTask] = await Promise.all([
+  const [operationalSchedule, operationalDay, nextTask, teamStats] = await Promise.all([
     getOperationalScheduleSummary(supabase, team, today),
     getOperationalDay(supabase, team, today),
     userId ? getNextPersonalTask(supabase, team, userId) : Promise.resolve(null),
+    getTeamStats(supabase, team, today),
   ]);
   const currentPeriod = operationalSchedule.period;
   const attendance = {
@@ -169,6 +173,8 @@ export async function getDashboardData(
         }
       : null,
     expectedOnBase: operationalDay.period ? operationalDay.summary.expected : expectedOnBase,
+    homeLeaderboard: teamStats.leaderboard,
+    attendanceStats: teamStats.stats,
     issues,
     nextTask,
     personalStatus: currentPerson && personalResolution

@@ -1,0 +1,65 @@
+{
+  "period": {
+    "name": "קו כיסופים 2025",
+    "starts_on": "2025-05-28",
+    "ends_on": "2025-08-07",
+    "status": "completed",
+    "note": "היסטורי בלבד. סטטוס 'completed' נבחר בכוונה: RLS (can_view_schedule_period) מאפשרת צפייה לחברי צוות רגילים בסטטוסים published/active/completed, ו-selectOperationalReservePeriod אף פעם לא בוחר תקופה עם סטטוס completed כתקופה 'נוכחית' — כך שהתקופה גלויה לכל הצוות אך לעולם לא הופכת למצב תפעולי נוכחי."
+  },
+  "milestoneEvents": [
+    { "title": "הסבת נשק + אל\"ת כיסופים", "event_type": "other", "starts_on": "2025-05-28", "is_all_day": true, "notes": "חובת הגעה כולם" },
+    { "title": "הסבת נשק + אל\"ת כיסופים", "event_type": "other", "starts_on": "2025-06-03", "is_all_day": true, "notes": "חובת הגעה כולם" },
+    { "title": "תפיסת קו כיסופים", "event_type": "changeover", "starts_on": "2025-06-05", "is_all_day": true, "notes": null },
+    { "title": "ירידה מתע\"ם", "event_type": "processing", "starts_on": "2025-07-31", "is_all_day": true, "notes": null },
+    { "title": "תשעה באב", "event_type": "holiday", "starts_on": "2025-08-03", "is_all_day": true, "notes": null },
+    { "title": "זיכויים בבה\"ד 1", "event_type": "processing", "starts_on": "2025-08-04", "is_all_day": true, "notes": null },
+    { "title": "יום עיבוד 1", "event_type": "processing", "starts_on": "2025-08-05", "is_all_day": true, "notes": null },
+    { "title": "יום עיבוד 2", "event_type": "processing", "starts_on": "2025-08-06", "is_all_day": true, "notes": null },
+    { "title": "זיכויים/משפטים", "event_type": "processing", "starts_on": "2025-08-07", "is_all_day": true, "notes": null }
+  ],
+  "rotationGroups": [
+    {
+      "name": "סבב ירוק",
+      "members": [
+        "דניאל גרוס",
+        "ירין אמסילי",
+        "מלסה אטלאי",
+        "גיא כהן",
+        "אסף אליאב",
+        "יונתן אבוחצירא",
+        "אורי בנבג'י",
+        "רפאל עזרא",
+        "אריאל דויב"
+      ]
+    },
+    {
+      "name": "סבב צהוב",
+      "members": [
+        "בנימין ברי",
+        "ניתאי ידעי",
+        "לידור דורון",
+        "תמיר אסראסו",
+        "אביאל אלקאיל",
+        "ירין כהן",
+        "עדן מימון",
+        "עמנואל אלמו"
+      ]
+    }
+  ],
+  "excludedFromRoster": [
+    {
+      "legacy_name": "גושו טדסה",
+      "why": "מופיע בגיליונות 'נוכחים' ו'צלם' של הקובץ הישן (עם מספר אישי ונתוני נוכחות אמיתיים), אך אינו מופיע ברשימת אף אחד מהסבבים בהנחיות המשימה, וגם לא ברשימת 17 האנשים בגיליון 'כללי' (סיכום/אלופי הבית). מיובאת הנוכחות ההיסטורית שלו (הוא אדם אמיתי, לא placeholder), אך אינו משויך לאף סבב היסטורי — לא הומצא שיוך."
+    },
+    {
+      "legacy_name": "יחיד ומיוחד",
+      "why": "טקסט placeholder בעמודת 'סבב ירוק' בגיליון 'כללי' (לא שם של אדם אמיתי) — הודר לפי הנחיה מפורשת במשימה."
+    }
+  ],
+  "nameVariants": [
+    { "canonical": "יונתן אבוחצירא", "legacy_variants": ["יוני אבוחצירה", "יוני"] },
+    { "canonical": "אריאל דויב", "legacy_variants": ["אריאל דוייב", "דוייב"] },
+    { "canonical": "אורי בנבג'י", "legacy_variants": ["בג'י"] },
+    { "canonical": "עמנואל אלמו", "legacy_variants": ["מנו"] }
+  ]
+}

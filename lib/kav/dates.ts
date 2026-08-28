@@ -34,6 +34,13 @@ export function eachCalendarDate(startsOn: string, endsOn: string): string[] {
   return dates;
 }
 
+export function shiftMonth(month: string, delta: number): string {
+  if (!/^\d{4}-\d{2}$/.test(month)) throw new Error(`Invalid calendar month: ${month}`);
+  const [year, mon] = month.split("-").map(Number);
+  const total = year * 12 + (mon - 1) + delta;
+  return `${Math.floor(total / 12)}-${String((total % 12) + 1).padStart(2, "0")}`;
+}
+
 export function getWeekStart(date: string, weekStartDay = 0) {
   if (!Number.isInteger(weekStartDay) || weekStartDay < 0 || weekStartDay > 6) {
     throw new Error("Week start day must be between 0 and 6");

@@ -1,0 +1,106 @@
+{
+  "period": {
+    "name": "תקופת מילואים ספטמבר–דצמבר 2026",
+    "starts_on": "2026-09-06",
+    "ends_on": "2026-12-02",
+    "status": "draft"
+  },
+  "phases": [
+    { "name": "הכנת מפקדים / גיוס", "phase_type": "preparation", "starts_on": "2026-09-06", "ends_on": "2026-09-10", "sort_order": 0 },
+    { "name": "ראש השנה בבית", "phase_type": "other", "starts_on": "2026-09-11", "ends_on": "2026-09-13", "sort_order": 1 },
+    { "name": "אימון לפני הפעלה", "phase_type": "preparation", "starts_on": "2026-09-14", "ends_on": "2026-09-16", "sort_order": 2 },
+    { "name": "פעילות מבצעית / קו", "phase_type": "line", "starts_on": "2026-09-17", "ends_on": "2026-12-01", "sort_order": 3 },
+    { "name": "ירידה מהמשימה", "phase_type": "stand_down", "starts_on": "2026-12-02", "ends_on": "2026-12-02", "sort_order": 4 }
+  ],
+  "events": [
+    {
+      "title": "יום הכנת מפקדים",
+      "event_type": "training",
+      "starts_on": "2026-09-06",
+      "is_all_day": true,
+      "notes": "יום הכנת מפקדים מרמת מ\"כ בראשות מח\"ט יהודה · קהל: כלל המפקדים בפלוגה"
+    },
+    {
+      "title": "גיוס וחיול מפקדים",
+      "event_type": "other",
+      "starts_on": "2026-09-09",
+      "is_all_day": true,
+      "notes": "גיוס וחיול מפקדים בבא\"פ לכיש · קהל: כלל המפקדים בפלוגה"
+    },
+    {
+      "title": "גיוס גוף עיקרי",
+      "event_type": "other",
+      "starts_on": "2026-09-10",
+      "is_all_day": true,
+      "notes": "קהל: כולם"
+    },
+    {
+      "title": "ראש השנה בבית",
+      "event_type": "family",
+      "starts_on": "2026-09-11",
+      "ends_on": "2026-09-13",
+      "is_all_day": true,
+      "notes": "הנחיה מבצעית מפורשת: כולם בבית · קהל: כולם"
+    },
+    {
+      "title": "התייצבות בבא\"פ",
+      "event_type": "changeover",
+      "starts_on": "2026-09-14",
+      "starts_time": "10:00",
+      "is_all_day": false,
+      "notes": "תחילת תכנים של אימון לפני הפעלה · הגעה עד 10:00 · קהל: כולם"
+    },
+    {
+      "title": "המשך אימון לפני הפעלה",
+      "event_type": "training",
+      "starts_on": "2026-09-15",
+      "ends_on": "2026-09-16",
+      "is_all_day": true,
+      "notes": "קהל: כולם"
+    },
+    {
+      "title": "זיכויים ועלייה לקו",
+      "event_type": "changeover",
+      "starts_on": "2026-09-17",
+      "starts_time": "14:00",
+      "is_all_day": false,
+      "notes": "14:00 תפיסת אחריות · קהל: כולם"
+    },
+    {
+      "title": "ירידה מהמשימה",
+      "event_type": "processing",
+      "starts_on": "2026-12-02",
+      "is_all_day": true,
+      "notes": "זיכויים וימי התרעננות · קהל: כולם"
+    }
+  ],
+  "holidays": [
+    { "title": "ערב ראש השנה", "starts_on": "2026-09-11" },
+    { "title": "ראש השנה א׳", "starts_on": "2026-09-12" },
+    { "title": "ראש השנה ב׳", "starts_on": "2026-09-13" },
+    { "title": "צום גדליה", "starts_on": "2026-09-14" },
+    { "title": "ערב יום כיפור", "starts_on": "2026-09-20" },
+    { "title": "יום כיפור", "starts_on": "2026-09-21" },
+    { "title": "ערב סוכות", "starts_on": "2026-09-25" },
+    { "title": "סוכות", "starts_on": "2026-09-26" },
+    { "title": "חול המועד סוכות", "starts_on": "2026-09-27", "ends_on": "2026-10-02" },
+    { "title": "הושענא רבה", "starts_on": "2026-10-02" },
+    { "title": "שמיני עצרת / שמחת תורה", "starts_on": "2026-10-03" }
+  ],
+  "pendingLeaveRequests": [
+    { "person_name": "אביאל אלקאיל", "starts_on": "2026-09-24", "ends_on": "2026-09-25", "reason": "אירוע" },
+    { "person_name": "אביאל אלקאיל", "starts_on": "2026-10-11", "ends_on": "2026-10-12", "reason": "אירוע" },
+    { "person_name": "אביאל אלקאיל", "starts_on": "2026-10-21", "ends_on": "2026-10-22", "reason": "אירוע" },
+    { "person_name": "אביאל אלקאיל", "starts_on": "2026-11-03", "ends_on": "2026-11-04", "reason": "אירוע" },
+    { "person_name": "אביאל אלקאיל", "starts_on": "2026-11-16", "ends_on": "2026-11-17", "reason": "אירוע" },
+    { "person_name": "תמיר אסראסו", "starts_on": "2026-09-23", "ends_on": "2026-09-28", "reason": null },
+    { "person_name": "תמיר אסראסו", "starts_on": "2026-10-27", "ends_on": "2026-10-28", "reason": null },
+    { "person_name": "בנימין ברי", "starts_on": "2026-09-19", "ends_on": "2026-09-20", "reason": "אירוע (יום הולדת של מישל)" },
+    { "person_name": "בנימין ברי", "starts_on": "2026-09-09", "ends_on": "2026-09-12", "reason": "עבודה" },
+    { "person_name": "בנימין ברי", "starts_on": "2026-11-26", "ends_on": "2026-11-27", "reason": "חג ההודיה" }
+  ],
+  "skippedLeaveRequests": [
+    { "person_name": "ירין כהן", "reason": "חתונה", "why_skipped": "מקור: 'ניהול כוח אדם צוותי.xlsx'!בקשות יציאה ואילוצים row 13 — אין תאריכים בגיליון המקור; לא הומצאו תאריכים." },
+    { "why_skipped": "מקור: אותו גיליון, שורה עם תאריך הגשה (12.8.26) אך ללא שם חייל ותאריכים — שורה חסרה/פגומה." }
+  ]
+}

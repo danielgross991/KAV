@@ -22,8 +22,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import type { PersonEquipmentItem, PersonProfileData, PersonPakalItem } from "@/lib/kav/team-management";
+import type { EquipmentType, PersonEquipmentItem, PersonProfileData, PersonPakalItem } from "@/lib/kav/team-management";
 import { cn } from "@/lib/utils";
+
+const equipmentCategoryLabels: Record<EquipmentType["category"], string> = {
+  WEAPON: "נשק",
+  OPTIC: "כוונת",
+  AMRAL: "אמר״ל",
+  PAKAL: "פק״ל",
+  OTHER: "אחר",
+};
+const equipmentCategoryOrder: EquipmentType["category"][] = ["WEAPON", "OPTIC", "AMRAL", "PAKAL", "OTHER"];
 
 const tabs = [
   { id: "general", label: "כללי" },
@@ -243,16 +252,31 @@ function EquipmentTab({ data }: { data: PersonProfileData }) {
           {data.equipment.length === 0 ? (
             <EmptyState title="אין ציוד משויך" description="לא קיימות רשומות ציוד לאיש הצוות." />
           ) : (
-            <div className="grid gap-3">
-              {data.equipment.map((item) => (
-                <EquipmentRow
-                  key={item.id}
-                  canManage={data.canManageTeam}
-                  item={item}
-                  personId={data.person.id}
-                  teamSlug={data.team.slug}
-                />
-              ))}
+            <div className="grid gap-4">
+              {equipmentCategoryOrder.flatMap((category) => {
+                const items = data.equipment.filter(
+                  (item) => (item.equipmentType?.category ?? "OTHER") === category,
+                );
+                if (!items.length) return [];
+                return (
+                  <div key={category}>
+                    <p className="mb-2 text-xs font-semibold text-muted-foreground">
+                      {equipmentCategoryLabels[category]} · {items.length}
+                    </p>
+                    <div className="grid gap-3">
+                      {items.map((item) => (
+                        <EquipmentRow
+                          key={item.id}
+                          canManage={data.canManageTeam}
+                          item={item}
+                          personId={data.person.id}
+                          teamSlug={data.team.slug}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </CardContent>
@@ -267,11 +291,19 @@ function EquipmentTab({ data }: { data: PersonProfileData }) {
             activeTypes.length > 0 ? (
               <form action={assignEquipment} className="grid gap-3">
                 <Select label="סוג ציוד" name="equipment_type_id" required>
-                  {activeTypes.map((type) => (
-                    <option key={type.id} value={type.id}>
-                      {type.name}
-                    </option>
-                  ))}
+                  {equipmentCategoryOrder.flatMap((category) => {
+                    const items = activeTypes.filter((type) => type.category === category);
+                    if (!items.length) return [];
+                    return (
+                      <optgroup key={category} label={equipmentCategoryLabels[category]}>
+                        {items.map((type) => (
+                          <option key={type.id} value={type.id}>
+                            {type.name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </Select>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <Field label="דגם" name="model" />

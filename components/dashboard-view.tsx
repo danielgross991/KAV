@@ -16,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardData } from "@/lib/kav/dashboard";
 
+const MEDALS = ["🥇", "🥈", "🥉"];
+
 export function DashboardView({ data }: { data: DashboardData }) {
   return data.canManage ? <ManagerDashboard data={data} /> : <ViewerDashboard data={data} />;
 }
@@ -123,6 +125,8 @@ function ManagerDashboard({ data }: { data: DashboardData }) {
         <div className="space-y-4">
           <CurrentPeriod data={data} />
           <UpcomingEvent data={data} />
+          <HomeLeaderboard data={data} />
+          <AttendanceByPerson data={data} />
           <QualificationReadiness data={data} />
         </div>
       </div>
@@ -157,9 +161,32 @@ function ViewerDashboard({ data }: { data: DashboardData }) {
       <div className="mt-4 space-y-4">
         <NextTask data={data} personal />
         <UpcomingEvent data={data} />
+        <HomeLeaderboard data={data} />
         <CurrentPeriod data={data} compact />
       </div>
     </AppPage>
+  );
+}
+
+function HomeLeaderboard({ data }: { data: DashboardData }) {
+  if (!data.homeLeaderboard.length) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-3"><CardTitle>אלופי הבית 🏡</CardTitle></CardHeader>
+      <CardContent className="divide-y">
+        {data.homeLeaderboard.map((item, index) => (
+          <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0" key={item.personId}>
+            <span className="flex items-center gap-2.5 text-sm font-medium">
+              <span aria-hidden className="text-lg">{MEDALS[index] ?? "🏅"}</span>
+              {item.fullName}
+            </span>
+            <span className="kav-num text-sm text-muted-foreground">
+              {item.homeDays} ימי בית · {Math.round(item.homePercentage * 100)}%
+            </span>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -278,6 +305,30 @@ function NextTask({ data, personal = false }: { data: DashboardData; personal?: 
         </div>
       )}
     </section>
+  );
+}
+
+function AttendanceByPerson({ data }: { data: DashboardData }) {
+  const withData = data.attendanceStats
+    .filter((item) => item.attendancePercentage !== null)
+    .sort((a, b) => (a.attendancePercentage ?? 0) - (b.attendancePercentage ?? 0))
+    .slice(0, 6);
+  if (!withData.length) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-3"><CardTitle>נוכחות לפי אדם</CardTitle></CardHeader>
+      <CardContent className="divide-y">
+        {withData.map((item) => (
+          <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0" key={item.personId}>
+            <span className="truncate text-sm font-medium">{item.fullName}</span>
+            <Badge variant={(item.attendancePercentage ?? 0) >= 0.9 ? "success" : (item.attendancePercentage ?? 0) >= 0.7 ? "warning" : "danger"}>
+              {Math.round((item.attendancePercentage ?? 0) * 100)}%
+            </Badge>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 

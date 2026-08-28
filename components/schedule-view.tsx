@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarDays, CheckCircle2, Plus } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import {
@@ -15,18 +15,19 @@ import { AppPage, EmptyState, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { addCalendarDays, calendarDayDifference, eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
+import { addCalendarDays, calendarDayDifference, eachCalendarDate, getDateInTimeZone, shiftMonth } from "@/lib/kav/dates";
 import { generateRotationBlocks } from "@/lib/kav/schedule-domain";
 import { getDaySchedule, type ScheduleData } from "@/lib/kav/schedule";
 import { cn } from "@/lib/utils";
 
 const phaseLabels: Record<string, string> = { preparation: "הכנה", line: "קו", stand_down: "ירידה / התארגנות", processing: "זיכויים", other: "אחר" };
-const eventLabels: Record<string, string> = { briefing: "תדריך", training: "אימון", family: "משפחות", processing: "זיכויים", changeover: "החלפה", other: "אחר" };
+const eventLabels: Record<string, string> = { briefing: "תדריך", training: "אימון", family: "משפחות", processing: "זיכויים", changeover: "החלפה", holiday: "חג / מועד", other: "אחר" };
 
-export function ScheduleView({ data, initialManage, view }: { data: ScheduleData; initialManage: boolean; view: string }) {
+export function ScheduleView({ data, initialManage, month, view }: { data: ScheduleData; initialManage: boolean; month?: string; view: string }) {
   const [manage, setManage] = useState(initialManage);
   const router = useRouter();
   const period = data.selectedPeriod;
+  const activeMonth = /^\d{4}-\d{2}$/.test(month ?? "") ? month! : (period && data.today >= period.starts_on && data.today <= period.ends_on ? data.today : period?.starts_on ?? data.today).slice(0, 7);
   return <AppPage>
     <PageHeader
       eyebrow={data.team.name}
@@ -36,23 +37,70 @@ export function ScheduleView({ data, initialManage, view }: { data: ScheduleData
     >
       <div className="space-y-2.5">
         {data.periods.length ? <select aria-label="תקופת מילואים" className="h-10 w-full rounded-md border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" value={period?.id ?? ""} onChange={(event) => router.push(`/${data.team.slug}/schedule?period=${event.target.value}&view=${view}`)}>{data.periods.map((item) => <option key={item.id} value={item.id}>{item.name} · {statusLabel(item.status)}</option>)}</select> : null}
-        {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={view === "agenda"} href={href(data, "agenda")}>אג׳נדה</Tab><Tab active={view === "month"} href={href(data, "month")}>חודש</Tab><Tab active={view === "rotations"} href={href(data, "rotations")}>סבבים</Tab></nav> : null}
+        {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={view === "agenda"} href={href(data, "agenda", activeMonth)}>אג׳נדה</Tab><Tab active={view === "month"} href={href(data, "month", activeMonth)}>חודש</Tab><Tab active={view === "rotations"} href={href(data, "rotations", activeMonth)}>סבבים</Tab></nav> : null}
       </div>
     </PageHeader>
     {manage && data.canManage ? <Manager data={data} /> : null}
-    {!period ? <Empty /> : view === "month" ? <Month data={data} /> : view === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
+    {!period ? <Empty /> : view === "month" ? <Month data={data} month={activeMonth} /> : view === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
   </AppPage>;
 }
 
 function Empty() { return <EmptyState icon={<CalendarDays className="size-4" />} title="אין עדיין תקופת מילואים" description="מנהל יכול ליצור תקופה חדשה ולהתחיל לבנות את הלו״ז." />; }
 function Tab({ active, children, href }: { active: boolean; children: React.ReactNode; href: string }) { return <Link aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:text-foreground")} href={href}>{children}</Link>; }
-function href(data: ScheduleData, view: string) { return `/${data.team.slug}/schedule?period=${data.selectedPeriod?.id}&view=${view}`; }
+function href(data: ScheduleData, view: string, month?: string) { return `/${data.team.slug}/schedule?period=${data.selectedPeriod?.id}&view=${view}${month ? `&month=${month}` : ""}`; }
+function monthLabel(month: string) { return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T12:00:00Z`)); }
 
-function Month({ data }: { data: ScheduleData }) {
-  const period = data.selectedPeriod!; const focus = data.today >= period.starts_on && data.today <= period.ends_on ? data.today : period.starts_on;
-  const monthStart = `${focus.slice(0, 7)}-01`; const gridStart = addCalendarDays(monthStart, -new Date(`${monthStart}T00:00:00Z`).getUTCDay());
+function Month({ data, month }: { data: ScheduleData; month: string }) {
+  const monthStart = `${month}-01`; const gridStart = addCalendarDays(monthStart, -new Date(`${monthStart}T00:00:00Z`).getUTCDay());
   const dates = Array.from({ length: 42 }, (_, index) => addCalendarDays(gridStart, index));
-  return <section className="overflow-x-auto rounded-lg border bg-card"><div className="border-b px-4 py-3 font-semibold">{new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${focus}T12:00:00Z`))}</div><div className="grid min-w-[760px] grid-cols-7 border-b bg-muted/40 text-center text-xs text-muted-foreground">{["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"].map((day) => <div className="p-2" key={day}>{day}</div>)}</div><div className="grid min-w-[760px] grid-cols-7">{dates.map((date) => { const day = getDaySchedule(data, date); return <Link className={cn("min-h-28 border-b border-l p-2 hover:bg-accent/40", date.slice(0, 7) !== focus.slice(0, 7) && "bg-muted/30 text-muted-foreground")} href={`/${data.team.slug}/schedule/${date}?period=${period.id}`} key={date}><div className="mb-2 flex justify-between"><span className={cn("grid size-7 place-items-center rounded-full text-sm", date === data.today && "bg-primary text-primary-foreground")}>{Number(date.slice(-2))}</span><span className="flex gap-1">{day.tasks.length ? <span className="mt-2 size-2 rounded-full bg-primary" /> : null}{day.events.length ? <span className="mt-2 size-2 rounded-full bg-amber-500" /> : null}</span></div>{day.groups.slice(0, 2).map((group) => <div className="truncate text-xs" key={group.id}><b>{group.name}</b> · {stateLabel(group.block?.state)}</div>)}{day.tasks.length ? <div className="mt-2 truncate text-xs text-primary">{day.tasks.length} משימות</div> : null}</Link>; })}</div></section>;
+  const todayMonth = data.today.slice(0, 7);
+  return <section className="overflow-x-auto rounded-lg border bg-card">
+    <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
+      <Link aria-label="חודש קודם" className="flex size-9 items-center justify-center rounded-md border bg-card text-muted-foreground hover:bg-muted" href={href(data, "month", shiftMonth(month, -1))}><ChevronRight className="size-4" /></Link>
+      <div className="flex items-center gap-2">
+        <span className="font-semibold">{monthLabel(month)}</span>
+        {month !== todayMonth ? <Link className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted" href={href(data, "month", todayMonth)}>היום</Link> : null}
+      </div>
+      <Link aria-label="חודש הבא" className="flex size-9 items-center justify-center rounded-md border bg-card text-muted-foreground hover:bg-muted" href={href(data, "month", shiftMonth(month, 1))}><ChevronLeft className="size-4" /></Link>
+    </div>
+    <div className="grid min-w-[760px] grid-cols-7 border-b bg-muted/40 text-center text-xs text-muted-foreground">{["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"].map((day) => <div className="p-2" key={day}>{day}</div>)}</div>
+    <div className="grid min-w-[760px] grid-cols-7">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} />; })}</div>
+  </section>;
+}
+
+function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; inMonth: boolean }) {
+  const holiday = day.events.find((event) => event.event_type === "holiday");
+  const otherEvents = day.events.filter((event) => event.event_type !== "holiday");
+  const viewer = data.viewerPersonId ? day.people.find((person) => person.id === data.viewerPersonId) : null;
+  const isPast = date < data.today;
+  const attendanceIssue = data.canManage && isPast && ((day.attendance?.absent.length ?? 0) > 0 || (day.attendance?.unreported.length ?? 0) > 0);
+
+  return <Link className={cn("min-h-28 border-b border-l p-2 hover:bg-accent/40", !inMonth && "bg-muted/30 text-muted-foreground")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`}>
+    <div className="mb-1.5 flex items-start justify-between gap-1">
+      <span className={cn("grid size-7 place-items-center rounded-full text-sm", date === data.today && "bg-primary text-primary-foreground")}>{Number(date.slice(-2))}</span>
+      <span className="mt-1 flex flex-wrap justify-end gap-1">
+        {holiday ? <span aria-label={holiday.title} className="size-2 rounded-full bg-violet-500" title={holiday.title} /> : null}
+        {otherEvents.length ? <span className="size-2 rounded-full bg-amber-500" /> : null}
+        {day.tasks.length ? <span className="size-2 rounded-full bg-primary" /> : null}
+        {data.canManage && day.approvedLeave.length ? <span className="size-2 rounded-full bg-sky-500" /> : null}
+        {attendanceIssue ? <span className="size-2 rounded-full bg-destructive" /> : null}
+      </span>
+    </div>
+    {holiday ? <div className="truncate text-xs font-medium text-violet-700">{holiday.title}</div> : null}
+    {data.canManage ? (
+      <>
+        {day.groups.slice(0, 2).map((group) => <div className="truncate text-xs" key={group.id}><b>{group.name}</b> · {stateLabel(group.block?.state)}</div>)}
+        {day.tasks.length ? <div className="mt-1.5 truncate text-xs text-primary">{day.tasks.length} משימות</div> : null}
+      </>
+    ) : viewer ? (
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        <Badge variant={viewer.resolution.state === "base" ? "success" : viewer.resolution.state === "home" ? "muted" : "outline"}>
+          {stateLabel(viewer.resolution.state)}
+        </Badge>
+        {viewer.resolution.leave ? <Badge variant="info">יציאה</Badge> : null}
+      </div>
+    ) : null}
+  </Link>;
 }
 
 function Agenda({ data }: { data: ScheduleData }) {

@@ -13,7 +13,7 @@ export default async function PersonPage({ params, searchParams }: PersonPagePro
   const { saved, tab } = await searchParams;
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
-  const data = await getPersonProfileData(supabase, membership, personId);
+  const data = await getPersonProfileData(supabase, membership, personId, userId);
 
   return <PersonProfileView data={data} saved={saved} tab={tab} />;
 }
