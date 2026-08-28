@@ -34,6 +34,14 @@ export function eachCalendarDate(startsOn: string, endsOn: string): string[] {
   return dates;
 }
 
+export function getWeekStart(date: string, weekStartDay = 0) {
+  if (!Number.isInteger(weekStartDay) || weekStartDay < 0 || weekStartDay > 6) {
+    throw new Error("Week start day must be between 0 and 6");
+  }
+  const day = parseCalendarDate(date).getUTCDay();
+  return addCalendarDays(date, -((day - weekStartDay + 7) % 7));
+}
+
 export function localDateTimeToIso(
   timeZone: string,
   localDate: string,

@@ -185,12 +185,93 @@ export type Database = {
         notes: string | null;
         updated_at: string;
       }>;
+      schedule_publications: Row<{
+        created_at: string;
+        id: string;
+        published_at: string | null;
+        published_by: string | null;
+        reserve_period_id: string;
+        status: "draft" | "published";
+        team_id: string;
+        updated_at: string;
+        version: number;
+        week_starts_on: string;
+      }>;
+      task_assignments: Row<{
+        assigned_by: string | null;
+        assignment_role: string;
+        availability_override: boolean;
+        created_at: string;
+        id: string;
+        person_id: string;
+        status: "assigned" | "replaced" | "cancelled";
+        task_instance_id: string;
+        task_instance_requirement_id: string;
+        team_id: string;
+        updated_at: string;
+      }>;
+      task_instance_requirements: Row<{
+        created_at: string;
+        id: string;
+        pakal_type_id: string | null;
+        required_count: number;
+        requirement_type: "any_person" | "pakal";
+        role_label: string;
+        sort_order: number;
+        task_instance_id: string;
+        team_id: string;
+      }>;
+      task_instances: Row<{
+        created_at: string;
+        created_by: string | null;
+        ends_at: string;
+        id: string;
+        location: string | null;
+        notes: string | null;
+        reserve_period_id: string;
+        schedule_publication_id: string;
+        starts_at: string;
+        task_template_id: string | null;
+        team_id: string;
+        title: string;
+        updated_at: string;
+      }>;
+      task_template_requirements: Row<{
+        created_at: string;
+        id: string;
+        pakal_type_id: string | null;
+        required_count: number;
+        requirement_type: "any_person" | "pakal";
+        role_label: string;
+        sort_order: number;
+        task_template_id: string;
+        team_id: string;
+      }>;
+      task_templates: Row<{
+        created_at: string;
+        default_duration_minutes: number | null;
+        default_location: string | null;
+        description: string | null;
+        id: string;
+        is_active: boolean;
+        name: string;
+        team_id: string;
+        updated_at: string;
+      }>;
       team_memberships: Row<{
         id: string;
         is_active: boolean;
         role: "admin" | "manager" | "viewer";
         team_id: string;
         user_id: string;
+      }>;
+      team_settings: Row<{
+        attendance_whatsapp_template: string | null;
+        created_at: string;
+        show_leave_reasons_to_viewers: boolean;
+        team_id: string;
+        updated_at: string;
+        week_start_day: number;
       }>;
       team_pakal_requirements: Row<{
         created_at: string;
