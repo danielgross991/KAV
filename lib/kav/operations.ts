@@ -48,9 +48,8 @@ export type OperationalRange = {
 // reasons, manager notes, or any other private column. This lets any active team member
 // (not just managers) get a correct operational resolution, without ever weakening the
 // manager-only RLS on leave_requests/attendance_days/attendance_entries themselves.
-// Do NOT reintroduce a direct `.from("attendance_entries")`/`.from("attendance_days")`/
-// `.from("leave_requests")` select in this file — it will silently return zero rows for a
-// viewer session and break their personal status/stats. See rls-safety.test.mjs.
+// Do NOT reintroduce direct source-table selects in this file. Those tables are
+// manager-only and must remain behind the scoped RPCs for viewer-facing reads.
 
 export async function getApprovedLeaveWindows(
   supabase: Client,

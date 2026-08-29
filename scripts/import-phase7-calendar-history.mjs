@@ -88,7 +88,9 @@ async function main() {
   const period2026 = await getOrCreatePeriod(team.id, reservePeriod2026.period);
   await createPhases(team.id, period2026.id, reservePeriod2026.phases ?? []);
   await createEvents(team, period2026.id, reservePeriod2026.events ?? [], "event");
-  await createEvents(team, period2026.id, (reservePeriod2026.holidays ?? []).map((h) => ({ ...h, event_type: "holiday", is_all_day: true })), "holiday");
+  // The current schedule schema intentionally has no separate holiday event type;
+  // holidays are displayed as all-day calendar events with the valid generic type.
+  await createEvents(team, period2026.id, (reservePeriod2026.holidays ?? []).map((h) => ({ ...h, event_type: "other", is_all_day: true })), "holiday");
   await importPendingLeave(team.id, period2026.id, reservePeriod2026.pendingLeaveRequests ?? [], nameToId);
   for (const skipped of reservePeriod2026.skippedLeaveRequests ?? []) {
     report.pendingLeaveSkipped.push(skipped);
@@ -220,9 +222,14 @@ async function createEvents(team, reservePeriodId, events, kind) {
     const bucket = kind === "holiday" ? report.holidaysSkipped : report.eventsSkipped;
     if (existing) { bucket.push({ title: event.title, starts_on: event.starts_on, reason: "already exists" }); continue; }
 
+    // Holidays in the legacy extract use a semantic label that is not part of the
+    // schedule_events constraint. Preserve them as all-day events using the valid
+    // generic category; the title and all-day flag retain the calendar meaning.
+    const eventType = ["briefing", "training", "family", "processing", "changeover", "other"]
+      .includes(event.event_type) ? event.event_type : "other";
     const { error: insertError } = await supabase.from("schedule_events").insert({
       team_id: team.id, reserve_period_id: reservePeriodId, title: event.title,
-      event_type: event.event_type, starts_at: startsAt, ends_at: endsAt,
+      event_type: eventType, starts_at: startsAt, ends_at: endsAt,
       is_all_day: Boolean(event.is_all_day), notes: event.notes ?? null, location: event.location ?? null,
     });
     if (insertError) throw new Error(`Unable to create event '${event.title}': ${insertError.message}`);
@@ -300,45 +307,54 @@ async function importHistoricalAttendance(teamId, reservePeriodId, attendanceDat
     });
   }
 
+  const { data: existingDays, error: daysError } = await supabase.from("attendance_days")
+    .select("id, attendance_date, status").eq("team_id", teamId).eq("reserve_period_id", reservePeriodId);
+  if (daysError) throw new Error(`Unable to load historical attendance days: ${daysError.message}`);
+  const dayByDate = new Map((existingDays ?? []).map((day) => [day.attendance_date, day]));
   for (const record of inRange) {
-    let { data: day, error } = await supabase.from("attendance_days").select("id, status")
-      .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId).eq("attendance_date", record.date).maybeSingle();
-    if (error) throw new Error(`Unable to look up attendance day ${record.date}: ${error.message}`);
+    let day = dayByDate.get(record.date);
     if (!day) {
       const { data: created, error: insertError } = await supabase.from("attendance_days").insert({
         team_id: teamId, reserve_period_id: reservePeriodId, attendance_date: record.date,
         status: "submitted", submitted_at: new Date().toISOString(),
-      }).select("id, status").single();
+      }).select("id, attendance_date, status").single();
       if (insertError) throw new Error(`Unable to create attendance day ${record.date}: ${insertError.message}`);
       day = created;
+      dayByDate.set(record.date, day);
       report.historicalAttendanceDates.push(record.date);
     } else if (day.status !== "submitted") {
-      const { error: updateError } = await supabase.from("attendance_days").update({ status: "submitted" })
-        .eq("id", day.id);
+      const { error: updateError } = await supabase.from("attendance_days").update({ status: "submitted" }).eq("id", day.id);
       if (updateError) throw new Error(`Unable to finalize attendance day ${record.date}: ${updateError.message}`);
     }
+  }
 
+  const dayIds = [...dayByDate.values()].map((day) => day.id);
+  const { data: existingEntries, error: entriesError } = dayIds.length
+    ? await supabase.from("attendance_entries").select("id, attendance_day_id, person_id")
+      .eq("team_id", teamId).in("attendance_day_id", dayIds)
+    : { data: [], error: null };
+  if (entriesError) throw new Error(`Unable to load historical attendance entries: ${entriesError.message}`);
+  const entryKeys = new Set((existingEntries ?? []).map((entry) => `${entry.attendance_day_id}:${entry.person_id}`));
+  const rowsToInsert = [];
+  for (const record of inRange) {
+    const day = dayByDate.get(record.date);
     for (const [legacyName, isPresent] of Object.entries(record.presence)) {
       const personId = resolvePersonId(nameToId, legacyName, `historical attendance ${record.date}`);
       if (!personId) continue;
-      const { data: existingEntry, error: entryError } = await supabase.from("attendance_entries").select("id")
-        .eq("team_id", teamId).eq("attendance_day_id", day.id).eq("person_id", personId).maybeSingle();
-      if (entryError) throw new Error(`Unable to look up attendance entry ${record.date}/${legacyName}: ${entryError.message}`);
-      if (existingEntry) {
-        const { error: updateError } = await supabase.from("attendance_entries").update({
-          is_present: isPresent, source: "legacy_import_2025",
-        }).eq("id", existingEntry.id);
-        if (updateError) throw new Error(`Unable to update attendance entry ${record.date}/${legacyName}: ${updateError.message}`);
-        report.historicalPresenceRowsUpdated.push({ date: record.date, person: legacyName, isPresent });
-      } else {
-        const { error: insertError } = await supabase.from("attendance_entries").insert({
-          team_id: teamId, attendance_day_id: day.id, person_id: personId,
-          is_present: isPresent, source: "legacy_import_2025",
-        });
-        if (insertError) throw new Error(`Unable to create attendance entry ${record.date}/${legacyName}: ${insertError.message}`);
-        report.historicalPresenceRowsCreated.push({ date: record.date, person: legacyName, isPresent });
-      }
+      const key = `${day.id}:${personId}`;
+      if (entryKeys.has(key)) continue;
+      entryKeys.add(key);
+      rowsToInsert.push({ team_id: teamId, attendance_day_id: day.id, person_id: personId, is_present: isPresent, source: "manual" });
+      report.historicalPresenceRowsCreated.push({ date: record.date, person: legacyName, isPresent });
     }
+  }
+  for (let index = 0; index < rowsToInsert.length; index += 500) {
+    const { error: insertError } = await supabase.from("attendance_entries")
+      .upsert(rowsToInsert.slice(index, index + 500), {
+        onConflict: "attendance_day_id,person_id",
+        ignoreDuplicates: true,
+      });
+    if (insertError) throw new Error(`Unable to create historical attendance entries: ${insertError.message}`);
   }
 }
 
