@@ -8,6 +8,7 @@ import {
   Clock3,
   Home,
   UserCheck,
+  UserRound,
   Users,
 } from "lucide-react";
 
@@ -15,6 +16,7 @@ import { AppPage, PageHeader, SectionHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardData } from "@/lib/kav/dashboard";
+import { cn } from "@/lib/utils";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -125,6 +127,7 @@ function ManagerDashboard({ data }: { data: DashboardData }) {
         <div className="space-y-4">
           <CurrentPeriod data={data} />
           <UpcomingEvent data={data} />
+          <StatsPeriodSelector data={data} />
           <HomeLeaderboard data={data} />
           <AttendanceByPerson data={data} />
           <QualificationReadiness data={data} />
@@ -161,6 +164,7 @@ function ViewerDashboard({ data }: { data: DashboardData }) {
       <div className="mt-4 space-y-4">
         <NextTask data={data} personal />
         <UpcomingEvent data={data} />
+        <StatsPeriodSelector data={data} />
         <HomeLeaderboard data={data} />
         <CurrentPeriod data={data} compact />
       </div>
@@ -170,23 +174,78 @@ function ViewerDashboard({ data }: { data: DashboardData }) {
 
 function HomeLeaderboard({ data }: { data: DashboardData }) {
   if (!data.homeLeaderboard.length) return null;
+  const podium = [data.homeLeaderboard[1], data.homeLeaderboard[0], data.homeLeaderboard[2]].filter(Boolean);
   return (
     <Card>
-      <CardHeader className="pb-3"><CardTitle>אלופי הבית 🏡</CardTitle></CardHeader>
-      <CardContent className="divide-y">
-        {data.homeLeaderboard.map((item, index) => (
-          <div className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0" key={item.personId}>
-            <span className="flex items-center gap-2.5 text-sm font-medium">
-              <span aria-hidden className="text-lg">{MEDALS[index] ?? "🏅"}</span>
-              {item.fullName}
-            </span>
-            <span className="kav-num text-sm text-muted-foreground">
-              {item.homeDays} ימי בית · {Math.round(item.homePercentage * 100)}%
-            </span>
-          </div>
+      <CardHeader className="pb-3"><CardTitle>אלופי הבית</CardTitle></CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 items-end gap-2">
+          {podium.map((item) => {
+            const rank = data.homeLeaderboard.findIndex((candidate) => candidate.personId === item.personId) + 1;
+            return (
+              <div
+                key={item.personId}
+                className={cn(
+                  "grid min-h-36 place-items-center rounded-lg border bg-muted/30 p-2 text-center",
+                  rank === 1 && "min-h-44 border-primary/30 bg-accent",
+                )}
+              >
+                <span className="text-xl" aria-hidden>{MEDALS[rank - 1]}</span>
+                <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} featured={rank === 1} />
+                <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
+                <span className="kav-num mt-1 text-xs text-muted-foreground">
+                  {item.homeDays} ימים · {Math.round(item.homePercentage * 100)}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function StatsPeriodSelector({ data }: { data: DashboardData }) {
+  if (data.statsPeriods.length <= 1) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle>סטטיסטיקות לפי סבב</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-wrap gap-2">
+        {data.statsPeriods.slice(0, 4).map((period) => (
+          <Link
+            key={period.id}
+            className={cn(
+              "rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted",
+              data.statsPeriodId === period.id && "border-primary bg-accent text-primary",
+            )}
+            href={`/${data.team.slug}?statsPeriod=${period.id}`}
+          >
+            {period.name}
+          </Link>
         ))}
       </CardContent>
     </Card>
+  );
+}
+
+function PersonAvatar({ featured, name, photoUrl }: { featured?: boolean; name: string; photoUrl: string | null }) {
+  const size = featured ? "size-16" : "size-12";
+  if (photoUrl) {
+    return (
+      <span
+        aria-label={name}
+        className={cn("block rounded-lg border bg-cover bg-center", size)}
+        style={{ backgroundImage: `url(${photoUrl})` }}
+      />
+    );
+  }
+
+  return (
+    <span className={cn("flex items-center justify-center rounded-lg border bg-card text-muted-foreground", size)}>
+      <UserRound className={featured ? "size-7" : "size-5"} />
+    </span>
   );
 }
 

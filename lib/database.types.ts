@@ -381,6 +381,19 @@ export type Database = {
           status: string;
         }[];
       };
+      get_team_leave_request_markers: {
+        Args: {
+          target_reserve_period_id: string;
+          target_team_id: string;
+        };
+        Returns: {
+          ends_on: string;
+          id: string;
+          person_id: string;
+          starts_on: string;
+          status: string;
+        }[];
+      };
       get_person_attendance_summary: {
         Args: {
           target_person_id: string;

@@ -6,13 +6,20 @@ import { canManage } from "@/lib/kav/teams";
 
 type TeamDashboardProps = {
   params: Promise<{ teamSlug: string }>;
+  searchParams: Promise<{ statsPeriod?: string }>;
 };
 
-export default async function TeamDashboardPage({ params }: TeamDashboardProps) {
-  const { teamSlug } = await params;
+export default async function TeamDashboardPage({ params, searchParams }: TeamDashboardProps) {
+  const [{ teamSlug }, query] = await Promise.all([params, searchParams]);
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
-  const data = await getDashboardData(supabase, membership.team, canManage(membership.role), userId);
+  const data = await getDashboardData(
+    supabase,
+    membership.team,
+    canManage(membership.role),
+    userId,
+    query.statsPeriod,
+  );
 
   return <DashboardView data={data} />;
 }

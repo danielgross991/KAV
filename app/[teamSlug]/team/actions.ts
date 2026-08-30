@@ -19,6 +19,7 @@ export async function createPersonAction(teamSlug: string, formData: FormData) {
   const phone = optionalText(formData, "phone");
   const email = optionalEmail(formData, "email");
   const notes = optionalText(formData, "notes");
+  const photoUrl = optionalText(formData, "photo_url");
   const isActive = formData.get("is_active") === "on";
 
   const { data, error } = await supabase
@@ -29,6 +30,7 @@ export async function createPersonAction(teamSlug: string, formData: FormData) {
       is_active: isActive,
       notes,
       phone,
+      photo_url: photoUrl,
       team_id: membership.team.id,
     })
     .select("id")
@@ -52,6 +54,7 @@ export async function updatePersonAction(
   const phone = optionalText(formData, "phone");
   const email = optionalEmail(formData, "email");
   const notes = optionalText(formData, "notes");
+  const photoUrl = optionalText(formData, "photo_url");
   const isActive = formData.get("is_active") === "on";
 
   const { error } = await supabase
@@ -62,6 +65,7 @@ export async function updatePersonAction(
       is_active: isActive,
       notes,
       phone,
+      photo_url: photoUrl,
     })
     .eq("team_id", membership.team.id)
     .eq("id", personId);

@@ -51,6 +51,14 @@ export type DashboardData = {
     state: string;
   }[];
   team: TeamSummary;
+  statsPeriodId: string | null;
+  statsPeriods: {
+    endsOn: string;
+    id: string;
+    name: string;
+    startsOn: string;
+    status: string;
+  }[];
   upcomingEvent:
     | {
         startsAt: string;
@@ -65,6 +73,7 @@ export async function getDashboardData(
   team: TeamSummary,
   manager = false,
   userId?: string,
+  selectedStatsPeriodId?: string,
 ): Promise<DashboardData> {
   const today = getDateInTimeZone(team.timezone);
   const now = new Date().toISOString();
@@ -75,6 +84,7 @@ export async function getDashboardData(
     requirementsResult,
     personPakalsResult,
     currentPersonResult,
+    statsPeriodsResult,
   ] = await Promise.all([
     supabase
       .from("people")
@@ -106,6 +116,11 @@ export async function getDashboardData(
           .eq("auth_user_id", userId)
           .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    supabase
+      .from("reserve_periods")
+      .select("id, name, starts_on, ends_on, status")
+      .eq("team_id", team.id)
+      .order("starts_on", { ascending: false }),
   ]);
 
   assertOk(activePeopleResult.error, "active people");
@@ -113,12 +128,13 @@ export async function getDashboardData(
   assertOk(requirementsResult.error, "pakal requirements");
   assertOk(personPakalsResult.error, "person pakals");
   assertOk(currentPersonResult.error, "current person");
+  assertOk(statsPeriodsResult.error, "stats periods");
 
   const [operationalSchedule, operationalDay, nextTask, teamStats] = await Promise.all([
     getOperationalScheduleSummary(supabase, team, today),
     getOperationalDay(supabase, team, today),
     userId ? getNextPersonalTask(supabase, team, userId) : Promise.resolve(null),
-    getTeamStats(supabase, team, today),
+    getTeamStats(supabase, team, today, selectedStatsPeriodId),
   ]);
   const currentPeriod = operationalSchedule.period;
   const attendance = {
@@ -192,6 +208,14 @@ export async function getDashboardData(
     })),
     rotationStatus,
     team,
+    statsPeriodId: teamStats.periodId,
+    statsPeriods: (statsPeriodsResult.data ?? []).map((period) => ({
+      endsOn: period.ends_on,
+      id: period.id,
+      name: period.name,
+      startsOn: period.starts_on,
+      status: period.status,
+    })),
     upcomingEvent: upcomingEventResult.data
       ? {
           startsAt: upcomingEventResult.data.starts_at,

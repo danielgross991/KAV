@@ -77,9 +77,16 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
       {data.canManage ? (
         <section className="mt-5 grid gap-4 md:grid-cols-2">
           <div>
-            <SectionHeader title="חריגים" hint={`${day.approvedLeave.length + day.overrides.length}`} />
+            <SectionHeader title="חריגים ובקשות" hint={`${day.approvedLeave.length + day.leaveRequests.length + day.overrides.length}`} />
             <Card className="divide-y overflow-hidden">
               {day.approvedLeave.map((person) => <CompactRow key={person.id} title={person.full_name} detail="יציאה מאושרת" />)}
+              {day.leaveRequests.map((request) => (
+                <CompactRow
+                  key={request.id}
+                  title={personName.get(request.personId) ?? "איש צוות"}
+                  detail={`בקשת יציאה · ${leaveStatusLabel(request.status)}`}
+                />
+              ))}
               {day.overrides.map((override) => (
                 <CompactRow
                   key={override.id}
@@ -87,7 +94,7 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
                   detail={`שינוי סבב · ${override.from_rotation_group_id ? `${groupName.get(override.from_rotation_group_id)} ← ` : ""}${override.to_rotation_group_id ? groupName.get(override.to_rotation_group_id) : "ללא סבב"}`}
                 />
               ))}
-              {!day.approvedLeave.length && !day.overrides.length ? <p className="p-3.5 text-sm text-muted-foreground">אין חריגים ביום זה.</p> : null}
+              {!day.approvedLeave.length && !day.leaveRequests.length && !day.overrides.length ? <p className="p-3.5 text-sm text-muted-foreground">אין חריגים או בקשות ביום זה.</p> : null}
             </Card>
           </div>
           <div>
@@ -131,7 +138,7 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
         <SectionHeader title="אירועים" hint={`${day.events.length}`} />
         <Card className="divide-y overflow-hidden">
           {day.events.map((event) => {
-            const isHoliday = event.event_type === "holiday";
+            const isHoliday = isHolidayEvent(event);
             return (
               <div className="flex gap-3 p-3.5" key={event.id}>
                 <span className={`flex size-9 shrink-0 items-center justify-center rounded-md ${isHoliday ? "bg-special-soft text-special" : "bg-warning-soft text-warning"}`}><CalendarClock className="size-4" /></span>
@@ -167,3 +174,30 @@ function stateLabel(value?: string | null) { return value === "base" ? "בבסי
 function shortDate(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function formatTime(iso: string, zone: string) { return new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: zone }).format(new Date(iso)); }
+
+const holidayTitles = new Set([
+  "ערב ראש השנה",
+  "ראש השנה א׳",
+  "ראש השנה ב׳",
+  "צום גדליה",
+  "ערב יום כיפור",
+  "יום כיפור",
+  "ערב סוכות",
+  "סוכות",
+  "חול המועד סוכות",
+  "הושענא רבה",
+  "שמיני עצרת / שמחת תורה",
+  "תשעה באב",
+]);
+
+function isHolidayEvent(event: ReturnType<typeof getDaySchedule>["events"][number]) {
+  return event.event_type === "holiday" || holidayTitles.has(event.title);
+}
+
+function leaveStatusLabel(status: string) {
+  if (status === "pending") return "ממתינה";
+  if (status === "approved") return "מאושרת";
+  if (status === "partially_approved") return "מאושרת חלקית";
+  if (status === "rejected") return "נדחתה";
+  return status;
+}

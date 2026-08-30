@@ -65,6 +65,7 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="טלפון" name="phone" type="tel" />
                     <Field label="אימייל" name="email" type="email" />
+                    <Field label="קישור לתמונה" name="photo_url" type="url" />
                   </div>
                   <TextArea label="הערות" name="notes" />
                   <label className="flex items-center gap-2 text-sm">
@@ -127,20 +128,29 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
         />
       ) : (
         <>
-          <div className="hidden overflow-hidden rounded-lg border bg-card md:block">
-            <table className="w-full table-fixed text-right text-sm">
+          <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
+            <table className="min-w-[1180px] w-full table-fixed text-right text-sm">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
                 <tr>
-                  <th className="w-[28%] px-4 py-3 font-medium">שם</th>
-                  <th className="w-[12%] px-4 py-3 font-medium">סטטוס</th>
-                  <th className="w-[27%] px-4 py-3 font-medium">פקלים</th>
-                  <th className="w-[17%] px-4 py-3 font-medium">רוטציה</th>
-                  <th className="w-[16%] px-4 py-3 font-medium">קשר</th>
+                  <th className="w-[15%] px-4 py-3 font-medium">לוחם</th>
+                  <th className="w-[7%] px-4 py-3 font-medium">סטטוס</th>
+                  <th className="w-[12%] px-4 py-3 font-medium">נשק</th>
+                  {data.canManageTeam ? <th className="w-[8%] px-4 py-3 font-medium">צ׳ נשק</th> : null}
+                  <th className="w-[10%] px-4 py-3 font-medium">כוונת</th>
+                  {data.canManageTeam ? <th className="w-[8%] px-4 py-3 font-medium">צ׳ כוונת</th> : null}
+                  <th className="w-[10%] px-4 py-3 font-medium">אמר״ל</th>
+                  {data.canManageTeam ? <th className="w-[8%] px-4 py-3 font-medium">צ׳ אמר״ל</th> : null}
+                  <th className="w-[12%] px-4 py-3 font-medium">פק״לים</th>
+                  <th className="w-[10%] px-4 py-3 font-medium">ציוד נוסף</th>
+                  <th className="w-[10%] px-4 py-3 font-medium">סבב</th>
+                  <th className="w-[8%] px-4 py-3 font-medium">קשר</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {filteredPeople.map((person) => (
-                  <tr key={person.id} className="hover:bg-muted/30">
+                {filteredPeople.map((person) => {
+                  const equipment = summarizeEquipment(person.equipment);
+                  return (
+                  <tr key={person.id} className="align-top hover:bg-muted/30">
                     <td className="px-4 py-3">
                       <Link
                         className="font-medium text-primary hover:underline"
@@ -152,9 +162,17 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
                     <td className="px-4 py-3">
                       <StatusBadge active={person.is_active} />
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{equipment.weapon.models}</td>
+                    {data.canManageTeam ? <td className="px-4 py-3 kav-num text-muted-foreground">{equipment.weapon.serials}</td> : null}
+                    <td className="px-4 py-3 text-muted-foreground">{equipment.optic.models}</td>
+                    {data.canManageTeam ? <td className="px-4 py-3 kav-num text-muted-foreground">{equipment.optic.serials}</td> : null}
+                    <td className="px-4 py-3 text-muted-foreground">{equipment.amral.models}</td>
+                    {data.canManageTeam ? <td className="px-4 py-3 kav-num text-muted-foreground">{equipment.amral.serials}</td> : null}
                     <td className="px-4 py-3">
                       <PakalChips names={person.pakals.map((item) => item.name)} />
+                      {equipment.pakal.models !== "אין" ? <p className="mt-1 text-xs text-muted-foreground">{equipment.pakal.models}</p> : null}
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{equipment.other.models}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {person.rotation?.name ?? "אין"}
                     </td>
@@ -162,7 +180,7 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
                       <ContactLinks email={person.email} phone={person.phone} />
                     </td>
                   </tr>
-                ))}
+                );})}
               </tbody>
             </table>
           </div>
@@ -267,6 +285,30 @@ function PakalChips({ names }: { names: string[] }) {
       {names.length > 4 ? <Badge variant="muted">+{names.length - 4}</Badge> : null}
     </div>
   );
+}
+
+function summarizeEquipment(equipment: TeamManagementData["people"][number]["equipment"]) {
+  return {
+    amral: summarizeEquipmentCategory(equipment, "AMRAL"),
+    optic: summarizeEquipmentCategory(equipment, "OPTIC"),
+    other: summarizeEquipmentCategory(equipment, "OTHER"),
+    pakal: summarizeEquipmentCategory(equipment, "PAKAL"),
+    weapon: summarizeEquipmentCategory(equipment, "WEAPON"),
+  };
+}
+
+function summarizeEquipmentCategory(
+  equipment: TeamManagementData["people"][number]["equipment"],
+  category: "AMRAL" | "OPTIC" | "OTHER" | "PAKAL" | "WEAPON",
+) {
+  const items = equipment.filter((item) => item.equipmentType?.category === category);
+  const models = items.map((item) => item.model || item.equipmentType?.name).filter(Boolean).join(", ");
+  const serials = items.map((item) => item.serial_number).filter(Boolean).join(", ");
+
+  return {
+    models: models || "אין",
+    serials: serials || "אין",
+  };
 }
 
 function ContactLinks({ email, phone }: { email: string | null; phone: string | null }) {

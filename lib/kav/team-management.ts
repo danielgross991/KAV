@@ -14,8 +14,16 @@ export type PersonListItem = Pick<
   TableRow<"people">,
   "email" | "full_name" | "id" | "is_active" | "phone" | "photo_url"
 > & {
+  equipment: PersonListEquipmentItem[];
   pakals: Array<Pick<TableRow<"pakal_types">, "id" | "name">>;
   rotation: { id: string; name: string } | null;
+};
+
+export type PersonListEquipmentItem = Pick<
+  TableRow<"person_equipment">,
+  "id" | "model" | "person_id" | "serial_number" | "status"
+> & {
+  equipmentType: Pick<TableRow<"equipment_types">, "category" | "name"> | null;
 };
 
 export type PakalType = TableRow<"pakal_types"> & {
@@ -72,7 +80,8 @@ export async function getTeamManagementData(
   supabase: Client,
   membership: TeamMembership,
 ): Promise<TeamManagementData> {
-  const [people, pakalTypes, personPakals, requirements, currentRotationContext] =
+  const canManageTeam = canManage(membership.role);
+  const [people, pakalTypes, personPakals, requirements, currentRotationContext, equipmentTypes, equipment] =
     await Promise.all([
       selectOrThrow(
         supabase
@@ -107,18 +116,52 @@ export async function getTeamManagementData(
         "לא ניתן לטעון דרישות כשירות",
       ),
       getCurrentRotationContext(supabase, membership.team.id, membership.team.timezone),
+      canManageTeam
+        ? selectOrThrow(
+            supabase
+              .from("equipment_types")
+              .select("id, team_id, name, category, serial_required, is_active, created_at")
+              .eq("team_id", membership.team.id),
+            "לא ניתן לטעון סוגי ציוד",
+          )
+        : Promise.resolve([]),
+      canManageTeam
+        ? selectOrThrow(
+            supabase
+              .from("person_equipment")
+              .select("id, team_id, person_id, equipment_type_id, model, serial_number, status")
+              .eq("team_id", membership.team.id)
+              .neq("status", "returned"),
+            "לא ניתן לטעון ציוד צוות",
+          )
+        : Promise.resolve([]),
     ]);
 
   const pakalsById = new Map(pakalTypes.map((pakal) => [pakal.id, pakal]));
+  const equipmentTypeById = new Map(equipmentTypes.map((type) => [type.id, type]));
+  const equipmentByPersonId = new Map<string, PersonListEquipmentItem[]>();
+  for (const item of equipment) {
+    const items = equipmentByPersonId.get(item.person_id) ?? [];
+    items.push({
+      equipmentType: equipmentTypeById.get(item.equipment_type_id) ?? null,
+      id: item.id,
+      model: item.model,
+      person_id: item.person_id,
+      serial_number: item.serial_number,
+      status: item.status,
+    });
+    equipmentByPersonId.set(item.person_id, items);
+  }
   const requirementsByPakalId = new Map(
     requirements.map((requirement) => [requirement.pakal_type_id, requirement.required_count]),
   );
   const assignedCounts = countActivePakals(personPakals);
 
   return {
-    canManageTeam: canManage(membership.role),
+    canManageTeam,
     people: people.map((person) => ({
       email: person.email,
+      equipment: equipmentByPersonId.get(person.id) ?? [],
       full_name: person.full_name,
       id: person.id,
       is_active: person.is_active,

@@ -11,6 +11,7 @@ export type DailyResolution = {
 export type PersonStatsInput = {
   fullName: string;
   id: string;
+  photoUrl?: string | null;
 };
 
 export type PersonAttendanceStats = {
@@ -22,6 +23,7 @@ export type PersonAttendanceStats = {
   homePercentage: number;
   leaveDays: number;
   personId: string;
+  photoUrl: string | null;
   presentOnExpectedDays: number;
   totalElapsedDays: number;
 };
@@ -59,6 +61,7 @@ export function computeAttendanceStats(
       homePercentage: totalElapsedDays > 0 ? homeDays / totalElapsedDays : 0,
       leaveDays,
       personId: person.id,
+      photoUrl: person.photoUrl ?? null,
       presentOnExpectedDays,
       totalElapsedDays,
     };

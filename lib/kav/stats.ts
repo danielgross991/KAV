@@ -28,17 +28,21 @@ export async function getTeamStats(
   supabase: Client,
   team: TeamSummary,
   today = getDateInTimeZone(team.timezone),
+  selectedPeriodId?: string,
 ): Promise<TeamStats> {
   const { data: periods, error } = await supabase
     .from("reserve_periods")
     .select("*")
     .eq("team_id", team.id)
-    .in("status", ["active", "published"])
-    .lte("starts_on", today)
-    .gte("ends_on", today);
+    .order("starts_on", { ascending: false });
   if (error) throw new Error(`Unable to load reserve periods for stats: ${error.message}`);
 
-  const period = selectOperationalReservePeriod(periods ?? [], today);
+  const period = selectedPeriodId
+    ? (periods ?? []).find((item) => item.id === selectedPeriodId) ?? null
+    : selectOperationalReservePeriod(
+        (periods ?? []).filter((item) => item.status === "active" || item.status === "published"),
+        today,
+      );
   if (!period) return { leaderboard: [], periodId: null, stats: [] };
 
   const elapsedEnd = today < period.ends_on ? addCalendarDays(today, -1) : period.ends_on;
@@ -63,7 +67,7 @@ export async function getTeamStats(
   }
 
   const stats = computeAttendanceStats(
-    activePeople.map((person) => ({ fullName: person.full_name, id: person.id })),
+    activePeople.map((person) => ({ fullName: person.full_name, id: person.id, photoUrl: person.photo_url })),
     resolutionsByPerson,
   );
 

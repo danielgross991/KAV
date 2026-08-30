@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone, overlapsCalendarDayInTimeZone } from "@/lib/kav/dates";
-import { getApprovedLeaveWindows, getAttendanceEntriesByDate } from "@/lib/kav/operations";
+import { getApprovedLeaveWindows, getAttendanceEntriesByDate, getLeaveRequestMarkers } from "@/lib/kav/operations";
 import {
   resolveOperationalPerson,
   resolvePersonSchedule,
@@ -25,6 +25,7 @@ export type ScheduleData = {
   config: Row<"rotation_generation_configs"> | null;
   events: Row<"schedule_events">[];
   groups: Row<"rotation_groups">[];
+  leaveRequests: LeaveInput[];
   leaves: LeaveInput[];
   memberships: Row<"rotation_members">[];
   overrides: Row<"rotation_overrides">[];
@@ -67,12 +68,15 @@ export async function getScheduleData(
   if (!selectedPeriod) {
     return {
       attendanceByDate: new Map(), blocks: [], canManage: canManage(membership.role), config: null, events: [], groups: [], leaves: [],
-      memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
+      leaveRequests: [], memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
       selectedPeriod: null, team, tasks: [], today, validationIssues: [], viewerPersonId,
     };
   }
 
-  const [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, leaves, attendanceByDate, tasksResult] = await Promise.all([
+  const [
+    phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult,
+    leaves, leaveRequests, attendanceByDate, tasksResult,
+  ] = await Promise.all([
     supabase.from("period_phases").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("sort_order"),
     supabase.from("rotation_groups").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("sort_order"),
     supabase.from("rotation_blocks").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_on"),
@@ -80,6 +84,9 @@ export async function getScheduleData(
     supabase.from("schedule_events").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
     supabase.from("rotation_generation_configs").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).maybeSingle(),
     getApprovedLeaveWindows(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
+    canManage(membership.role)
+      ? getLeaveRequestMarkers(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on)
+      : Promise.resolve([]),
     getAttendanceEntriesByDate(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
     supabase.from("task_instances").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
   ]);
@@ -119,7 +126,7 @@ export async function getScheduleData(
   return {
     attendanceByDate,
     blocks, canManage: canManage(membership.role), config: configResult.data, events: eventsResult.data ?? [],
-    groups, leaves, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
+    groups, leaveRequests, leaves, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
     selectedPeriod, team, tasks: tasksResult.data ?? [], today, validationIssues, viewerPersonId,
   };
 }
@@ -165,6 +172,9 @@ export function getDaySchedule(data: ScheduleData, date: string) {
     // Team-wide leave/attendance breakdowns stay manager-only: viewers understand their
     // own effective status (via `people[].resolution` above) but not the whole team's.
     approvedLeave: data.canManage ? people.filter((person) => person.resolution.leave) : [],
+    leaveRequests: data.canManage
+      ? data.leaveRequests.filter((item) => item.startsOn <= date && item.endsOn >= date)
+      : [],
     attendance: data.canManage ? {
       present: people.filter((person) => person.resolution.attendance === "present"),
       absent: people.filter((person) => person.resolution.attendance === "absent"),

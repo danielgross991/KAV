@@ -176,19 +176,55 @@ async function createDefaultEquipmentTypes(teamId, types) {
 }
 
 async function getOrCreatePeriod(teamId, period) {
-  const { data: existing, error } = await supabase
+  const { data: exactName, error } = await supabase
     .from("reserve_periods").select("*").eq("team_id", teamId).eq("name", period.name).maybeSingle();
   if (error) throw new Error(`Unable to look up reserve period '${period.name}': ${error.message}`);
+  const existing = exactName ?? await findPeriodByDateRange(teamId, period);
   if (existing) {
-    report.periodsReused.push({ id: existing.id, name: existing.name });
+    const updates = {
+      ends_on: period.ends_on,
+      location: period.location ?? existing.location,
+      name: period.name,
+      starts_on: period.starts_on,
+      status: period.status,
+    };
+    const needsUpdate = existing.name !== updates.name ||
+      existing.location !== updates.location ||
+      existing.starts_on !== updates.starts_on ||
+      existing.ends_on !== updates.ends_on ||
+      existing.status !== updates.status;
+    if (needsUpdate) {
+      const { data: updated, error: updateError } = await supabase
+        .from("reserve_periods")
+        .update(updates)
+        .eq("id", existing.id)
+        .select("*")
+        .single();
+      if (updateError) throw new Error(`Unable to update reserve period '${existing.name}': ${updateError.message}`);
+      report.periodsReused.push({ id: updated.id, name: updated.name, updated: true });
+      return updated;
+    }
+    report.periodsReused.push({ id: existing.id, name: existing.name, updated: false });
     return existing;
   }
   const { data, error: insertError } = await supabase.from("reserve_periods").insert({
     team_id: teamId, name: period.name, starts_on: period.starts_on, ends_on: period.ends_on,
-    status: period.status,
+    location: period.location ?? null, status: period.status,
   }).select("*").single();
   if (insertError) throw new Error(`Unable to create reserve period '${period.name}': ${insertError.message}`);
   report.periodsCreated.push({ id: data.id, name: data.name, status: data.status });
+  return data;
+}
+
+async function findPeriodByDateRange(teamId, period) {
+  const { data, error } = await supabase
+    .from("reserve_periods")
+    .select("*")
+    .eq("team_id", teamId)
+    .eq("starts_on", period.starts_on)
+    .eq("ends_on", period.ends_on)
+    .maybeSingle();
+  if (error) throw new Error(`Unable to look up reserve period by date range: ${error.message}`);
   return data;
 }
 

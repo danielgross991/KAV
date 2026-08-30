@@ -130,6 +130,7 @@ function GeneralTab({ data }: { data: PersonProfileData }) {
             <Field defaultValue={person.full_name} label="שם מלא" name="full_name" required />
             <Field defaultValue={person.phone ?? ""} label="טלפון" name="phone" type="tel" />
             <Field defaultValue={person.email ?? ""} label="אימייל" name="email" type="email" />
+            <Field defaultValue={person.photo_url ?? ""} label="קישור לתמונה" name="photo_url" type="url" />
             <label className="flex items-center gap-2 pt-7 text-sm">
               <input name="is_active" type="checkbox" defaultChecked={person.is_active} />
               פעיל

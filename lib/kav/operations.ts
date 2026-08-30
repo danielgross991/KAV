@@ -36,7 +36,7 @@ export type OperationalDay = {
 };
 
 export type OperationalRange = {
-  people: Pick<Row<"people">, "full_name" | "id" | "is_active">[];
+  people: Pick<Row<"people">, "full_name" | "id" | "is_active" | "photo_url">[];
   resolve: (personId: string, date: string) => ReturnType<typeof resolveOperationalPerson>;
 };
 
@@ -75,6 +75,32 @@ export async function getApprovedLeaveWindows(
       endsOn: item.ends_on,
       approvedStartsOn: item.approved_starts_on,
       approvedEndsOn: item.approved_ends_on,
+    }));
+}
+
+export async function getLeaveRequestMarkers(
+  supabase: Client,
+  teamId: string,
+  reservePeriodId: string,
+  startsOn: string,
+  endsOn: string,
+): Promise<LeaveInput[]> {
+  const { data, error } = await supabase.rpc("get_team_leave_request_markers", {
+    target_team_id: teamId,
+    target_reserve_period_id: reservePeriodId,
+  });
+  assertOk(error, "leave request markers");
+
+  return (data ?? [])
+    .filter((item) => item.starts_on <= endsOn && item.ends_on >= startsOn)
+    .map((item) => ({
+      id: item.id,
+      personId: item.person_id,
+      status: item.status,
+      startsOn: item.starts_on,
+      endsOn: item.ends_on,
+      approvedStartsOn: null,
+      approvedEndsOn: null,
     }));
 }
 
@@ -126,7 +152,7 @@ export async function getOperationalRange(
   endsOn: string,
 ): Promise<OperationalRange> {
   const [peopleResult, groupsResult, blocksResult, overridesResult, leaves, attendanceByDate] = await Promise.all([
-    supabase.from("people").select("id, full_name, is_active").eq("team_id", team.id).eq("is_active", true)
+    supabase.from("people").select("id, full_name, is_active, photo_url").eq("team_id", team.id).eq("is_active", true)
       .order("display_order").order("full_name"),
     supabase.from("rotation_groups").select("id").eq("team_id", team.id).eq("reserve_period_id", period.id),
     supabase.from("rotation_blocks").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
