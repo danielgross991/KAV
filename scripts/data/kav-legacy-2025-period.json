@@ -46,6 +46,34 @@
       ]
     }
   ],
+  "rotationBlocks": [
+    { "group_name": "סבב ירוק", "state": "base", "starts_on": "2025-05-28", "ends_on": "2025-05-29", "notes": "הסבת נשק + אל\"ת כיסופים — חובת הגעה כולם" },
+    { "group_name": "סבב ירוק", "state": "home", "starts_on": "2025-05-30", "ends_on": "2025-06-02" },
+    { "group_name": "סבב ירוק", "state": "base", "starts_on": "2025-06-03", "ends_on": "2025-06-12", "notes": "אל\"ת/תפיסת קו ותחילת סבב ירוק לפי נוכחות בפועל" },
+    { "group_name": "סבב ירוק", "state": "home", "starts_on": "2025-06-13", "ends_on": "2025-06-18" },
+    { "group_name": "סבב ירוק", "state": "base", "starts_on": "2025-06-19", "ends_on": "2025-06-26" },
+    { "group_name": "סבב ירוק", "state": "home", "starts_on": "2025-06-27", "ends_on": "2025-07-02" },
+    { "group_name": "סבב ירוק", "state": "base", "starts_on": "2025-07-03", "ends_on": "2025-07-10" },
+    { "group_name": "סבב ירוק", "state": "home", "starts_on": "2025-07-11", "ends_on": "2025-07-16" },
+    { "group_name": "סבב ירוק", "state": "base", "starts_on": "2025-07-17", "ends_on": "2025-07-24" },
+    { "group_name": "סבב ירוק", "state": "home", "starts_on": "2025-07-25", "ends_on": "2025-08-04" },
+    { "group_name": "סבב ירוק", "state": "base", "starts_on": "2025-08-05", "ends_on": "2025-08-06", "notes": "ימי עיבוד/זיכויים — נוכחות צוותית בפועל" },
+    { "group_name": "סבב ירוק", "state": "home", "starts_on": "2025-08-07", "ends_on": "2025-08-07" },
+    { "group_name": "סבב צהוב", "state": "base", "starts_on": "2025-05-28", "ends_on": "2025-05-29", "notes": "הסבת נשק + אל\"ת כיסופים — חובת הגעה כולם" },
+    { "group_name": "סבב צהוב", "state": "home", "starts_on": "2025-05-30", "ends_on": "2025-06-02" },
+    { "group_name": "סבב צהוב", "state": "base", "starts_on": "2025-06-03", "ends_on": "2025-06-05", "notes": "אל\"ת/תפיסת קו — נוכחות צוותית בפועל" },
+    { "group_name": "סבב צהוב", "state": "home", "starts_on": "2025-06-06", "ends_on": "2025-06-11" },
+    { "group_name": "סבב צהוב", "state": "base", "starts_on": "2025-06-12", "ends_on": "2025-06-19" },
+    { "group_name": "סבב צהוב", "state": "home", "starts_on": "2025-06-20", "ends_on": "2025-06-25" },
+    { "group_name": "סבב צהוב", "state": "base", "starts_on": "2025-06-26", "ends_on": "2025-07-03" },
+    { "group_name": "סבב צהוב", "state": "home", "starts_on": "2025-07-04", "ends_on": "2025-07-09" },
+    { "group_name": "סבב צהוב", "state": "base", "starts_on": "2025-07-10", "ends_on": "2025-07-17" },
+    { "group_name": "סבב צהוב", "state": "home", "starts_on": "2025-07-18", "ends_on": "2025-07-23" },
+    { "group_name": "סבב צהוב", "state": "base", "starts_on": "2025-07-24", "ends_on": "2025-07-31" },
+    { "group_name": "סבב צהוב", "state": "home", "starts_on": "2025-08-01", "ends_on": "2025-08-04" },
+    { "group_name": "סבב צהוב", "state": "base", "starts_on": "2025-08-05", "ends_on": "2025-08-06", "notes": "ימי עיבוד/זיכויים — נוכחות צוותית בפועל" },
+    { "group_name": "סבב צהוב", "state": "home", "starts_on": "2025-08-07", "ends_on": "2025-08-07" }
+  ],
   "unresolvedHistoricalPeople": [
     {
       "legacy_name": "גושו טדסה",

@@ -6,6 +6,7 @@ import { getApprovedLeaveWindows, getAttendanceEntriesByDate, getLeaveRequestMar
 import {
   resolveOperationalPerson,
   resolvePersonSchedule,
+  selectDefaultScheduleReservePeriod,
   selectOperationalReservePeriod,
   validateScheduleForPublication,
   type LeaveInput,
@@ -63,7 +64,7 @@ export async function getScheduleData(
   const allPeriods = periods ?? [];
   const selectedPeriod =
     allPeriods.find((period) => period.id === selectedPeriodId) ??
-    selectOperationalReservePeriod(allPeriods, today);
+    selectDefaultScheduleReservePeriod(allPeriods, today);
 
   if (!selectedPeriod) {
     return {

@@ -52,6 +52,19 @@ export function selectOperationalReservePeriod<T extends OperationalReservePerio
     null;
 }
 
+export function selectDefaultScheduleReservePeriod<T extends OperationalReservePeriod>(
+  periods: T[],
+  date: string,
+): T | null {
+  return selectOperationalReservePeriod(periods, date) ??
+    newestStarting(periods.filter((period) => period.status === "draft" && period.starts_on <= date && period.ends_on >= date)) ??
+    earliestStarting(periods.filter((period) =>
+      period.status !== "archived" && period.ends_on >= date,
+    )) ??
+    newestEnding(periods.filter((period) => period.status === "completed")) ??
+    null;
+}
+
 export function generateRotationBlocks(input: {
   period: DateRange;
   anchorDate: string;
@@ -279,6 +292,18 @@ function byStart(a: DateRange, b: DateRange) {
 function newestStarting<T extends OperationalReservePeriod>(periods: T[]): T | null {
   return periods.reduce<T | null>((selected, period) =>
     !selected || period.starts_on > selected.starts_on ? period : selected,
+  null);
+}
+
+function earliestStarting<T extends OperationalReservePeriod>(periods: T[]): T | null {
+  return periods.reduce<T | null>((selected, period) =>
+    !selected || period.starts_on < selected.starts_on ? period : selected,
+  null);
+}
+
+function newestEnding<T extends OperationalReservePeriod>(periods: T[]): T | null {
+  return periods.reduce<T | null>((selected, period) =>
+    !selected || period.ends_on > selected.ends_on ? period : selected,
   null);
 }
 

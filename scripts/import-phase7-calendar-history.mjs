@@ -46,7 +46,7 @@ const report = {
   equipmentTypesCreated: [], equipmentTypesSkipped: [],
   equipmentImported: [],
   historicalAttendanceDates: [], historicalPresenceRowsCreated: [], historicalPresenceRowsUpdated: [],
-  historicalRotationMembership: [],
+  historicalRotationBlocksCreated: [], historicalRotationBlocksSkipped: [], historicalRotationMembership: [],
   skippedRows: [], ambiguousNames: [], missingDates: [],
   // One entry per unique unresolved legacy name (not one per date/occurrence — a name that
   // fails to resolve across 72 attendance days would otherwise flood this with 72 near-
@@ -111,7 +111,8 @@ async function main() {
   // ---- F/G/H: historical קו כיסופים 2025 period, rotation groups, attendance ----
   const period2025 = await getOrCreatePeriod(team.id, legacyPeriod2025.period);
   await createEvents(team, period2025.id, legacyPeriod2025.milestoneEvents ?? [], "event");
-  await createHistoricalRotationGroups(team.id, period2025.id, legacyPeriod2025.rotationGroups ?? [], nameToId);
+  const historicalGroupIds = await createHistoricalRotationGroups(team.id, period2025.id, legacyPeriod2025.rotationGroups ?? [], nameToId);
+  await createHistoricalRotationBlocks(team.id, period2025.id, legacyPeriod2025.rotationBlocks ?? [], historicalGroupIds);
   for (const placeholder of legacyPeriod2025.placeholderNamesExcluded ?? []) {
     report.ambiguousNames.push(placeholder);
   }
@@ -299,6 +300,7 @@ async function importPendingLeave(teamId, reservePeriodId, requests, nameToId) {
 async function createHistoricalRotationGroups(teamId, reservePeriodId, groups, nameToId) {
   let sortOrder = 0;
   const colorByGroupName = { "סבב ירוק": "green", "סבב צהוב": "amber" };
+  const groupIdByName = new Map();
   for (const group of groups) {
     let groupId;
     const { data: existingGroup, error } = await supabase.from("rotation_groups").select("id")
@@ -314,6 +316,7 @@ async function createHistoricalRotationGroups(teamId, reservePeriodId, groups, n
       if (insertError) throw new Error(`Unable to create rotation group '${group.name}': ${insertError.message}`);
       groupId = created.id;
     }
+    groupIdByName.set(group.name, groupId);
     sortOrder += 1;
 
     for (const memberName of group.members) {
@@ -329,6 +332,39 @@ async function createHistoricalRotationGroups(teamId, reservePeriodId, groups, n
       if (insertError) throw new Error(`Unable to create rotation membership for ${memberName}: ${insertError.message}`);
       report.historicalRotationMembership.push({ group: group.name, person: memberName });
     }
+  }
+  return groupIdByName;
+}
+
+async function createHistoricalRotationBlocks(teamId, reservePeriodId, blocks, groupIdByName) {
+  for (const block of blocks) {
+    const rotationGroupId = groupIdByName.get(block.group_name);
+    if (!rotationGroupId) {
+      report.historicalRotationBlocksSkipped.push({ ...block, why_skipped: "rotation group not found" });
+      continue;
+    }
+
+    const { data: existing, error } = await supabase.from("rotation_blocks").select("id")
+      .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId).eq("rotation_group_id", rotationGroupId)
+      .eq("starts_on", block.starts_on).eq("ends_on", block.ends_on).maybeSingle();
+    if (error) throw new Error(`Unable to look up historical rotation block ${block.group_name} ${block.starts_on}: ${error.message}`);
+    if (existing) {
+      report.historicalRotationBlocksSkipped.push({ group: block.group_name, starts_on: block.starts_on, ends_on: block.ends_on, reason: "already exists" });
+      continue;
+    }
+
+    const { error: insertError } = await supabase.from("rotation_blocks").insert({
+      team_id: teamId,
+      reserve_period_id: reservePeriodId,
+      rotation_group_id: rotationGroupId,
+      state: block.state,
+      starts_on: block.starts_on,
+      ends_on: block.ends_on,
+      source: "manual",
+      sequence_no: null,
+    });
+    if (insertError) throw new Error(`Unable to create historical rotation block ${block.group_name} ${block.starts_on}: ${insertError.message}`);
+    report.historicalRotationBlocksCreated.push({ group: block.group_name, state: block.state, starts_on: block.starts_on, ends_on: block.ends_on });
   }
 }
 
