@@ -57,6 +57,7 @@ export type DashboardData = {
   statsPeriods: {
     endsOn: string;
     id: string;
+    location: string | null;
     name: string;
     startsOn: string;
     status: string;
@@ -82,7 +83,6 @@ export const getDashboardData = cache(async function getDashboardData(
 
   const [
     activePeopleResult,
-    upcomingEventResult,
     requirementsResult,
     personPakalsResult,
     currentPersonResult,
@@ -93,14 +93,6 @@ export const getDashboardData = cache(async function getDashboardData(
       .select("id", { count: "exact", head: true })
       .eq("team_id", team.id)
       .eq("is_active", true),
-    supabase
-      .from("schedule_events")
-      .select("title, event_type, starts_at")
-      .eq("team_id", team.id)
-      .gte("starts_at", now)
-      .order("starts_at", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
     supabase
       .from("team_pakal_requirements")
       .select("required_count, pakal_types!inner(id, name)")
@@ -120,24 +112,40 @@ export const getDashboardData = cache(async function getDashboardData(
       : Promise.resolve({ data: null, error: null }),
     supabase
       .from("reserve_periods")
-      .select("id, name, starts_on, ends_on, status")
+      .select("id, name, location, starts_on, ends_on, status")
       .eq("team_id", team.id)
       .order("starts_on", { ascending: false }),
   ]);
 
   assertOk(activePeopleResult.error, "active people");
-  assertOk(upcomingEventResult.error, "upcoming event");
   assertOk(requirementsResult.error, "pakal requirements");
   assertOk(personPakalsResult.error, "person pakals");
   assertOk(currentPersonResult.error, "current person");
   assertOk(statsPeriodsResult.error, "stats periods");
 
-  const [operationalDay, nextTask, teamStats] = await Promise.all([
-    getOperationalDay(supabase, team, today),
-    userId ? getNextPersonalTask(supabase, team, userId) : Promise.resolve(null),
+  const selectedPeriod = selectedStatsPeriodId
+    ? (statsPeriodsResult.data ?? []).find((period) => period.id === selectedStatsPeriodId) ?? null
+    : null;
+  let upcomingEventQuery = supabase
+    .from("schedule_events")
+    .select("title, event_type, starts_at")
+    .eq("team_id", team.id)
+    .gte("starts_at", now)
+    .order("starts_at", { ascending: true })
+    .limit(1);
+
+  if (selectedPeriod) {
+    upcomingEventQuery = upcomingEventQuery.eq("reserve_period_id", selectedPeriod.id);
+  }
+
+  const [operationalDay, nextTask, teamStats, upcomingEventResult] = await Promise.all([
+    getOperationalDay(supabase, team, today, selectedPeriod?.id),
+    userId ? getNextPersonalTask(supabase, team, userId, selectedPeriod?.id) : Promise.resolve(null),
     getTeamStats(supabase, team, today, selectedStatsPeriodId),
+    upcomingEventQuery.maybeSingle(),
   ]);
-  const currentPeriod = operationalDay.period;
+  assertOk(upcomingEventResult.error, "upcoming event");
+  const currentPeriod = selectedPeriod ?? operationalDay.period;
   const attendance = {
     absent: operationalDay.summary.absent,
     present: operationalDay.summary.expectedPresent,
@@ -215,6 +223,7 @@ export const getDashboardData = cache(async function getDashboardData(
     statsPeriods: (statsPeriodsResult.data ?? []).map((period) => ({
       endsOn: period.ends_on,
       id: period.id,
+      location: period.location,
       name: period.name,
       startsOn: period.starts_on,
       status: period.status,

@@ -6,6 +6,7 @@ import { AppPage, PageHeader, SectionHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { requireAuth } from "@/lib/kav/auth";
+import { getSelectedLinePeriodId } from "@/lib/kav/line-selection.server";
 import { getDaySchedule, getScheduleData } from "@/lib/kav/schedule";
 import { getTaskDaySchedule } from "@/lib/kav/tasks";
 import { requireTeamAccess } from "@/lib/kav/teams";
@@ -20,7 +21,8 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
-  const data = await getScheduleData(supabase, membership, query.period, userId);
+  const selectedLinePeriodId = await getSelectedLinePeriodId(teamSlug);
+  const data = await getScheduleData(supabase, membership, query.period ?? selectedLinePeriodId ?? undefined, userId);
   const period = data.selectedPeriod;
   if (!period || date < period.starts_on || date > period.ends_on) notFound();
   const day = getDaySchedule(data, date);

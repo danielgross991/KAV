@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { MailPlus, UserCog } from "lucide-react";
+import { ImageUp, MailPlus, UserCog, UserRound } from "lucide-react";
 
-import { provisionPersonLoginAction } from "@/app/[teamSlug]/users/actions";
+import { provisionPersonLoginAction, updatePersonPhotoAction } from "@/app/[teamSlug]/users/actions";
 import { AppPage, EmptyState, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { requireTeamAccess } from "@/lib/kav/teams";
 
 type UsersPageProps = {
   params: Promise<{ teamSlug: string }>;
-  searchParams: Promise<{ linked?: string }>;
+  searchParams: Promise<{ linked?: string; photo?: string }>;
 };
 
 export default async function UsersPage({ params, searchParams }: UsersPageProps) {
@@ -33,7 +33,7 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
       .order("role", { ascending: true }),
     supabase
       .from("people")
-      .select("id, auth_user_id, full_name, email, is_active")
+      .select("id, auth_user_id, full_name, email, is_active, photo_url")
       .eq("team_id", membership.team.id)
       .order("display_order")
       .order("full_name"),
@@ -54,6 +54,7 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
         subtitle="קישור מייל לאיש צוות ופתיחת כניסה אישית ללא סיסמה."
       />
       {query.linked ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">המייל קושר והמשתמש יכול להיכנס בקישור אימייל.</p> : null}
+      {query.photo ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">תמונת איש הצוות נשמרה.</p> : null}
 
       {(memberships ?? []).length === 0 ? (
         <EmptyState icon={<UserCog className="size-4" />} title="אין משתמשים משויכים לצוות" />
@@ -155,6 +156,51 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
                 </form>
               );
             })}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-5">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">תמונות לאלופי הבית</h2>
+          <Badge variant="outline">מוצג בפודיום</Badge>
+        </div>
+        <Card>
+          <CardContent className="divide-y p-0">
+            {(people ?? []).map((person) => (
+              <form
+                action={updatePersonPhotoAction.bind(null, teamSlug)}
+                className="grid gap-3 p-3.5 md:grid-cols-[auto_1fr_1.7fr_auto] md:items-center"
+                key={person.id}
+              >
+                <input type="hidden" name="person_id" value={person.id} />
+                {person.photo_url ? (
+                  <span
+                    aria-label={`תמונה של ${person.full_name}`}
+                    className="block size-12 rounded-md border bg-cover bg-center"
+                    style={{ backgroundImage: `url(${person.photo_url})` }}
+                  />
+                ) : (
+                  <span className="flex size-12 items-center justify-center rounded-md border bg-muted text-muted-foreground">
+                    <UserRound className="size-5" />
+                  </span>
+                )}
+                <Link className="font-semibold text-primary hover:underline" href={`/${teamSlug}/team/${person.id}`}>
+                  {person.full_name}
+                </Link>
+                <Input
+                  aria-label={`קישור תמונה עבור ${person.full_name}`}
+                  name="photo_url"
+                  type="url"
+                  defaultValue={person.photo_url ?? ""}
+                  placeholder="https://..."
+                />
+                <Button variant="secondary">
+                  <ImageUp className="size-4" />
+                  שמירת תמונה
+                </Button>
+              </form>
+            ))}
           </CardContent>
         </Card>
       </section>

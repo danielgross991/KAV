@@ -343,6 +343,7 @@ export const getNextPersonalTask = cache(async function getNextPersonalTask(
   supabase: Client,
   team: TeamMembership["team"],
   userId: string,
+  reservePeriodId?: string,
 ) {
   const { data: person, error: personError } = await supabase.from("people").select("id")
     .eq("team_id", team.id).eq("auth_user_id", userId).maybeSingle();
@@ -353,8 +354,10 @@ export const getNextPersonalTask = cache(async function getNextPersonalTask(
   assertOk(assignmentsError, "personal task assignments");
   const taskIds = (assignments ?? []).map((assignment) => assignment.task_instance_id);
   if (!taskIds.length) return null;
-  const { data: tasks, error: tasksError } = await supabase.from("task_instances").select("*")
+  let tasksQuery = supabase.from("task_instances").select("*")
     .eq("team_id", team.id).in("id", taskIds).gte("ends_at", new Date().toISOString()).order("starts_at").limit(1);
+  if (reservePeriodId) tasksQuery = tasksQuery.eq("reserve_period_id", reservePeriodId);
+  const { data: tasks, error: tasksError } = await tasksQuery;
   assertOk(tasksError, "next personal task");
   const task = tasks?.[0];
   if (!task) return null;

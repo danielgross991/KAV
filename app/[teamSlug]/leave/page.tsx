@@ -8,18 +8,20 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { requireAuth } from "@/lib/kav/auth";
 import { getDateInTimeZone } from "@/lib/kav/dates";
+import { getSelectedLinePeriodId } from "@/lib/kav/line-selection.server";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 import { cn } from "@/lib/utils";
 
 export default async function LeavePage({ params, searchParams }: {
   params: Promise<{ teamSlug: string }>;
-  searchParams: Promise<{ view?: string; saved?: string; deleted?: string }>;
+  searchParams: Promise<{ period?: string; view?: string; saved?: string; deleted?: string }>;
 }) {
   const [{ teamSlug }, query] = await Promise.all([params, searchParams]);
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
   const today = getDateInTimeZone(membership.team.timezone);
   const isManager = canManage(membership.role);
+  const selectedLinePeriodId = query.period ?? await getSelectedLinePeriodId(teamSlug);
   const currentPersonPromise = isManager
     ? Promise.resolve({ data: null, error: null })
     : supabase.from("people").select("id, full_name").eq("team_id", membership.team.id).eq("auth_user_id", userId).maybeSingle();
@@ -36,6 +38,7 @@ export default async function LeavePage({ params, searchParams }: {
     leaves={leaves ?? []}
     periods={periods ?? []}
     query={query}
+    selectedPeriodId={selectedLinePeriodId}
     teamName={membership.team.name}
     teamSlug={teamSlug}
   />;
@@ -43,9 +46,14 @@ export default async function LeavePage({ params, searchParams }: {
   const peopleById = new Map((people ?? []).map((person) => [person.id, person.full_name]));
   const periodsById = new Map((periods ?? []).map((period) => [period.id, period]));
   const view = ["active", "upcoming", "history"].includes(query.view ?? "") ? query.view! : "active";
-  const filtered = (leaves ?? []).filter((leave) => view === "active"
-    ? leave.starts_on <= today && leave.ends_on >= today
-    : view === "upcoming" ? leave.starts_on > today : leave.ends_on < today);
+  const filtered = (leaves ?? [])
+    .filter((leave) => selectedLinePeriodId ? leave.reserve_period_id === selectedLinePeriodId : true)
+    .filter((leave) => view === "active"
+      ? leave.starts_on <= today && leave.ends_on >= today
+      : view === "upcoming" ? leave.starts_on > today : leave.ends_on < today);
+  const periodOptions = selectedLinePeriodId
+    ? [...(periods ?? []).filter((period) => period.id === selectedLinePeriodId), ...(periods ?? []).filter((period) => period.id !== selectedLinePeriodId)]
+    : periods ?? [];
 
   return <AppPage className="max-w-6xl">
     <PageHeader eyebrow={membership.team.name} title="יציאות" subtitle="ניהול בקשות וטווחים מאושרים" action={<a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="יציאה חדשה"><Plus className="size-4" /></a>}>
@@ -62,7 +70,7 @@ export default async function LeavePage({ params, searchParams }: {
         <form action={saveLeaveAction.bind(null, teamSlug)} className="grid gap-3 border-t bg-muted/30 p-3.5 md:grid-cols-4">
           <input type="hidden" name="id" value={leave.id} />
           <Select label="איש צוות" name="person_id" value={leave.person_id} options={(people ?? []).map((p) => [p.id, p.full_name])} />
-          <Select label="תקופה" name="reserve_period_id" value={leave.reserve_period_id} options={(periods ?? []).map((p) => [p.id, p.name])} />
+          <Select label="תקופה" name="reserve_period_id" value={leave.reserve_period_id} options={periodOptions.map((p) => [p.id, p.name])} />
           <Field label="מתאריך" name="starts_on" type="date" defaultValue={leave.starts_on} required />
           <Field label="עד תאריך" name="ends_on" type="date" defaultValue={leave.ends_on} required />
           <Select label="סטטוס" name="status" value={leave.status} options={statusOptions} />
@@ -79,7 +87,7 @@ export default async function LeavePage({ params, searchParams }: {
     <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave"><h2 className="text-base font-semibold">יציאה חדשה</h2>
       <form action={saveLeaveAction.bind(null, teamSlug)} className="mt-4 grid gap-3 md:grid-cols-4">
         <Select label="איש צוות" name="person_id" options={(people ?? []).filter((p) => p.is_active).map((p) => [p.id, p.full_name])} />
-        <Select label="תקופת מילואים" name="reserve_period_id" options={(periods ?? []).map((p) => [p.id, p.name])} />
+        <Select label="תקופת מילואים" name="reserve_period_id" options={periodOptions.map((p) => [p.id, p.name])} />
         <Field label="מתאריך" name="starts_on" type="date" required /><Field label="עד תאריך" name="ends_on" type="date" required />
         <Select label="סטטוס" name="status" value="approved" options={statusOptions} />
         <Field label="מאושר מתאריך" name="approved_starts_on" type="date" /><Field label="מאושר עד תאריך" name="approved_ends_on" type="date" />
@@ -95,6 +103,7 @@ function ViewerLeavePage({
   leaves,
   periods,
   query,
+  selectedPeriodId,
   teamName,
   teamSlug,
 }: {
@@ -102,10 +111,15 @@ function ViewerLeavePage({
   leaves: LeaveRow[];
   periods: PeriodRow[];
   query: { saved?: string; view?: string };
+  selectedPeriodId: string | null;
   teamName: string;
   teamSlug: string;
 }) {
   const visiblePeriods = periods.filter((period) => period.status !== "archived");
+  const visiblePeriodOptions = selectedPeriodId
+    ? [...visiblePeriods.filter((period) => period.id === selectedPeriodId), ...visiblePeriods.filter((period) => period.id !== selectedPeriodId)]
+    : visiblePeriods;
+  const visibleLeaves = selectedPeriodId ? leaves.filter((leave) => leave.reserve_period_id === selectedPeriodId) : leaves;
   return (
     <AppPage className="max-w-[920px]">
       <PageHeader
@@ -120,7 +134,7 @@ function ViewerLeavePage({
       ) : (
         <>
           <section className="divide-y overflow-hidden rounded-lg border bg-card">
-            {leaves.map((leave) => (
+            {visibleLeaves.map((leave) => (
               <div className="grid gap-2 p-3.5 sm:grid-cols-[1fr_auto] sm:items-center" key={leave.id}>
                 <div>
                   <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
@@ -135,12 +149,12 @@ function ViewerLeavePage({
                 </Badge>
               </div>
             ))}
-            {!leaves.length ? <div className="grid min-h-40 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין לך בקשות יציאה עדיין</p></div></div> : null}
+            {!visibleLeaves.length ? <div className="grid min-h-40 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין לך בקשות יציאה עדיין</p></div></div> : null}
           </section>
           <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave">
             <h2 className="text-base font-semibold">בקשה חדשה</h2>
             <form action={createViewerLeaveRequestAction.bind(null, teamSlug)} className="mt-4 grid gap-3 md:grid-cols-4">
-              <Select label="תקופת מילואים" name="reserve_period_id" options={visiblePeriods.map((period) => [period.id, period.name])} />
+              <Select label="תקופת מילואים" name="reserve_period_id" options={visiblePeriodOptions.map((period) => [period.id, period.name])} />
               <Field label="מתאריך" name="starts_on" type="date" required />
               <Field label="עד תאריך" name="ends_on" type="date" required />
               <Field label="סיבה" name="reason" />
