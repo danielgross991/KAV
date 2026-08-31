@@ -17,7 +17,7 @@ export default async function SchedulePage({ params, searchParams }: SchedulePag
   const data = await getScheduleData(supabase, membership, query.period ?? selectedLinePeriodId ?? undefined, userId);
   const view = ["month", "agenda", "rotations"].includes(query.view ?? "")
     ? query.view!
-    : "agenda";
+    : "month";
 
   return <ScheduleView data={data} initialManage={query.manage === "1"} month={query.month} view={view} />;
 }

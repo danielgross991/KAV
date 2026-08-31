@@ -4,7 +4,13 @@ import type { Database } from "@/lib/database.types";
 import { addCalendarDays, eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
 import { getOperationalRange } from "@/lib/kav/operations";
 import { selectOperationalReservePeriod } from "@/lib/kav/schedule-domain";
-import { computeAttendanceStats, rankHomeLeaderboard, type DailyResolution, type PersonAttendanceStats } from "@/lib/kav/stats-domain";
+import {
+  applyHistoricalAttendanceSemantics,
+  computeAttendanceStats,
+  rankHomeLeaderboard,
+  type DailyResolution,
+  type PersonAttendanceStats,
+} from "@/lib/kav/stats-domain";
 import type { TeamSummary } from "@/lib/kav/teams";
 
 export type { PersonAttendanceStats } from "@/lib/kav/stats-domain";
@@ -53,15 +59,17 @@ export async function getTeamStats(
   const elapsedDates = eachCalendarDate(period.starts_on, elapsedEnd);
 
   const resolutionsByPerson = new Map<string, DailyResolution[]>();
+  const useActualHistoricalAttendance = period.status === "completed";
   for (const person of activePeople) {
     const days: DailyResolution[] = elapsedDates.map((date) => {
       const resolution = range.resolve(person.id, date);
-      return {
+      const day = {
         attendance: resolution.attendance,
         expectedAtBase: resolution.expectedAtBase,
         leave: Boolean(resolution.leave),
         state: resolution.state,
       };
+      return useActualHistoricalAttendance ? applyHistoricalAttendanceSemantics(day) : day;
     });
     resolutionsByPerson.set(person.id, days);
   }

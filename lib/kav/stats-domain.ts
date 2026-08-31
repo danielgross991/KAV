@@ -69,6 +69,22 @@ export function computeAttendanceStats(
 }
 
 /**
+ * Historical imports may have actual daily presence from legacy spreadsheets even when
+ * the planned rotation blocks were reconstructed later. For completed reserve periods,
+ * let the finalized attendance table describe where the person really was:
+ * present = base, absent = home.
+ */
+export function applyHistoricalAttendanceSemantics(day: DailyResolution): DailyResolution {
+  if (day.attendance === "present") {
+    return { ...day, expectedAtBase: true, state: "base" };
+  }
+  if (day.attendance === "absent") {
+    return { ...day, expectedAtBase: false, state: "home" };
+  }
+  return day;
+}
+
+/**
  * Deterministic "אלופי הבית" ranking: most home days wins, ties broken by home
  * percentage, then by name/id so the order never depends on incidental array order.
  */
