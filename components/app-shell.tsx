@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LogOut } from "lucide-react";
 
+import { KavMark } from "@/components/kav-mark";
 import { Separator } from "@/components/ui/separator";
 import { TeamNav } from "@/components/team-nav";
 import type { TeamMembership } from "@/lib/kav/teams";
@@ -57,16 +58,6 @@ export function AppShell({
         variant="mobile"
       />
     </div>
-  );
-}
-
-function KavMark() {
-  return (
-    <span className="relative flex size-8 shrink-0 items-center justify-center rounded-md bg-primary" aria-hidden="true">
-      <span className="absolute right-[9px] top-[8px] h-4 w-0.5 rounded-full bg-white/90" />
-      <span className="absolute right-[14px] top-[8px] h-4 w-0.5 rounded-full bg-white/50" />
-      <span className="absolute right-[19px] top-[8px] h-4 w-0.5 rounded-full bg-white/25" />
-    </span>
   );
 }
 
