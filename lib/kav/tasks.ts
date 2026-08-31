@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { addCalendarDays, getDateInTimeZone, getWeekStart, localDateTimeToIso } from "@/lib/kav/dates";
@@ -55,7 +56,7 @@ export type TasksData = {
   workload: Array<{ fullName: string; personId: string; taskCount: number; taskMinutes: number }>;
 };
 
-export async function getTasksData(
+export const getTasksData = cache(async function getTasksData(
   supabase: Client,
   membership: TeamMembership,
   userId: string,
@@ -280,7 +281,7 @@ export async function getTasksData(
     tasks: taskRows,
     workload,
   };
-}
+});
 
 export function getScheduleProposal(data: TasksData) {
   return data.schedulerInput ? generateScheduleProposal(data.schedulerInput) : null;
@@ -294,7 +295,7 @@ export type TaskDaySchedule = {
   tasks: Row<"task_instances">[];
 };
 
-export async function getTaskDaySchedule(
+export const getTaskDaySchedule = cache(async function getTaskDaySchedule(
   supabase: Client,
   membership: TeamMembership,
   date: string,
@@ -336,9 +337,9 @@ export async function getTaskDaySchedule(
     requirements: requirementsResult.data ?? [],
     tasks: taskRows,
   };
-}
+});
 
-export async function getNextPersonalTask(
+export const getNextPersonalTask = cache(async function getNextPersonalTask(
   supabase: Client,
   team: TeamMembership["team"],
   userId: string,
@@ -371,7 +372,7 @@ export async function getNextPersonalTask(
     teammateNames: (peopleResult.data ?? []).map((item) => item.full_name),
     title: task.title,
   };
-}
+});
 
 function emptyTasksData(base: Pick<TasksData, "canManage" | "periods" | "selectedPeriod" | "team" | "today" | "weekEndsOn" | "weekStartsOn">): TasksData {
   return {

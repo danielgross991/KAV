@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone, overlapsCalendarDayInTimeZone } from "@/lib/kav/dates";
@@ -41,7 +42,7 @@ export type ScheduleData = {
   viewerPersonId: string | null;
 };
 
-export async function getScheduleData(
+export const getScheduleData = cache(async function getScheduleData(
   supabase: Client,
   membership: TeamMembership,
   selectedPeriodId?: string,
@@ -128,7 +129,7 @@ export async function getScheduleData(
     groups, leaveRequests, leaves, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
     selectedPeriod, team, tasks: tasksResult.data ?? [], today, validationIssues, viewerPersonId,
   };
-}
+});
 
 export function getDaySchedule(data: ScheduleData, date: string) {
   const membershipInputs = data.memberships.map((item) => ({
@@ -183,7 +184,7 @@ export function getDaySchedule(data: ScheduleData, date: string) {
   };
 }
 
-export async function getOperationalScheduleSummary(
+export const getOperationalScheduleSummary = cache(async function getOperationalScheduleSummary(
   supabase: Client,
   team: TeamMembership["team"],
   today = getDateInTimeZone(team.timezone),
@@ -232,7 +233,7 @@ export async function getOperationalScheduleSummary(
       state: blockInputs.find((block) => block.groupId === group.id)?.state ?? "unknown",
     })),
   };
-}
+});
 
 function assertOk(error: { message: string } | null, label: string) {
   if (error) throw new Error(`Unable to load ${label}: ${error.message}`);

@@ -1,8 +1,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone } from "@/lib/kav/dates";
-import { getOperationalScheduleSummary } from "@/lib/kav/schedule";
 import { getOperationalDay } from "@/lib/kav/operations";
 import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
 import { getNextPersonalTask } from "@/lib/kav/tasks";
@@ -70,7 +70,7 @@ export type DashboardData = {
     | null;
 };
 
-export async function getDashboardData(
+export const getDashboardData = cache(async function getDashboardData(
   supabase: Supabase,
   team: TeamSummary,
   manager = false,
@@ -132,13 +132,12 @@ export async function getDashboardData(
   assertOk(currentPersonResult.error, "current person");
   assertOk(statsPeriodsResult.error, "stats periods");
 
-  const [operationalSchedule, operationalDay, nextTask, teamStats] = await Promise.all([
-    getOperationalScheduleSummary(supabase, team, today),
+  const [operationalDay, nextTask, teamStats] = await Promise.all([
     getOperationalDay(supabase, team, today),
     userId ? getNextPersonalTask(supabase, team, userId) : Promise.resolve(null),
     getTeamStats(supabase, team, today, selectedStatsPeriodId),
   ]);
-  const currentPeriod = operationalSchedule.period;
+  const currentPeriod = operationalDay.period;
   const attendance = {
     absent: operationalDay.summary.absent,
     present: operationalDay.summary.expectedPresent,
@@ -146,8 +145,8 @@ export async function getDashboardData(
     total: operationalDay.summary.expected,
     unexpectedPresent: operationalDay.summary.unexpectedPresent,
   };
-  const rotationStatus = operationalSchedule.rotationStatus;
-  const expectedOnBase = operationalSchedule.expectedOnBase;
+  const rotationStatus = operationalDay.rotationStatus;
+  const expectedOnBase = operationalDay.summary.expected;
 
   const personPakals = personPakalsResult.data ?? [];
   const pakalCounts = new Map<string, number>();
@@ -190,7 +189,7 @@ export async function getDashboardData(
           status: currentPeriod.status,
         }
       : null,
-    expectedOnBase: operationalDay.period ? operationalDay.summary.expected : expectedOnBase,
+    expectedOnBase,
     homeLeaderboard: teamStats.leaderboard,
     attendanceStats: teamStats.stats,
     issues,
@@ -228,7 +227,7 @@ export async function getDashboardData(
         }
       : null,
   };
-}
+});
 
 function assertOk(error: { message: string } | null, label: string) {
   if (error) {

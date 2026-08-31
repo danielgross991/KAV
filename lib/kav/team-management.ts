@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getCurrentRotationContext } from "@/lib/kav/rotations";
@@ -76,7 +77,7 @@ export type ReserveHistoryItem = {
   }>;
 };
 
-export async function getTeamManagementData(
+export const getTeamManagementData = cache(async function getTeamManagementData(
   supabase: Client,
   membership: TeamMembership,
 ): Promise<TeamManagementData> {
@@ -183,9 +184,9 @@ export async function getTeamManagementData(
     rotations: currentRotationContext.rotationOptions,
     team: membership.team,
   };
-}
+});
 
-export async function getPersonProfileData(
+export const getPersonProfileData = cache(async function getPersonProfileData(
   supabase: Client,
   membership: TeamMembership,
   personId: string,
@@ -359,7 +360,7 @@ export async function getPersonProfileData(
     })),
     team: membership.team,
   };
-}
+});
 
 async function selectMaybePrivateDetails(
   supabase: Client,

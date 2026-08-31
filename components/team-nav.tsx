@@ -38,7 +38,7 @@ export function TeamNav({
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const items = canManage(role) ? managerItems : viewerItems;
   const base = `/${teamSlug}`;
-  const showRouteLoading = pendingHref !== null && pendingHref !== pathname;
+  const showRouteLoading = pendingHref !== null && !isActivePath(pathname, pendingHref, base);
 
   if (variant === "mobile") {
     return (
@@ -143,6 +143,10 @@ export function TeamNav({
       </nav>
     </>
   );
+}
+
+function isActivePath(pathname: string, href: string, base: string) {
+  return href === base ? pathname === href : pathname.startsWith(href);
 }
 
 function DesktopNavItem({

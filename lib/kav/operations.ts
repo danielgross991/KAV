@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone } from "@/lib/kav/dates";
@@ -24,6 +25,10 @@ export type OperationalDay = {
   leaves: LeaveInput[];
   people: OperationalPerson[];
   period: Row<"reserve_periods"> | null;
+  rotationStatus: {
+    name: string;
+    state: string;
+  }[];
   summary: {
     absent: number;
     expected: number;
@@ -51,7 +56,7 @@ export type OperationalRange = {
 // Do NOT reintroduce direct source-table selects in this file. Those tables are
 // manager-only and must remain behind the scoped RPCs for viewer-facing reads.
 
-export async function getApprovedLeaveWindows(
+export const getApprovedLeaveWindows = cache(async function getApprovedLeaveWindows(
   supabase: Client,
   teamId: string,
   reservePeriodId: string,
@@ -76,9 +81,9 @@ export async function getApprovedLeaveWindows(
       approvedStartsOn: item.approved_starts_on,
       approvedEndsOn: item.approved_ends_on,
     }));
-}
+});
 
-export async function getLeaveRequestMarkers(
+export const getLeaveRequestMarkers = cache(async function getLeaveRequestMarkers(
   supabase: Client,
   teamId: string,
   reservePeriodId: string,
@@ -102,9 +107,9 @@ export async function getLeaveRequestMarkers(
       approvedStartsOn: null,
       approvedEndsOn: null,
     }));
-}
+});
 
-export async function getAttendanceEntriesByDate(
+export const getAttendanceEntriesByDate = cache(async function getAttendanceEntriesByDate(
   supabase: Client,
   teamId: string,
   reservePeriodId: string,
@@ -126,9 +131,9 @@ export async function getAttendanceEntriesByDate(
     byDate.set(item.attendance_date, entries);
   }
   return byDate;
-}
+});
 
-async function getAttendanceDayStatus(
+const getAttendanceDayStatus = cache(async function getAttendanceDayStatus(
   supabase: Client,
   teamId: string,
   reservePeriodId: string,
@@ -142,9 +147,9 @@ async function getAttendanceDayStatus(
   });
   assertOk(error, "attendance day status");
   return data?.[0]?.status ?? null;
-}
+});
 
-export async function getOperationalRange(
+export const getOperationalRange = cache(async function getOperationalRange(
   supabase: Client,
   team: TeamSummary,
   period: Row<"reserve_periods">,
@@ -206,9 +211,9 @@ export async function getOperationalRange(
       });
     },
   };
-}
+});
 
-export async function getOperationalDay(
+export const getOperationalDay = cache(async function getOperationalDay(
   supabase: Client,
   team: TeamSummary,
   date = getDateInTimeZone(team.timezone),
@@ -271,6 +276,10 @@ export async function getOperationalDay(
     leaves,
     people: resolvedPeople,
     period,
+    rotationStatus: (groupsResult.data ?? []).map((group) => ({
+      name: group.name,
+      state: blocks.find((block) => block.groupId === group.id)?.state ?? "unknown",
+    })),
     summary: {
       expected: expected.length,
       expectedPresent: expected.filter((person) => person.resolution.attendance === "present").length,
@@ -281,11 +290,11 @@ export async function getOperationalDay(
       unexpectedPresent: resolvedPeople.filter((person) => person.resolution.discrepancy === "unexpected-presence").length,
     },
   };
-}
+});
 
 function emptyDay(date: string): OperationalDay {
   return {
-    attendanceDayStatus: null, date, leaves: [], people: [], period: null,
+    attendanceDayStatus: null, date, leaves: [], people: [], period: null, rotationStatus: [],
     summary: { absent: 0, expected: 0, expectedPresent: 0, leave: 0, present: 0, unexpectedPresent: 0, unreported: 0 },
   };
 }
