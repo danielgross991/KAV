@@ -35,6 +35,7 @@ const supabase = createClient(url, secretKey, { auth: { autoRefreshToken: false,
 const reservePeriod2026 = readJson("kav-2026-reserve-period.json");
 const legacyPeriod2025 = readJson("kav-legacy-2025-period.json");
 const legacyAttendance = readJson("kav-legacy-2025-attendance.json");
+const legacyLeaveRequests = readJson("kav-legacy-2025-leave-requests.json");
 const defaultEquipmentTypes = readJson("kav-default-equipment-types.json");
 
 const report = {
@@ -42,7 +43,7 @@ const report = {
   phasesCreated: [], phasesSkipped: [],
   eventsCreated: [], eventsSkipped: [],
   holidaysCreated: [], holidaysSkipped: [],
-  pendingLeaveImported: [], pendingLeaveSkipped: [],
+  pendingLeaveImported: [], pendingLeaveSkipped: [], historicalLeaveImported: [], historicalLeaveSkipped: [],
   equipmentTypesCreated: [], equipmentTypesSkipped: [],
   equipmentImported: [],
   historicalAttendanceDates: [], historicalPresenceRowsCreated: [], historicalPresenceRowsUpdated: [],
@@ -118,6 +119,7 @@ async function main() {
   }
   reportKnownUnresolvedHistoricalPeople(nameToId, legacyPeriod2025.unresolvedHistoricalPeople ?? []);
   await importHistoricalAttendance(team.id, period2025.id, legacyAttendance, nameToId, legacyPeriod2025.period);
+  await importHistoricalLeave(team.id, period2025.id, legacyLeaveRequests.requests ?? [], nameToId, legacyPeriod2025.period);
 
   finalizeUnresolvedMappings();
   printReport();
@@ -297,6 +299,51 @@ async function importPendingLeave(teamId, reservePeriodId, requests, nameToId) {
   }
 }
 
+async function importHistoricalLeave(teamId, reservePeriodId, requests, nameToId, period) {
+  for (const request of requests) {
+    if (request.starts_on < period.starts_on || request.ends_on > period.ends_on) {
+      report.historicalLeaveSkipped.push({ ...request, why_skipped: "outside historical reserve period" });
+      continue;
+    }
+
+    const personId = resolvePersonId(nameToId, request.person_name, "historical leave import");
+    if (!personId) {
+      report.historicalLeaveSkipped.push({ ...request, why_skipped: "person not found in team roster" });
+      continue;
+    }
+
+    const { data: existing, error } = await supabase.from("leave_requests").select("id")
+      .eq("team_id", teamId).eq("person_id", personId)
+      .eq("starts_on", request.starts_on).eq("ends_on", request.ends_on)
+      .eq("reason", request.reason ?? null).maybeSingle();
+    if (error) throw new Error(`Unable to look up historical leave for ${request.person_name}: ${error.message}`);
+    if (existing) {
+      report.historicalLeaveSkipped.push({ ...request, why_skipped: "already exists" });
+      continue;
+    }
+
+    const { error: insertError } = await supabase.from("leave_requests").insert({
+      team_id: teamId,
+      reserve_period_id: reservePeriodId,
+      person_id: personId,
+      starts_on: request.starts_on,
+      ends_on: request.ends_on,
+      status: "approved",
+      approved_starts_on: request.starts_on,
+      approved_ends_on: request.ends_on,
+      reason: request.reason ?? null,
+      manager_notes: request.source_cell ? `מקור אקסל: ${request.source_cell}` : null,
+    });
+    if (insertError) throw new Error(`Unable to create historical leave for ${request.person_name}: ${insertError.message}`);
+    report.historicalLeaveImported.push({
+      person_name: request.person_name,
+      starts_on: request.starts_on,
+      ends_on: request.ends_on,
+      reason: request.reason ?? null,
+    });
+  }
+}
+
 async function createHistoricalRotationGroups(teamId, reservePeriodId, groups, nameToId) {
   let sortOrder = 0;
   const colorByGroupName = { "סבב ירוק": "green", "סבב צהוב": "amber" };
@@ -401,12 +448,8 @@ async function importHistoricalAttendance(teamId, reservePeriodId, attendanceDat
   }
 
   const dayIds = [...dayByDate.values()].map((day) => day.id);
-  const { data: existingEntries, error: entriesError } = dayIds.length
-    ? await supabase.from("attendance_entries").select("id, attendance_day_id, person_id")
-      .eq("team_id", teamId).in("attendance_day_id", dayIds)
-    : { data: [], error: null };
-  if (entriesError) throw new Error(`Unable to load historical attendance entries: ${entriesError.message}`);
-  const entryKeys = new Set((existingEntries ?? []).map((entry) => `${entry.attendance_day_id}:${entry.person_id}`));
+  const existingEntries = dayIds.length ? await getExistingAttendanceEntries(teamId, dayIds) : [];
+  const entryKeys = new Set(existingEntries.map((entry) => `${entry.attendance_day_id}:${entry.person_id}`));
   const rowsToInsert = [];
   for (const record of inRange) {
     const day = dayByDate.get(record.date);
@@ -427,6 +470,19 @@ async function importHistoricalAttendance(teamId, reservePeriodId, attendanceDat
         ignoreDuplicates: true,
       });
     if (insertError) throw new Error(`Unable to create historical attendance entries: ${insertError.message}`);
+  }
+}
+
+async function getExistingAttendanceEntries(teamId, dayIds) {
+  const rows = [];
+  const pageSize = 1000;
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase.from("attendance_entries").select("id, attendance_day_id, person_id")
+      .eq("team_id", teamId).in("attendance_day_id", dayIds)
+      .range(from, from + pageSize - 1);
+    if (error) throw new Error(`Unable to load historical attendance entries: ${error.message}`);
+    rows.push(...(data ?? []));
+    if (!data || data.length < pageSize) return rows;
   }
 }
 

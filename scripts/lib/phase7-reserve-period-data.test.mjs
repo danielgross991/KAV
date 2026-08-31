@@ -11,6 +11,9 @@ const periodSeed = JSON.parse(
 const legacyPeriodSeed = JSON.parse(
   readFileSync(join(__dirname, "..", "data", "kav-legacy-2025-period.json"), "utf-8"),
 );
+const legacyLeaveSeed = JSON.parse(
+  readFileSync(join(__dirname, "..", "data", "kav-legacy-2025-leave-requests.json"), "utf-8"),
+);
 
 test("2026 reserve period seed is the upcoming Otniel line with exact requested dates", () => {
   assert.equal(periodSeed.period.name, "קו עותניאל ספטמבר–דצמבר 2026");
@@ -42,5 +45,26 @@ test("historical Kishufim seed includes non-overlapping rotation blocks for both
     for (let index = 1; index < groupBlocks.length; index += 1) {
       assert.ok(groupBlocks[index].starts_on > groupBlocks[index - 1].ends_on);
     }
+  }
+});
+
+test("historical Kishufim leave requests are extracted from person-specific calendar notes", () => {
+  const requests = legacyLeaveSeed.requests ?? [];
+  assert.equal(requests.length, 31);
+  assert.equal(requests.some((request) => request.reason === "חובת הגעה כולם"), false);
+  assert.equal(requests.some((request) => request.reason === "תפיסת קו כיסופים"), false);
+  assert.ok(requests.some((request) =>
+    request.person_name === "מלסה" &&
+    request.starts_on === "2025-06-22" &&
+    request.ends_on === "2025-06-26" &&
+    request.reason === "חול"));
+  assert.ok(requests.some((request) =>
+    request.person_name === "ניתאי" &&
+    request.starts_on === "2025-07-18" &&
+    request.reason === "חתונה"));
+
+  for (const request of requests) {
+    assert.ok(request.starts_on >= legacyPeriodSeed.period.starts_on, `${request.person_name} starts before the historical period`);
+    assert.ok(request.ends_on <= legacyPeriodSeed.period.ends_on, `${request.person_name} ends after the historical period`);
   }
 });

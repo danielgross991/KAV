@@ -88,9 +88,15 @@
     }
   ],
   "nameVariants": [
+    { "canonical": "לידור דורון", "legacy_variants": ["לידור"] },
+    { "canonical": "ניתאי ידעי", "legacy_variants": ["ניתאי"] },
     { "canonical": "יונתן אבוחצירא", "legacy_variants": ["יוני אבוחצירה", "יוני"] },
     { "canonical": "אריאל דויב", "legacy_variants": ["אריאל דוייב", "דוייב"] },
     { "canonical": "אורי בנבג'י", "legacy_variants": ["בג'י"] },
+    { "canonical": "דניאל גרוס", "legacy_variants": ["גרוס"] },
+    { "canonical": "מלסה אטלאי", "legacy_variants": ["מלסה"] },
+    { "canonical": "בנימין ברי", "legacy_variants": ["ברי"] },
+    { "canonical": "תמיר אסראסו", "legacy_variants": ["אסראסו"] },
     { "canonical": "עמנואל אלמו", "legacy_variants": ["מנו"] }
   ]
 }
