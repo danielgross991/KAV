@@ -4,7 +4,6 @@ import { MapPin } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { setSelectedLineAction } from "@/app/[teamSlug]/line/actions";
-import { DEFAULT_LINE_VALUE } from "@/lib/kav/line-selection";
 import { cn } from "@/lib/utils";
 
 type LineOption = {
@@ -37,7 +36,7 @@ export function LineSelector({
   const action = setSelectedLineAction.bind(null, teamSlug);
   const selectedValue = options.some((option) => option.id === selectedPeriodId)
     ? selectedPeriodId!
-    : DEFAULT_LINE_VALUE;
+    : options[0]!.id;
 
   return (
     <form action={action} className={cn("grid gap-1.5 text-xs font-medium text-muted-foreground", className)}>
@@ -53,11 +52,10 @@ export function LineSelector({
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
         className="h-10 w-full rounded-md border bg-background px-2 text-sm text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/30"
       >
-        <option value={DEFAULT_LINE_VALUE}>קו נוכחי / קרוב</option>
         {options.map((period) => (
           <option key={period.id} value={period.id}>
-            {period.location ? `${period.location} · ` : ""}
             {period.name}
+            {period.location && period.location !== period.name ? ` · ${period.location}` : ""}
           </option>
         ))}
       </select>

@@ -53,34 +53,48 @@ export async function getTeamStats(
   if (!period) return { leaderboard: [], periodId: null, stats: [] };
 
   const elapsedEnd = today < period.ends_on ? addCalendarDays(today, -1) : period.ends_on;
-  if (elapsedEnd < period.starts_on) return { leaderboard: [], periodId: period.id, stats: [] };
-
-  const range = await getOperationalRange(supabase, team, period, period.starts_on, elapsedEnd);
-  const activePeople = range.people.filter((person) => person.is_active);
-  const elapsedDates = eachCalendarDate(period.starts_on, elapsedEnd);
-
-  const resolutionsByPerson = new Map<string, DailyResolution[]>();
-  const useActualHistoricalAttendance = period.status === "completed";
-  for (const person of activePeople) {
-    const days: DailyResolution[] = elapsedDates.map((date) => {
-      const resolution = range.resolve(person.id, date);
-      const day = {
-        attendance: resolution.attendance,
-        expectedAtBase: resolution.expectedAtBase,
-        leave: Boolean(resolution.leave),
-        state: resolution.state,
-      };
-      return useActualHistoricalAttendance ? applyHistoricalAttendanceSemantics(day) : day;
-    });
-    resolutionsByPerson.set(person.id, days);
+  if (elapsedEnd < period.starts_on) {
+    const previousPeriod = (periods ?? [])
+      .filter((item) => item.status === "completed" && item.ends_on < period.starts_on)
+      .sort((a, b) => b.ends_on.localeCompare(a.ends_on))[0];
+    if (!previousPeriod) return { leaderboard: [], periodId: period.id, stats: [] };
+    const previousStats = await buildStatsForPeriod(previousPeriod, previousPeriod.ends_on);
+    return {
+      leaderboard: rankHomeLeaderboard(previousStats).slice(0, 3),
+      periodId: period.id,
+      stats: [],
+    };
   }
 
-  const statPeople = activePeople.map((person) => ({ fullName: person.full_name, id: person.id, photoUrl: person.photo_url }));
-  const stats = getLegacyLineStatsOverride(period, statPeople) ?? computeAttendanceStats(statPeople, resolutionsByPerson);
-
+  const stats = await buildStatsForPeriod(period, elapsedEnd);
   return {
     leaderboard: rankHomeLeaderboard(stats).slice(0, 3),
     periodId: period.id,
     stats,
   };
+
+  async function buildStatsForPeriod(targetPeriod: NonNullable<typeof period>, targetElapsedEnd: string) {
+    const range = await getOperationalRange(supabase, team, targetPeriod, targetPeriod.starts_on, targetElapsedEnd);
+    const activePeople = range.people.filter((person) => person.is_active);
+    const elapsedDates = eachCalendarDate(targetPeriod.starts_on, targetElapsedEnd);
+
+    const resolutionsByPerson = new Map<string, DailyResolution[]>();
+    const useActualHistoricalAttendance = targetPeriod.status === "completed";
+    for (const person of activePeople) {
+      const days: DailyResolution[] = elapsedDates.map((date) => {
+        const resolution = range.resolve(person.id, date);
+        const day = {
+          attendance: resolution.attendance,
+          expectedAtBase: resolution.expectedAtBase,
+          leave: Boolean(resolution.leave),
+          state: resolution.state,
+        };
+        return useActualHistoricalAttendance ? applyHistoricalAttendanceSemantics(day) : day;
+      });
+      resolutionsByPerson.set(person.id, days);
+    }
+
+    const statPeople = activePeople.map((person) => ({ fullName: person.full_name, id: person.id, photoUrl: person.photo_url }));
+    return getLegacyLineStatsOverride(targetPeriod, statPeople) ?? computeAttendanceStats(statPeople, resolutionsByPerson);
+  }
 }

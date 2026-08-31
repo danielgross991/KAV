@@ -41,9 +41,15 @@ export type DashboardData = {
     fullName: string;
     isOnLeave: boolean;
     personId: string;
+    photoUrl: string | null;
     state: "base" | "home" | null;
   } | null;
   personalStats: PersonAttendanceStats | null;
+  viewerProfile: {
+    fullName: string;
+    personId: string;
+    photoUrl: string | null;
+  } | null;
   qualificationReadiness: {
     current: number;
     name: string;
@@ -106,7 +112,7 @@ export const getDashboardData = cache(async function getDashboardData(
     userId
       ? supabase
           .from("people")
-          .select("id, full_name")
+          .select("id, full_name, photo_url")
           .eq("team_id", team.id)
           .eq("auth_user_id", userId)
           .maybeSingle()
@@ -142,7 +148,7 @@ export const getDashboardData = cache(async function getDashboardData(
   const [operationalDay, nextTask, teamStats, upcomingEventResult] = await Promise.all([
     getOperationalDay(supabase, team, today, selectedPeriod?.id),
     userId ? getNextPersonalTask(supabase, team, userId, selectedPeriod?.id) : Promise.resolve(null),
-    getTeamStats(supabase, team, today, selectedStatsPeriodId),
+    getTeamStats(supabase, team, today, selectedPeriod?.id),
     upcomingEventQuery.maybeSingle(),
   ]);
   assertOk(upcomingEventResult.error, "upcoming event");
@@ -209,10 +215,14 @@ export const getDashboardData = cache(async function getDashboardData(
           fullName: currentPerson.full_name,
           isOnLeave: Boolean(personalResolution.leave),
           personId: currentPerson.id,
+          photoUrl: currentPerson.photo_url,
           state: personalResolution.state,
         }
       : null,
     personalStats: currentPerson ? teamStats.stats.find((item) => item.personId === currentPerson.id) ?? null : null,
+    viewerProfile: currentPerson
+      ? { fullName: currentPerson.full_name, personId: currentPerson.id, photoUrl: currentPerson.photo_url }
+      : null,
     qualificationReadiness: requirements.map((requirement) => ({
       current: pakalCounts.get(requirement.pakal_types.id) ?? 0,
       name: requirement.pakal_types.name,

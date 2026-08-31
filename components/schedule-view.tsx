@@ -27,10 +27,10 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
   const period = data.selectedPeriod;
   const activeMonth = /^\d{4}-\d{2}$/.test(month ?? "") ? month! : (period && data.today >= period.starts_on && data.today <= period.ends_on ? data.today : period?.starts_on ?? data.today).slice(0, 7);
   return <AppPage>
-    <PageHeader
+      <PageHeader
       eyebrow={data.team.name}
       title="לו״ז"
-      subtitle={period ? `${period.name} · ${shortDate(period.starts_on)}–${shortDate(period.ends_on)}${period.location ? ` · ${period.location}` : ""}` : "תכנון תקופות, סבבים ואירועים"}
+      subtitle={period ? periodSubtitle(period) : "תכנון תקופות, סבבים ואירועים"}
       action={data.canManage ? <Button size="icon" variant={manage ? "secondary" : "outline"} aria-label="ניהול תקופה" onClick={() => setManage((value) => !value)}><Plus className="size-4" /></Button> : null}
     >
       <div className="space-y-2.5">
@@ -110,9 +110,11 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
       </>
     ) : viewer ? (
       <div className="mt-1 flex flex-wrap items-center gap-1">
-        <Badge variant={viewer.resolution.state === "base" ? "success" : viewer.resolution.state === "home" ? "info" : "outline"}>
-          {stateLabel(viewer.resolution.state)}
-        </Badge>
+        {viewer.resolution.state ? (
+          <Badge variant={viewer.resolution.state === "base" ? "success" : "info"}>
+            {stateLabel(viewer.resolution.state)}
+          </Badge>
+        ) : null}
         {viewer.resolution.leave ? <Badge variant="secondary">יציאה</Badge> : null}
         {personalLeaves.length ? <Badge variant="outline">בקשה שלך</Badge> : null}
         {teamLeaveCount && !personalLeaves.length ? <span className="text-[0.68rem] text-sky-700 sm:text-xs">{teamLeaveCount} יציאות</span> : null}
@@ -123,6 +125,11 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
 
 function LegendDot({ className, label }: { className: string; label: string }) {
   return <span className="inline-flex items-center gap-1"><span className={cn("size-2 rounded-full", className)} />{label}</span>;
+}
+
+function periodSubtitle(period: NonNullable<ScheduleData["selectedPeriod"]>) {
+  const location = period.location && period.location !== period.name ? ` · ${period.location}` : "";
+  return `${period.name} · ${shortDate(period.starts_on)}–${shortDate(period.ends_on)}${location}`;
 }
 
 function Agenda({ data }: { data: ScheduleData }) {

@@ -33,7 +33,7 @@ export async function setSelectedLineAction(teamSlug: string, formData: FormData
     .neq("status", "archived");
 
   if (!canManage(membership.role)) {
-    query = query.in("status", ["active", "published"]);
+    query = query.in("status", ["active", "published", "completed"]);
   }
 
   const { data: period, error } = await query.maybeSingle();

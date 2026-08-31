@@ -64,6 +64,7 @@ function ManagerDashboard({
         }
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
+      <WelcomeCard data={data} />
 
       <section className="overflow-hidden rounded-lg bg-primary text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
         <div className="flex items-center justify-between gap-3 px-4 pt-3.5">
@@ -177,6 +178,7 @@ function ViewerDashboard({
         subtitle={formatToday(data.team.timezone)}
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
+      <WelcomeCard data={data} />
 
       <div className="mt-4">
         <HomeLeaderboard data={data} />
@@ -226,6 +228,21 @@ function HomeLineSelector({
   );
 }
 
+function WelcomeCard({ data }: { data: DashboardData }) {
+  const profile = data.viewerProfile;
+  if (!profile) return null;
+  const firstName = profile.fullName.split(" ")[0];
+  return (
+    <section className="mb-4 flex items-center gap-3 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
+      <PersonAvatar name={profile.fullName} photoUrl={profile.photoUrl} featured />
+      <div className="min-w-0">
+        <p className="text-xs font-medium text-muted-foreground">ברוך הבא</p>
+        <h2 className="truncate text-lg font-bold">{firstName}</h2>
+      </div>
+    </section>
+  );
+}
+
 function PersonalStats({ data }: { data: DashboardData }) {
   const stats = data.personalStats;
   if (!stats) return null;
@@ -254,9 +271,13 @@ function MiniMetric({ label, value }: { label: string; value: number | string })
 function HomeLeaderboard({ data }: { data: DashboardData }) {
   if (!data.homeLeaderboard.length) return null;
   const podium = [data.homeLeaderboard[1], data.homeLeaderboard[0], data.homeLeaderboard[2]].filter(Boolean);
+  const isPreview = data.attendanceStats.length === 0 && Boolean(data.currentPeriod);
   return (
     <Card>
-      <CardHeader className="pb-3"><CardTitle>אלופי הבית</CardTitle></CardHeader>
+      <CardHeader className="pb-3">
+        <CardTitle>{isPreview ? "מי יהיו אלופי הבית הפעם?" : "אלופי הבית"}</CardTitle>
+        {isPreview ? <p className="mt-1 text-xs text-muted-foreground">כרגע מוצגים אלופי הקו הקודם עד שהקו הנוכחי יתחיל.</p> : null}
+      </CardHeader>
       <CardContent>
         <div className="grid grid-cols-3 items-end gap-2">
           {podium.map((item) => {
