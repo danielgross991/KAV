@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
 import { addCalendarDays, eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
+import { getLegacyLineStatsOverride } from "@/lib/kav/legacy-line-stats";
 import { getOperationalRange } from "@/lib/kav/operations";
 import { selectOperationalReservePeriod } from "@/lib/kav/schedule-domain";
 import {
@@ -74,10 +75,8 @@ export async function getTeamStats(
     resolutionsByPerson.set(person.id, days);
   }
 
-  const stats = computeAttendanceStats(
-    activePeople.map((person) => ({ fullName: person.full_name, id: person.id, photoUrl: person.photo_url })),
-    resolutionsByPerson,
-  );
+  const statPeople = activePeople.map((person) => ({ fullName: person.full_name, id: person.id, photoUrl: person.photo_url }));
+  const stats = getLegacyLineStatsOverride(period, statPeople) ?? computeAttendanceStats(statPeople, resolutionsByPerson);
 
   return {
     leaderboard: rankHomeLeaderboard(stats).slice(0, 3),

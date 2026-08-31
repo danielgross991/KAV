@@ -2,22 +2,16 @@ import Link from "next/link";
 import { LogOut } from "lucide-react";
 
 import { KavMark } from "@/components/kav-mark";
-import { LineSelector } from "@/components/line-selector";
 import { Separator } from "@/components/ui/separator";
 import { TeamNav } from "@/components/team-nav";
-import type { getLineSelectionOptions } from "@/lib/kav/line-selection";
 import type { TeamMembership } from "@/lib/kav/teams";
 
 export function AppShell({
   children,
-  lineOptions,
   membership,
-  selectedLinePeriodId,
 }: {
   children: React.ReactNode;
-  lineOptions: Awaited<ReturnType<typeof getLineSelectionOptions>>;
   membership: TeamMembership;
-  selectedLinePeriodId: string | null;
 }) {
   return (
     <div className="min-h-screen bg-background">
@@ -34,14 +28,6 @@ export function AppShell({
         <div className="mx-4 rounded-md border bg-muted/55 px-3 py-2.5">
           <p className="truncate text-sm font-semibold">{membership.team.name}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{roleLabel(membership.role)}</p>
-        </div>
-        <div className="mx-4 mt-3">
-          <LineSelector
-            id="desktop-line-selector"
-            options={lineOptions}
-            selectedPeriodId={selectedLinePeriodId}
-            teamSlug={membership.team.slug}
-          />
         </div>
         <Separator className="mx-4 my-4 w-auto" />
         <div className="flex-1 px-3">
@@ -72,13 +58,6 @@ export function AppShell({
               <span className="block truncate text-[11px] text-muted-foreground">{membership.team.name}</span>
             </span>
           </Link>
-          <LineSelector
-            className="w-[min(52vw,15rem)]"
-            id="mobile-line-selector"
-            options={lineOptions}
-            selectedPeriodId={selectedLinePeriodId}
-            teamSlug={membership.team.slug}
-          />
           <form action="/logout" method="post">
             <button
               type="submit"

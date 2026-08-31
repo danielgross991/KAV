@@ -16,10 +16,11 @@ const legacyLeaveSeed = JSON.parse(
 );
 
 test("2026 reserve period seed is the upcoming Otniel line with exact requested dates", () => {
-  assert.equal(periodSeed.period.name, "קו עותניאל ספטמבר–דצמבר 2026");
+  assert.equal(periodSeed.period.name, "קו עותניאל");
   assert.equal(periodSeed.period.location, "קו עותניאל");
   assert.equal(periodSeed.period.starts_on, "2026-09-06");
   assert.equal(periodSeed.period.ends_on, "2026-12-02");
+  assert.equal(periodSeed.period.status, "published");
 });
 
 test("Rosh Hashanah home instruction is modeled as an event, not fake leave requests", () => {

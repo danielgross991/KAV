@@ -53,7 +53,7 @@ export function LineSelector({
         onChange={(event) => event.currentTarget.form?.requestSubmit()}
         className="h-10 w-full rounded-md border bg-background px-2 text-sm text-foreground outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/30"
       >
-        <option value={DEFAULT_LINE_VALUE}>קו תפעולי נוכחי</option>
+        <option value={DEFAULT_LINE_VALUE}>קו נוכחי / קרוב</option>
         {options.map((period) => (
           <option key={period.id} value={period.id}>
             {period.location ? `${period.location} · ` : ""}

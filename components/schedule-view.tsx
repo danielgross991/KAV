@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -25,7 +24,6 @@ const eventLabels: Record<string, string> = { briefing: "תדריך", training: 
 
 export function ScheduleView({ data, initialManage, month, view }: { data: ScheduleData; initialManage: boolean; month?: string; view: string }) {
   const [manage, setManage] = useState(initialManage);
-  const router = useRouter();
   const period = data.selectedPeriod;
   const activeMonth = /^\d{4}-\d{2}$/.test(month ?? "") ? month! : (period && data.today >= period.starts_on && data.today <= period.ends_on ? data.today : period?.starts_on ?? data.today).slice(0, 7);
   return <AppPage>
@@ -36,7 +34,6 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
       action={data.canManage ? <Button size="icon" variant={manage ? "secondary" : "outline"} aria-label="ניהול תקופה" onClick={() => setManage((value) => !value)}><Plus className="size-4" /></Button> : null}
     >
       <div className="space-y-2.5">
-        {data.periods.length ? <label className="grid gap-1 text-xs font-medium text-muted-foreground"><span>בחירת סבב מילואים</span><select aria-label="תקופת מילואים" className="h-10 w-full rounded-md border bg-card px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/30" value={period?.id ?? ""} onChange={(event) => router.push(`/${data.team.slug}/schedule?period=${event.target.value}&view=${view}`)}>{data.periods.map((item) => <option key={item.id} value={item.id}>{item.name} · {statusLabel(item.status)}</option>)}</select></label> : null}
         {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={view === "agenda"} href={href(data, "agenda", activeMonth)}>אג׳נדה</Tab><Tab active={view === "month"} href={href(data, "month", activeMonth)}>חודש</Tab><Tab active={view === "rotations"} href={href(data, "rotations", activeMonth)}>סבבים</Tab></nav> : null}
       </div>
     </PageHeader>
@@ -92,7 +89,7 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
   const attendanceIssue = data.canManage && isPast && ((day.attendance?.absent.length ?? 0) > 0 || (day.attendance?.unreported.length ?? 0) > 0);
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
 
-  return <Link className={cn("min-h-[5.9rem] border-b border-l p-1.5 transition-colors hover:bg-accent/40 sm:min-h-[7.25rem] sm:p-2", !inMonth && "bg-muted/30 text-muted-foreground", viewer?.resolution.state === "home" && "bg-sky-50/60", personalLeaves.length && "ring-1 ring-inset ring-primary/35")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`}>
+  return <Link className={cn("min-h-[5.9rem] border-b border-l p-1.5 transition-colors hover:bg-accent/40 sm:min-h-[7.25rem] sm:p-2", !inMonth && "bg-muted/30 text-muted-foreground", viewer?.resolution.state === "home" && "bg-sky-50/60", personalLeaves.length && "border-primary/40 bg-primary/10 ring-2 ring-inset ring-primary/35")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`}>
     <div className="mb-1.5 flex items-start justify-between gap-1">
       <span className={cn("grid size-6 place-items-center rounded-full text-xs sm:size-7 sm:text-sm", date === data.today && "bg-primary text-primary-foreground")}>{Number(date.slice(-2))}</span>
       <span className="mt-1 flex flex-wrap justify-end gap-1">

@@ -1,10 +1,10 @@
 {
   "period": {
-    "name": "קו עותניאל ספטמבר–דצמבר 2026",
+    "name": "קו עותניאל",
     "location": "קו עותניאל",
     "starts_on": "2026-09-06",
     "ends_on": "2026-12-02",
-    "status": "draft"
+    "status": "published"
   },
   "phases": [
     { "name": "הכנת מפקדים / גיוס", "phase_type": "preparation", "starts_on": "2026-09-06", "ends_on": "2026-09-10", "sort_order": 0 },

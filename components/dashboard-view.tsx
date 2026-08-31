@@ -15,16 +15,36 @@ import {
 import { AppPage, PageHeader, SectionHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LineSelector } from "@/components/line-selector";
 import type { DashboardData } from "@/lib/kav/dashboard";
+import type { getLineSelectionOptions } from "@/lib/kav/line-selection";
 import { cn } from "@/lib/utils";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export function DashboardView({ data }: { data: DashboardData }) {
-  return data.canManage ? <ManagerDashboard data={data} /> : <ViewerDashboard data={data} />;
+export function DashboardView({
+  data,
+  lineOptions,
+  selectedLinePeriodId,
+}: {
+  data: DashboardData;
+  lineOptions: Awaited<ReturnType<typeof getLineSelectionOptions>>;
+  selectedLinePeriodId: string | null;
+}) {
+  return data.canManage
+    ? <ManagerDashboard data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
+    : <ViewerDashboard data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />;
 }
 
-function ManagerDashboard({ data }: { data: DashboardData }) {
+function ManagerDashboard({
+  data,
+  lineOptions,
+  selectedLinePeriodId,
+}: {
+  data: DashboardData;
+  lineOptions: Awaited<ReturnType<typeof getLineSelectionOptions>>;
+  selectedLinePeriodId: string | null;
+}) {
   const home = Math.max(0, data.activePeople - data.expectedOnBase - data.approvedLeaveToday);
 
   return (
@@ -43,6 +63,7 @@ function ManagerDashboard({ data }: { data: DashboardData }) {
           </Link>
         }
       />
+      <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
 
       <section className="overflow-hidden rounded-lg bg-primary text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
         <div className="flex items-center justify-between gap-3 px-4 pt-3.5">
@@ -127,7 +148,6 @@ function ManagerDashboard({ data }: { data: DashboardData }) {
         <div className="space-y-4">
           <CurrentPeriod data={data} />
           <UpcomingEvent data={data} />
-          <StatsPeriodSelector data={data} />
           <HomeLeaderboard data={data} />
           <AttendanceByPerson data={data} />
           <QualificationReadiness data={data} />
@@ -137,7 +157,15 @@ function ManagerDashboard({ data }: { data: DashboardData }) {
   );
 }
 
-function ViewerDashboard({ data }: { data: DashboardData }) {
+function ViewerDashboard({
+  data,
+  lineOptions,
+  selectedLinePeriodId,
+}: {
+  data: DashboardData;
+  lineOptions: Awaited<ReturnType<typeof getLineSelectionOptions>>;
+  selectedLinePeriodId: string | null;
+}) {
   const personal = data.personalStatus;
   const firstName = personal?.fullName.split(" ")[0];
 
@@ -148,8 +176,13 @@ function ViewerDashboard({ data }: { data: DashboardData }) {
         title={firstName ? `שלום ${firstName}` : "הבית שלי"}
         subtitle={formatToday(data.team.timezone)}
       />
+      <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
 
-      <section className="rounded-lg bg-primary px-4 py-4 text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
+      <div className="mt-4">
+        <HomeLeaderboard data={data} />
+      </div>
+
+      <section className="mt-4 rounded-lg bg-primary px-4 py-4 text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
         <div className="flex items-center gap-2 text-xs font-medium text-white/70">
           {personal?.state === "home" ? <Home className="size-4" /> : <Users className="size-4" />}
           הסטטוס שלך עכשיו
@@ -162,14 +195,34 @@ function ViewerDashboard({ data }: { data: DashboardData }) {
       </section>
 
       <div className="mt-4 space-y-4">
-        <HomeLeaderboard data={data} />
         <NextTask data={data} personal />
         <PersonalStats data={data} />
         <UpcomingEvent data={data} />
-        <StatsPeriodSelector data={data} />
         <CurrentPeriod data={data} compact />
       </div>
     </AppPage>
+  );
+}
+
+function HomeLineSelector({
+  data,
+  lineOptions,
+  selectedLinePeriodId,
+}: {
+  data: DashboardData;
+  lineOptions: Awaited<ReturnType<typeof getLineSelectionOptions>>;
+  selectedLinePeriodId: string | null;
+}) {
+  if (!lineOptions.length) return null;
+  return (
+    <div className="mb-4 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
+      <LineSelector
+        id="home-line-selector"
+        options={lineOptions}
+        selectedPeriodId={selectedLinePeriodId}
+        teamSlug={data.team.slug}
+      />
+    </div>
   );
 }
 
@@ -226,31 +279,6 @@ function HomeLeaderboard({ data }: { data: DashboardData }) {
             );
           })}
         </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function StatsPeriodSelector({ data }: { data: DashboardData }) {
-  if (data.statsPeriods.length <= 1) return null;
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle>סטטיסטיקות לפי סבב</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-wrap gap-2">
-        {data.statsPeriods.slice(0, 4).map((period) => (
-          <Link
-            key={period.id}
-            className={cn(
-              "rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted",
-              data.statsPeriodId === period.id && "border-primary bg-accent text-primary",
-            )}
-            href={`/${data.team.slug}?statsPeriod=${period.id}`}
-          >
-            {period.name}
-          </Link>
-        ))}
       </CardContent>
     </Card>
   );

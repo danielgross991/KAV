@@ -4,6 +4,7 @@ import { cache } from "react";
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { getOperationalDay } from "@/lib/kav/operations";
+import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
 import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
 import { getNextPersonalTask } from "@/lib/kav/tasks";
 import type { TeamSummary } from "@/lib/kav/teams";
@@ -125,7 +126,7 @@ export const getDashboardData = cache(async function getDashboardData(
 
   const selectedPeriod = selectedStatsPeriodId
     ? (statsPeriodsResult.data ?? []).find((period) => period.id === selectedStatsPeriodId) ?? null
-    : null;
+    : selectDefaultScheduleReservePeriod(statsPeriodsResult.data ?? [], today);
   let upcomingEventQuery = supabase
     .from("schedule_events")
     .select("title, event_type, starts_at")
