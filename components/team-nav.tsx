@@ -5,6 +5,7 @@ import { CalendarDays, CalendarOff, ClipboardList, Home, PackageCheck, Settings,
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
+import { KavLoading } from "@/components/kav-loading";
 import { KavMark } from "@/components/kav-mark";
 import { cn } from "@/lib/utils";
 import { canManage, type TeamRole } from "@/lib/kav/teams";
@@ -37,103 +38,110 @@ export function TeamNav({
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const items = canManage(role) ? managerItems : viewerItems;
   const base = `/${teamSlug}`;
+  const showRouteLoading = pendingHref !== null && pendingHref !== pathname;
 
   if (variant === "mobile") {
     return (
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur-md lg:hidden" aria-label="ניווט ראשי">
-        <div className="mx-auto flex max-w-md items-stretch px-1">
-          {items.map((item) => {
-            const href = `${base}${item.href}`;
-            const active = item.href === "" ? pathname === href : pathname.startsWith(href);
-            const pending = pendingHref === href && !active;
-            const Icon = item.icon;
+      <>
+        {showRouteLoading ? <KavLoading label="טוען מסך" /> : null}
+        <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur-md lg:hidden" aria-label="ניווט ראשי">
+          <div className="mx-auto flex max-w-md items-stretch px-1">
+            {items.map((item) => {
+              const href = `${base}${item.href}`;
+              const active = item.href === "" ? pathname === href : pathname.startsWith(href);
+              const pending = pendingHref === href && !active;
+              const Icon = item.icon;
 
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-current={active ? "page" : undefined}
-                onClick={() => {
-                  if (!active) setPendingHref(href);
-                }}
-                className={cn(
-                  "relative flex h-[58px] flex-1 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
-                  active && "bg-accent font-semibold text-primary",
-                  pending && "text-primary",
-                )}
-              >
-                <span className={cn("absolute top-0 h-0.5 w-8 rounded-full bg-primary transition-opacity", active || pending ? "opacity-100" : "opacity-0")} />
-                {pending ? <KavMark className="size-[19px] rounded-[0.3rem]" loading /> : <Icon className="size-[19px]" strokeWidth={active ? 2.2 : 1.8} />}
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-        <div className="h-[env(safe-area-inset-bottom)]" />
-      </nav>
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => {
+                    if (!active) setPendingHref(href);
+                  }}
+                  className={cn(
+                    "relative flex h-[58px] flex-1 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
+                    active && "bg-accent font-semibold text-primary",
+                    pending && "text-primary",
+                  )}
+                >
+                  <span className={cn("absolute top-0 h-0.5 w-8 rounded-full bg-primary transition-opacity", active || pending ? "opacity-100" : "opacity-0")} />
+                  {pending ? <KavMark className="size-[19px] rounded-[0.3rem]" loading /> : <Icon className="size-[19px]" strokeWidth={active ? 2.2 : 1.8} />}
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+          <div className="h-[env(safe-area-inset-bottom)]" />
+        </nav>
+      </>
     );
   }
 
   return (
-    <nav className="grid gap-0.5" aria-label="ניווט ראשי">
-      {items.map((item) => <DesktopNavItem
-        active={item.href === "" ? pathname === `${base}${item.href}` : pathname.startsWith(`${base}${item.href}`)}
-        href={`${base}${item.href}`}
-        icon={item.icon}
-        key={`${base}${item.href}`}
-        label={item.label}
-        pending={pendingHref === `${base}${item.href}`}
-        setPendingHref={setPendingHref}
-      />)}
-      {canManage(role) ? (
-        <div className="mt-3 border-t pt-3"><Link
-          href={`${base}/leave`}
-          aria-current={pathname.startsWith(`${base}/leave`) ? "page" : undefined}
-          onClick={() => {
-            if (!pathname.startsWith(`${base}/leave`)) setPendingHref(`${base}/leave`);
-          }}
-          className={cn(
-            "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-            pathname.startsWith(`${base}/leave`) && "bg-accent text-primary",
-            pendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) && "text-primary",
-          )}
-        >
-          <ActiveRail active={pathname.startsWith(`${base}/leave`) || pendingHref === `${base}/leave`} />
-          {pendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <CalendarOff className="size-4" />}
-          יציאות
-        </Link><Link
-          href={`${base}/settings`}
-          aria-current={pathname.startsWith(`${base}/settings`) ? "page" : undefined}
-          onClick={() => {
-            if (!pathname.startsWith(`${base}/settings`)) setPendingHref(`${base}/settings`);
-          }}
-          className={cn(
-            "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-            pathname.startsWith(`${base}/settings`) && "bg-accent text-primary",
-            pendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) && "text-primary",
-          )}
-        >
-          <ActiveRail active={pathname.startsWith(`${base}/settings`) || pendingHref === `${base}/settings`} />
-          {pendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <Settings className="size-4" />}
-          הגדרות
-        </Link>{role === "admin" ? <Link
-          href={`${base}/users`}
-          aria-current={pathname.startsWith(`${base}/users`) ? "page" : undefined}
-          onClick={() => {
-            if (!pathname.startsWith(`${base}/users`)) setPendingHref(`${base}/users`);
-          }}
-          className={cn(
-            "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-            pathname.startsWith(`${base}/users`) && "bg-accent text-primary",
-            pendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) && "text-primary",
-          )}
-        >
-          <ActiveRail active={pathname.startsWith(`${base}/users`) || pendingHref === `${base}/users`} />
-          {pendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <UsersRound className="size-4" />}
-          משתמשים
-        </Link> : null}</div>
-      ) : null}
-    </nav>
+    <>
+      {showRouteLoading ? <KavLoading label="טוען מסך" /> : null}
+      <nav className="grid gap-0.5" aria-label="ניווט ראשי">
+        {items.map((item) => <DesktopNavItem
+          active={item.href === "" ? pathname === `${base}${item.href}` : pathname.startsWith(`${base}${item.href}`)}
+          href={`${base}${item.href}`}
+          icon={item.icon}
+          key={`${base}${item.href}`}
+          label={item.label}
+          pending={pendingHref === `${base}${item.href}`}
+          setPendingHref={setPendingHref}
+        />)}
+        {canManage(role) ? (
+          <div className="mt-3 border-t pt-3"><Link
+            href={`${base}/leave`}
+            aria-current={pathname.startsWith(`${base}/leave`) ? "page" : undefined}
+            onClick={() => {
+              if (!pathname.startsWith(`${base}/leave`)) setPendingHref(`${base}/leave`);
+            }}
+            className={cn(
+              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              pathname.startsWith(`${base}/leave`) && "bg-accent text-primary",
+              pendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) && "text-primary",
+            )}
+          >
+            <ActiveRail active={pathname.startsWith(`${base}/leave`) || pendingHref === `${base}/leave`} />
+            {pendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <CalendarOff className="size-4" />}
+            יציאות
+          </Link><Link
+            href={`${base}/settings`}
+            aria-current={pathname.startsWith(`${base}/settings`) ? "page" : undefined}
+            onClick={() => {
+              if (!pathname.startsWith(`${base}/settings`)) setPendingHref(`${base}/settings`);
+            }}
+            className={cn(
+              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              pathname.startsWith(`${base}/settings`) && "bg-accent text-primary",
+              pendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) && "text-primary",
+            )}
+          >
+            <ActiveRail active={pathname.startsWith(`${base}/settings`) || pendingHref === `${base}/settings`} />
+            {pendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <Settings className="size-4" />}
+            הגדרות
+          </Link>{role === "admin" ? <Link
+            href={`${base}/users`}
+            aria-current={pathname.startsWith(`${base}/users`) ? "page" : undefined}
+            onClick={() => {
+              if (!pathname.startsWith(`${base}/users`)) setPendingHref(`${base}/users`);
+            }}
+            className={cn(
+              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              pathname.startsWith(`${base}/users`) && "bg-accent text-primary",
+              pendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) && "text-primary",
+            )}
+          >
+            <ActiveRail active={pathname.startsWith(`${base}/users`) || pendingHref === `${base}/users`} />
+            {pendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <UsersRound className="size-4" />}
+            משתמשים
+          </Link> : null}</div>
+        ) : null}
+      </nav>
+    </>
   );
 }
 
