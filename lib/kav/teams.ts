@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 
@@ -17,7 +18,7 @@ export type TeamMembership = {
   team: TeamSummary;
 };
 
-export async function getUserTeams(
+export const getUserTeams = cache(async function getUserTeams(
   supabase: SupabaseClient<Database>,
   userId: string,
 ): Promise<TeamMembership[]> {
@@ -59,9 +60,9 @@ export async function getUserTeams(
       team,
     };
   });
-}
+});
 
-export async function requireTeamAccess(
+export const requireTeamAccess = cache(async function requireTeamAccess(
   supabase: SupabaseClient<Database>,
   userId: string,
   teamSlug: string,
@@ -84,7 +85,7 @@ export async function requireTeamAccess(
   }
 
   return membership;
-}
+});
 
 export function canManage(role: TeamRole) {
   return role === "admin" || role === "manager";
