@@ -23,7 +23,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <CardHeader>
             <CardTitle className="text-xl">כניסה למערכת</CardTitle>
             <CardDescription>
-              הזן אימייל וסיסמה כדי להיכנס לחשבון KAV שלך.
+              הזן אימייל ונשלח לך קישור כניסה מאובטח לחשבון KAV שלך.
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -85,9 +85,7 @@ export async function getScheduleData(
     supabase.from("schedule_events").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
     supabase.from("rotation_generation_configs").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).maybeSingle(),
     getApprovedLeaveWindows(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
-    canManage(membership.role)
-      ? getLeaveRequestMarkers(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on)
-      : Promise.resolve([]),
+    getLeaveRequestMarkers(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
     getAttendanceEntriesByDate(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
     supabase.from("task_instances").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
   ]);
@@ -170,12 +168,13 @@ export function getDaySchedule(data: ScheduleData, date: string) {
     expectedBase: people.filter((person) => person.is_active && person.resolution.expectedAtBase),
     expectedHome: people.filter((person) => person.is_active && person.resolution.state === "home"),
     overrides: data.overrides.filter((item) => item.starts_on <= date && item.ends_on >= date),
-    // Team-wide leave/attendance breakdowns stay manager-only: viewers understand their
-    // own effective status (via `people[].resolution` above) but not the whole team's.
+    // Names and attendance breakdowns stay manager-only; marker-grade leave data is
+    // safe for team calendar context and contains no reasons or manager notes.
     approvedLeave: data.canManage ? people.filter((person) => person.resolution.leave) : [],
-    leaveRequests: data.canManage
-      ? data.leaveRequests.filter((item) => item.startsOn <= date && item.endsOn >= date)
-      : [],
+    leaveMarkers: data.leaves.filter((item) => item.approvedStartsOn && item.approvedEndsOn
+      ? item.approvedStartsOn <= date && item.approvedEndsOn >= date
+      : item.startsOn <= date && item.endsOn >= date),
+    leaveRequests: data.leaveRequests.filter((item) => item.startsOn <= date && item.endsOn >= date),
     attendance: data.canManage ? {
       present: people.filter((person) => person.resolution.attendance === "present"),
       absent: people.filter((person) => person.resolution.attendance === "absent"),

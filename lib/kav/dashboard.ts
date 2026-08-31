@@ -39,8 +39,10 @@ export type DashboardData = {
     attendance: "absent" | "present" | "unreported";
     fullName: string;
     isOnLeave: boolean;
+    personId: string;
     state: "base" | "home" | null;
   } | null;
+  personalStats: PersonAttendanceStats | null;
   qualificationReadiness: {
     current: number;
     name: string;
@@ -198,9 +200,11 @@ export async function getDashboardData(
           attendance: personalResolution.attendance,
           fullName: currentPerson.full_name,
           isOnLeave: Boolean(personalResolution.leave),
+          personId: currentPerson.id,
           state: personalResolution.state,
         }
       : null,
+    personalStats: currentPerson ? teamStats.stats.find((item) => item.personId === currentPerson.id) ?? null : null,
     qualificationReadiness: requirements.map((requirement) => ({
       current: pakalCounts.get(requirement.pakal_types.id) ?? 0,
       name: requirement.pakal_types.name,

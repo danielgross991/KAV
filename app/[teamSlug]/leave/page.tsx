@@ -1,9 +1,8 @@
 import Link from "next/link";
 import { CalendarOff, Plus, Trash2 } from "lucide-react";
-import { redirect } from "next/navigation";
 
-import { deleteLeaveAction, saveLeaveAction } from "@/app/[teamSlug]/leave/actions";
-import { AppPage, PageHeader, SuccessNotice } from "@/components/ui/app-page";
+import { createViewerLeaveRequestAction, deleteLeaveAction, saveLeaveAction } from "@/app/[teamSlug]/leave/actions";
+import { AppPage, EmptyState, PageHeader, SuccessNotice } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,14 +18,28 @@ export default async function LeavePage({ params, searchParams }: {
   const [{ teamSlug }, query] = await Promise.all([params, searchParams]);
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
-  if (!canManage(membership.role)) redirect(`/${teamSlug}`);
   const today = getDateInTimeZone(membership.team.timezone);
+  const isManager = canManage(membership.role);
+  const currentPersonPromise = isManager
+    ? Promise.resolve({ data: null, error: null })
+    : supabase.from("people").select("id, full_name").eq("team_id", membership.team.id).eq("auth_user_id", userId).maybeSingle();
   const [{ data: people, error: peopleError }, { data: periods, error: periodsError }, { data: leaves, error: leavesError }] = await Promise.all([
     supabase.from("people").select("id, full_name, is_active").eq("team_id", membership.team.id).order("display_order").order("full_name"),
     supabase.from("reserve_periods").select("id, name, starts_on, ends_on, status").eq("team_id", membership.team.id).order("starts_on", { ascending: false }),
     supabase.from("leave_requests").select("*").eq("team_id", membership.team.id).order("starts_on", { ascending: false }),
   ]);
+  const { data: currentPerson, error: currentPersonError } = await currentPersonPromise;
   if (peopleError || periodsError || leavesError) throw new Error("לא הצלחנו לטעון את היציאות");
+  if (currentPersonError) throw new Error(`לא הצלחנו לטעון את איש הצוות שלך: ${currentPersonError.message}`);
+  if (!isManager) return <ViewerLeavePage
+    currentPerson={currentPerson}
+    leaves={leaves ?? []}
+    periods={periods ?? []}
+    query={query}
+    teamName={membership.team.name}
+    teamSlug={teamSlug}
+  />;
+
   const peopleById = new Map((people ?? []).map((person) => [person.id, person.full_name]));
   const periodsById = new Map((periods ?? []).map((period) => [period.id, period]));
   const view = ["active", "upcoming", "history"].includes(query.view ?? "") ? query.view! : "active";
@@ -77,6 +90,69 @@ export default async function LeavePage({ params, searchParams }: {
   </AppPage>;
 }
 
+function ViewerLeavePage({
+  currentPerson,
+  leaves,
+  periods,
+  query,
+  teamName,
+  teamSlug,
+}: {
+  currentPerson: { full_name: string; id: string } | null;
+  leaves: LeaveRow[];
+  periods: PeriodRow[];
+  query: { saved?: string; view?: string };
+  teamName: string;
+  teamSlug: string;
+}) {
+  const visiblePeriods = periods.filter((period) => period.status !== "archived");
+  return (
+    <AppPage className="max-w-[920px]">
+      <PageHeader
+        eyebrow={teamName}
+        title="בקשות היציאה שלי"
+        subtitle={currentPerson ? currentPerson.full_name : "לא נמצא איש צוות מקושר למשתמש"}
+        action={currentPerson ? <a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="בקשה חדשה"><Plus className="size-4" /></a> : null}
+      />
+      {query.saved ? <SuccessNotice>הבקשה נשלחה</SuccessNotice> : null}
+      {!currentPerson ? (
+        <EmptyState icon={<CalendarOff className="size-4" />} title="אין איש צוות מקושר למשתמש שלך" description="אדמין יכול לקשר אותך דרך ניהול משתמשים." />
+      ) : (
+        <>
+          <section className="divide-y overflow-hidden rounded-lg border bg-card">
+            {leaves.map((leave) => (
+              <div className="grid gap-2 p-3.5 sm:grid-cols-[1fr_auto] sm:items-center" key={leave.id}>
+                <div>
+                  <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {periods.find((period) => period.id === leave.reserve_period_id)?.name ?? "סבב מילואים"}
+                    {leave.approved_starts_on ? ` · אושר ${range(leave.approved_starts_on, leave.approved_ends_on!)}` : ""}
+                  </p>
+                  {leave.reason ? <p className="mt-2 text-sm">{leave.reason}</p> : null}
+                </div>
+                <Badge variant={leave.status === "approved" || leave.status === "partially_approved" ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
+                  {statusLabel(leave.status)}
+                </Badge>
+              </div>
+            ))}
+            {!leaves.length ? <div className="grid min-h-40 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין לך בקשות יציאה עדיין</p></div></div> : null}
+          </section>
+          <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave">
+            <h2 className="text-base font-semibold">בקשה חדשה</h2>
+            <form action={createViewerLeaveRequestAction.bind(null, teamSlug)} className="mt-4 grid gap-3 md:grid-cols-4">
+              <Select label="תקופת מילואים" name="reserve_period_id" options={visiblePeriods.map((period) => [period.id, period.name])} />
+              <Field label="מתאריך" name="starts_on" type="date" required />
+              <Field label="עד תאריך" name="ends_on" type="date" required />
+              <Field label="סיבה" name="reason" />
+              <Button className="self-end"><Plus className="size-4" />שליחת בקשה</Button>
+            </form>
+          </section>
+        </>
+      )}
+    </AppPage>
+  );
+}
+
 const statusOptions = [["pending", "ממתינה"], ["approved", "מאושרת"], ["partially_approved", "מאושרת חלקית"], ["rejected", "נדחתה"]];
 function Field({ label, ...props }: React.ComponentProps<"input"> & { label: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<Input {...props} /></label>; }
 function Select({ label, name, options, value }: { label: string; name: string; options: string[][]; value?: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<select className="h-10 rounded-md border bg-background px-2 text-sm" defaultValue={value} name={name} required>{options.map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select></label>; }
@@ -84,3 +160,20 @@ function Tab({ active, children, href }: { active: boolean; children: React.Reac
 function range(start: string, end: string) { return `${short(start)}–${short(end)}`; }
 function short(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function statusLabel(value: string) { return Object.fromEntries(statusOptions)[value] ?? value; }
+
+type LeaveRow = {
+  approved_ends_on: string | null;
+  approved_starts_on: string | null;
+  ends_on: string;
+  id: string;
+  reason: string | null;
+  reserve_period_id: string;
+  starts_on: string;
+  status: string;
+};
+
+type PeriodRow = {
+  id: string;
+  name: string;
+  status: string;
+};

@@ -162,13 +162,39 @@ function ViewerDashboard({ data }: { data: DashboardData }) {
       </section>
 
       <div className="mt-4 space-y-4">
+        <HomeLeaderboard data={data} />
         <NextTask data={data} personal />
+        <PersonalStats data={data} />
         <UpcomingEvent data={data} />
         <StatsPeriodSelector data={data} />
-        <HomeLeaderboard data={data} />
         <CurrentPeriod data={data} compact />
       </div>
     </AppPage>
+  );
+}
+
+function PersonalStats({ data }: { data: DashboardData }) {
+  const stats = data.personalStats;
+  if (!stats) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-3"><CardTitle>הנתונים שלי במילואים</CardTitle></CardHeader>
+      <CardContent className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MiniMetric label="ימי בית" value={stats.homeDays} />
+        <MiniMetric label="ימי בסיס" value={stats.baseDays} />
+        <MiniMetric label="ימי יציאה" value={stats.leaveDays} />
+        <MiniMetric label="נוכחות" value={stats.attendancePercentage === null ? "אין" : `${Math.round(stats.attendancePercentage * 100)}%`} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: number | string }) {
+  return (
+    <div className="rounded-md border bg-muted/30 p-3 text-center">
+      <b className="kav-num block text-xl">{value}</b>
+      <span className="mt-1 block text-xs text-muted-foreground">{label}</span>
+    </div>
   );
 }
 

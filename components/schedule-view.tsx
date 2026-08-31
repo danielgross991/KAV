@@ -51,8 +51,12 @@ function href(data: ScheduleData, view: string, month?: string) { return `/${dat
 function monthLabel(month: string) { return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T12:00:00Z`)); }
 
 function Month({ data, month }: { data: ScheduleData; month: string }) {
-  const monthStart = `${month}-01`; const gridStart = addCalendarDays(monthStart, -new Date(`${monthStart}T00:00:00Z`).getUTCDay());
-  const dates = Array.from({ length: 42 }, (_, index) => addCalendarDays(gridStart, index));
+  const monthStart = `${month}-01`;
+  const firstDay = new Date(`${monthStart}T00:00:00Z`).getUTCDay();
+  const monthDays = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
+  const weekCount = Math.ceil((firstDay + monthDays) / 7);
+  const gridStart = addCalendarDays(monthStart, -firstDay);
+  const dates = Array.from({ length: weekCount * 7 }, (_, index) => addCalendarDays(gridStart, index));
   const todayMonth = data.today.slice(0, 7);
   return <section className="overflow-hidden rounded-lg border bg-card">
     <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
@@ -78,18 +82,24 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
   const holiday = day.events.find(isHolidayEvent);
   const otherEvents = day.events.filter((event) => !isHolidayEvent(event));
   const viewer = data.viewerPersonId ? day.people.find((person) => person.id === data.viewerPersonId) : null;
+  const personalLeaves = data.viewerPersonId
+    ? [...day.leaveMarkers, ...day.leaveRequests].filter((item) => item.personId === data.viewerPersonId)
+    : [];
+  const teamLeaveCount = data.canManage
+    ? day.approvedLeave.length + day.leaveRequests.length
+    : day.leaveMarkers.length + day.leaveRequests.length;
   const isPast = date < data.today;
   const attendanceIssue = data.canManage && isPast && ((day.attendance?.absent.length ?? 0) > 0 || (day.attendance?.unreported.length ?? 0) > 0);
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
 
-  return <Link className={cn("min-h-24 border-b border-l p-1.5 hover:bg-accent/40 sm:min-h-32 sm:p-2", !inMonth && "bg-muted/30 text-muted-foreground")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`}>
+  return <Link className={cn("min-h-[5.9rem] border-b border-l p-1.5 transition-colors hover:bg-accent/40 sm:min-h-[7.25rem] sm:p-2", !inMonth && "bg-muted/30 text-muted-foreground", viewer?.resolution.state === "home" && "bg-sky-50/60", personalLeaves.length && "ring-1 ring-inset ring-primary/35")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`}>
     <div className="mb-1.5 flex items-start justify-between gap-1">
       <span className={cn("grid size-6 place-items-center rounded-full text-xs sm:size-7 sm:text-sm", date === data.today && "bg-primary text-primary-foreground")}>{Number(date.slice(-2))}</span>
       <span className="mt-1 flex flex-wrap justify-end gap-1">
         {holiday ? <span aria-label={holiday.title} className="size-2 rounded-full bg-violet-500" title={holiday.title} /> : null}
         {otherEvents.length ? <span className="size-2 rounded-full bg-amber-500" /> : null}
         {day.tasks.length ? <span className="size-2 rounded-full bg-primary" /> : null}
-        {data.canManage && (day.approvedLeave.length || day.leaveRequests.length) ? <span className="size-2 rounded-full bg-sky-500" /> : null}
+        {teamLeaveCount ? <span className="size-2 rounded-full bg-sky-500" /> : null}
         {attendanceIssue ? <span className="size-2 rounded-full bg-destructive" /> : null}
       </span>
     </div>
@@ -98,15 +108,17 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
       <>
         {baseGroups.slice(0, 2).map((group) => <div className={cn("mt-1 truncate rounded px-1.5 py-0.5 text-[0.68rem] font-medium sm:text-xs", groupColorClass(group.color_token))} key={group.id}>{group.name} · {stateLabel(group.block?.state)}</div>)}
         {baseGroups.length > 2 ? <div className="mt-1 truncate text-[0.68rem] text-muted-foreground sm:text-xs">+{baseGroups.length - 2} סבבים בבסיס</div> : null}
-        {day.leaveRequests.length ? <div className="mt-1 truncate text-[0.68rem] text-sky-700 sm:text-xs">{day.leaveRequests.length} בקשות</div> : null}
+        {teamLeaveCount ? <div className="mt-1 truncate text-[0.68rem] text-sky-700 sm:text-xs">{teamLeaveCount} יציאות/בקשות</div> : null}
         {day.tasks.length ? <div className="mt-1 truncate text-[0.68rem] text-primary sm:text-xs">{day.tasks.length} משימות</div> : null}
       </>
     ) : viewer ? (
       <div className="mt-1 flex flex-wrap items-center gap-1">
-        <Badge variant={viewer.resolution.state === "base" ? "success" : viewer.resolution.state === "home" ? "muted" : "outline"}>
+        <Badge variant={viewer.resolution.state === "base" ? "success" : viewer.resolution.state === "home" ? "info" : "outline"}>
           {stateLabel(viewer.resolution.state)}
         </Badge>
-        {viewer.resolution.leave ? <Badge variant="info">יציאה</Badge> : null}
+        {viewer.resolution.leave ? <Badge variant="secondary">יציאה</Badge> : null}
+        {personalLeaves.length ? <Badge variant="outline">בקשה שלך</Badge> : null}
+        {teamLeaveCount && !personalLeaves.length ? <span className="text-[0.68rem] text-sky-700 sm:text-xs">{teamLeaveCount} יציאות</span> : null}
       </div>
     ) : null}
   </Link>;

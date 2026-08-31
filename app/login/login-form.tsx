@@ -1,17 +1,16 @@
 "use client";
 
 import { useActionState } from "react";
-import Link from "next/link";
-import { LogIn } from "lucide-react";
+import { Mail } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signInWithPassword, type LoginState } from "@/app/login/actions";
+import { signInWithEmail, type LoginState } from "@/app/login/actions";
 
 export function LoginForm({ next }: { next: string }) {
   const [state, formAction, pending] = useActionState<LoginState, FormData>(
-    signInWithPassword,
+    signInWithEmail,
     {},
   );
 
@@ -30,21 +29,6 @@ export function LoginForm({ next }: { next: string }) {
           required
         />
       </div>
-      <div className="grid gap-2">
-        <div className="flex items-center justify-between gap-3">
-          <Label htmlFor="password">סיסמה</Label>
-          <Link className="text-sm text-primary hover:underline" href="/forgot-password">
-            שכחת סיסמה?
-          </Link>
-        </div>
-        <Input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-        />
-      </div>
       {state.message ? (
         <p
           className={
@@ -57,8 +41,8 @@ export function LoginForm({ next }: { next: string }) {
         </p>
       ) : null}
       <Button type="submit" className="h-11 w-full" disabled={pending}>
-        <LogIn className="size-4" />
-        {pending ? "נכנס..." : "כניסה"}
+        <Mail className="size-4" />
+        {pending ? "שולח..." : "שליחת קישור כניסה"}
       </Button>
     </form>
   );

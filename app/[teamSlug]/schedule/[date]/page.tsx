@@ -28,6 +28,9 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
   const personName = new Map(data.people.map((person) => [person.id, person.full_name]));
   const groupName = new Map(data.groups.map((group) => [group.id, group.name]));
   const taskPeople = new Map(taskDay.people.map((person) => [person.id, person.full_name]));
+  const viewerLeaveMarkers = data.viewerPersonId
+    ? [...day.leaveMarkers, ...day.leaveRequests].filter((item) => item.personId === data.viewerPersonId)
+    : [];
 
   return (
     <AppPage className="max-w-[920px]">
@@ -106,7 +109,27 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
             </Card>
           </div>
         </section>
-      ) : null}
+      ) : (
+        <section className="mt-5">
+          <SectionHeader title="יציאות ובקשות" hint={`${day.leaveMarkers.length + day.leaveRequests.length}`} />
+          <Card className="divide-y overflow-hidden">
+            {viewerLeaveMarkers.map((request) => (
+              <CompactRow
+                key={`${request.id}-${request.status}`}
+                title="בקשה שלך"
+                detail={`${leaveStatusLabel(request.status)} · ${shortDate(request.startsOn)}–${shortDate(request.endsOn)}`}
+              />
+            ))}
+            {day.leaveMarkers.length + day.leaveRequests.length > viewerLeaveMarkers.length ? (
+              <CompactRow
+                title="יציאות בצוות"
+                detail={`${day.leaveMarkers.length + day.leaveRequests.length - viewerLeaveMarkers.length} יציאות או בקשות נוספות ביום הזה`}
+              />
+            ) : null}
+            {!day.leaveMarkers.length && !day.leaveRequests.length ? <p className="p-3.5 text-sm text-muted-foreground">אין יציאות או בקשות ביום זה.</p> : null}
+          </Card>
+        </section>
+      )}
 
       <section className="mt-5">
         <SectionHeader title="משימות" hint={`${taskDay.tasks.length}`} />

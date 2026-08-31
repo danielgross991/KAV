@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, CalendarOff, ClipboardList, Home, Settings, UsersRound, UserCheck, type LucideIcon } from "lucide-react";
+import { CalendarDays, CalendarOff, ClipboardList, Home, PackageCheck, Settings, UsersRound, UserCheck, type LucideIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
@@ -17,7 +17,12 @@ const managerItems = [
   { href: "/team", label: "צוות", icon: UsersRound },
 ];
 
-const viewerItems = managerItems.filter((item) => item.href !== "/attendance");
+const viewerItems = [
+  { href: "", label: "בית", icon: Home },
+  { href: "/schedule", label: "לו״ז", icon: CalendarDays },
+  { href: "/leave", label: "בקשות", icon: CalendarOff },
+  { href: "/equipment", label: "ציוד", icon: PackageCheck },
+];
 
 export function TeamNav({
   role,

@@ -74,6 +74,54 @@ export async function deleteLeaveAction(teamSlug: string, formData: FormData) {
   redirect(`/${teamSlug}/leave?deleted=1`);
 }
 
+export async function createViewerLeaveRequestAction(teamSlug: string, formData: FormData) {
+  const { supabase, userId } = await requireAuth();
+  const membership = await requireTeamAccess(supabase, userId, teamSlug);
+  const periodId = required(formData, "reserve_period_id");
+  const startsOn = required(formData, "starts_on");
+  const endsOn = required(formData, "ends_on");
+
+  const [{ data: person, error: personError }, { data: period, error: periodError }] = await Promise.all([
+    supabase
+      .from("people")
+      .select("id")
+      .eq("team_id", membership.team.id)
+      .eq("auth_user_id", userId)
+      .maybeSingle(),
+    supabase
+      .from("reserve_periods")
+      .select("id, starts_on, ends_on")
+      .eq("id", periodId)
+      .eq("team_id", membership.team.id)
+      .in("status", ["active", "published", "draft"])
+      .maybeSingle(),
+  ]);
+  assertOk(personError);
+  assertOk(periodError);
+  if (!person || !period) throw new Error("לא ניתן לפתוח בקשה עבור המשתמש הנוכחי");
+
+  const issues = validateLeaveRange({
+    requested: { startsOn, endsOn },
+    approved: null,
+    period: { startsOn: period.starts_on, endsOn: period.ends_on },
+  });
+  if (issues.length) throw new Error("טווח תאריכי היציאה אינו תקין");
+
+  const { error } = await supabase.from("leave_requests").insert({
+    team_id: membership.team.id,
+    reserve_period_id: period.id,
+    person_id: person.id,
+    starts_on: startsOn,
+    ends_on: endsOn,
+    status: "pending",
+    reason: optional(formData, "reason"),
+    created_by: userId,
+  });
+  assertOk(error);
+  refresh(teamSlug);
+  redirect(`/${teamSlug}/leave?saved=1`);
+}
+
 async function managerContext(teamSlug: string) {
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);

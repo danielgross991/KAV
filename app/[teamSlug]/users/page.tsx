@@ -1,19 +1,23 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { UserCog } from "lucide-react";
+import { MailPlus, UserCog } from "lucide-react";
 
+import { provisionPersonLoginAction } from "@/app/[teamSlug]/users/actions";
 import { AppPage, EmptyState, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { requireAuth } from "@/lib/kav/auth";
 import { requireTeamAccess } from "@/lib/kav/teams";
 
 type UsersPageProps = {
   params: Promise<{ teamSlug: string }>;
+  searchParams: Promise<{ linked?: string }>;
 };
 
-export default async function UsersPage({ params }: UsersPageProps) {
-  const { teamSlug } = await params;
+export default async function UsersPage({ params, searchParams }: UsersPageProps) {
+  const [{ teamSlug }, query] = await Promise.all([params, searchParams]);
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
 
@@ -47,8 +51,9 @@ export default async function UsersPage({ params }: UsersPageProps) {
       <PageHeader
         eyebrow={membership.team.name}
         title="ניהול משתמשים"
-        subtitle="תצוגת אדמין של חשבונות, תפקידים וקישור לאיש צוות. שינוי הרשאות יתווסף אחרי שנגדיר את מודל ה-viewer."
+        subtitle="קישור מייל לאיש צוות ופתיחת כניסה אישית ללא סיסמה."
       />
+      {query.linked ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">המייל קושר והמשתמש יכול להיכנס בקישור אימייל.</p> : null}
 
       {(memberships ?? []).length === 0 ? (
         <EmptyState icon={<UserCog className="size-4" />} title="אין משתמשים משויכים לצוות" />
@@ -104,6 +109,55 @@ export default async function UsersPage({ params }: UsersPageProps) {
           </CardContent>
         </Card>
       )}
+
+      <section className="mt-5">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">כניסה לפי מייל לאנשי צוות</h2>
+          <Badge variant="outline">{(people ?? []).length} אנשי צוות</Badge>
+        </div>
+        <Card>
+          <CardContent className="divide-y p-0">
+            {(people ?? []).map((person) => {
+              const membershipItem = person.auth_user_id
+                ? (memberships ?? []).find((item) => item.user_id === person.auth_user_id)
+                : null;
+              return (
+                <form
+                  action={provisionPersonLoginAction.bind(null, teamSlug)}
+                  className="grid gap-3 p-3.5 md:grid-cols-[1fr_1.5fr_auto_auto] md:items-center"
+                  key={person.id}
+                >
+                  <input type="hidden" name="person_id" value={person.id} />
+                  <div className="min-w-0">
+                    <Link className="font-semibold text-primary hover:underline" href={`/${teamSlug}/team/${person.id}`}>
+                      {person.full_name}
+                    </Link>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      <Badge variant={person.is_active ? "success" : "muted"}>{person.is_active ? "פעיל" : "לא פעיל"}</Badge>
+                      {membershipItem ? <RoleBadge role={membershipItem.role} /> : <Badge variant="outline">ללא כניסה</Badge>}
+                    </div>
+                  </div>
+                  <Input
+                    aria-label={`אימייל עבור ${person.full_name}`}
+                    name="email"
+                    type="email"
+                    defaultValue={person.email ?? ""}
+                    placeholder="name@example.com"
+                    required
+                  />
+                  <Badge variant={person.auth_user_id ? "info" : "secondary"}>
+                    {person.auth_user_id ? "מקושר" : "לא מקושר"}
+                  </Badge>
+                  <Button>
+                    <MailPlus className="size-4" />
+                    הפעלת כניסה
+                  </Button>
+                </form>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </section>
     </AppPage>
   );
 }
