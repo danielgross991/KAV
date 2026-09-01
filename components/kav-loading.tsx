@@ -5,8 +5,8 @@ export function KavLoading({ compact = false, label = "טוען נתונים" }:
   return (
     <div
       className={cn(
-        "grid w-full place-items-center bg-background/92 px-6 text-center backdrop-blur-sm",
-        compact ? "min-h-48 py-10" : "fixed inset-0 z-50 min-h-screen",
+        "grid w-full place-items-center px-6 text-center",
+        compact ? "min-h-48 bg-background/80 py-10 backdrop-blur-sm" : "fixed inset-0 z-50 min-h-screen bg-background/15 backdrop-blur-[1px]",
       )}
       role="status"
       aria-live="polite"

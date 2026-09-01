@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import {
@@ -82,6 +82,7 @@ function Month({ data, month, onMonthChange }: { data: ScheduleData; month: stri
   const gridStart = addCalendarDays(monthStart, -firstDay);
   const dates = Array.from({ length: weekCount * 7 }, (_, index) => addCalendarDays(gridStart, index));
   const todayMonth = data.today.slice(0, 7);
+  const [selectedDay, setSelectedDay] = useState<{ date: string; day: ReturnType<typeof getDaySchedule> } | null>(null);
   return <section className="overflow-hidden rounded-lg border bg-card shadow-[0_10px_28px_-24px_rgba(20,22,26,0.5)]">
     <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2.5">
       <button aria-label="חודש קודם" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96]" onClick={() => onMonthChange(shiftMonth(month, -1))} type="button"><ChevronRight className="size-4" /></button>
@@ -92,7 +93,8 @@ function Month({ data, month, onMonthChange }: { data: ScheduleData; month: stri
       <button aria-label="חודש הבא" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96]" onClick={() => onMonthChange(shiftMonth(month, 1))} type="button"><ChevronLeft className="size-4" /></button>
     </div>
     <div className="grid grid-cols-7 border-b bg-card px-1 pt-2 text-center text-[0.68rem] font-semibold text-muted-foreground sm:px-2 sm:text-xs">{["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"].map((day) => <div className="px-1 py-2" key={day}>{day}</div>)}</div>
-    <div className="kav-month-enter grid grid-cols-7 gap-1 bg-card p-1 sm:gap-1.5 sm:p-2">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} />; })}</div>
+    <div className="kav-month-enter grid grid-cols-7 gap-1 bg-card p-1 sm:gap-1.5 sm:p-2">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} onMobilePreview={() => setSelectedDay({ date, day })} />; })}</div>
+    {selectedDay ? <DayPreview data={data} date={selectedDay.date} day={selectedDay.day} onClose={() => setSelectedDay(null)} /> : null}
     <div className="flex flex-wrap gap-x-3 gap-y-1 border-t bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
       <LegendDot className="bg-violet-500" label="חג" />
       <LegendDot className="bg-primary" label="משימות" />
@@ -102,7 +104,7 @@ function Month({ data, month, onMonthChange }: { data: ScheduleData; month: stri
   </section>;
 }
 
-function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; inMonth: boolean }) {
+function MonthCell({ data, date, day, inMonth, onMobilePreview }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; inMonth: boolean; onMobilePreview: () => void }) {
   const holiday = day.events.find(isHolidayEvent);
   const otherEvents = day.events.filter((event) => !isHolidayEvent(event));
   const viewer = data.viewerPersonId ? day.people.find((person) => person.id === data.viewerPersonId) : null;
@@ -116,7 +118,12 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
   const attendanceIssue = data.canManage && isPast && ((day.attendance?.absent.length ?? 0) > 0 || (day.attendance?.unreported.length ?? 0) > 0);
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
 
-  return <Link className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", viewer?.resolution.state === "home" && "bg-sky-50/80", personalLeaves.length && "border-primary/40 bg-primary/10 ring-2 ring-inset ring-primary/25")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`}>
+  return <Link aria-haspopup="dialog" className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", viewer?.resolution.state === "home" && "bg-sky-50/80", personalLeaves.length && "border-primary/40 bg-primary/10 ring-2 ring-inset ring-primary/25")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
+    if (window.matchMedia("(max-width: 767px)").matches) {
+      event.preventDefault();
+      onMobilePreview();
+    }
+  }}>
     <div className="mb-1.5 flex items-start justify-between gap-1">
       <span className={cn("grid size-6 place-items-center rounded-full text-xs font-semibold transition-colors sm:size-7 sm:text-sm", date === data.today ? "bg-primary text-primary-foreground" : "bg-card text-foreground group-hover:bg-accent group-hover:text-primary")}>{Number(date.slice(-2))}</span>
       <span className="mt-1 flex flex-wrap justify-end gap-1">
@@ -148,6 +155,44 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
       </div>
     ) : null}
   </Link>;
+}
+
+function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; onClose: () => void }) {
+  const peopleById = new Map(data.people.map((person) => [person.id, person.full_name]));
+  const leaveItems = Array.from(new Map([...day.leaveMarkers, ...day.leaveRequests].map((item) => [`${item.id}-${item.status}`, item])).values());
+  const baseGroups = day.groups.filter((group) => group.block?.state === "base");
+  const detailHref = `/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`;
+
+  return <>
+    <button aria-label="סגירת פירוט יום" className="fixed inset-0 z-40 bg-foreground/10 backdrop-blur-[1px] md:hidden" onClick={onClose} type="button" />
+    <aside aria-modal="true" className="fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 max-h-[72vh] overflow-auto rounded-xl border bg-card p-4 text-right shadow-[0_24px_80px_-32px_rgba(20,22,26,0.6)] md:hidden" role="dialog">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-muted-foreground">{fullDate(date)}</p>
+          <h3 className="mt-1 text-base font-bold">{day.phase?.name ?? "יום מבצעי"}</h3>
+        </div>
+        <button aria-label="סגירה" className="grid size-9 place-items-center rounded-md border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" onClick={onClose} type="button"><X className="size-4" /></button>
+      </div>
+      <div className="mt-4 grid gap-3 text-sm">
+        <PreviewSection title="מה יש ביום הזה">
+          {baseGroups.length ? <div className="flex flex-wrap gap-1.5">{baseGroups.map((group) => <Badge key={group.id} variant="success">{group.name}</Badge>)}</div> : <p className="text-muted-foreground">אין סבב בבסיס.</p>}
+          {[...day.events, ...day.tasks].length ? <div className="mt-2 space-y-1.5">{day.events.map((event) => <PreviewLine key={event.id} meta={event.is_all_day ? "כל היום" : time(event.starts_at, data.team.timezone)} text={event.title} />)}{day.tasks.map((task) => <PreviewLine key={task.id} meta={time(task.starts_at, data.team.timezone)} text={task.title} />)}</div> : <p className="mt-2 text-muted-foreground">אין אירועים או משימות.</p>}
+        </PreviewSection>
+        <PreviewSection title="בקשות יציאה">
+          {leaveItems.length ? <div className="space-y-1.5">{leaveItems.map((item) => <PreviewLine key={`${item.id}-${item.status}`} meta={leaveStatusLabel(item.status)} text={peopleById.get(item.personId) ?? "איש צוות"} />)}</div> : <p className="text-muted-foreground">אין בקשות יציאה ביום הזה.</p>}
+        </PreviewSection>
+      </div>
+      <Link className="mt-4 flex h-10 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground" href={detailHref}>פתיחת פירוט מלא</Link>
+    </aside>
+  </>;
+}
+
+function PreviewSection({ children, title }: { children: React.ReactNode; title: string }) {
+  return <section className="rounded-lg border bg-background/70 p-3"><h4 className="mb-2 text-xs font-semibold text-muted-foreground">{title}</h4>{children}</section>;
+}
+
+function PreviewLine({ meta, text }: { meta: string; text: string }) {
+  return <div className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-2"><span className="truncate font-medium">{text}</span><span className="shrink-0 text-xs text-muted-foreground">{meta}</span></div>;
 }
 
 function LegendDot({ className, label }: { className: string; label: string }) {
@@ -226,6 +271,7 @@ function Period({ id }: { id: string }) { return <input type="hidden" name="rese
 function State({ state }: { state: string }) { return <Badge variant={state === "base" ? "success" : "secondary"}>{stateLabel(state)}</Badge>; }
 function stateLabel(value?: string | null) { return value === "base" ? "בסיס" : value === "home" ? "בית" : "לא הוגדר"; }
 function statusLabel(value: string) { return ({ draft: "טיוטה", published: "פורסם", active: "פעיל", completed: "הושלם", archived: "ארכיון" } as Record<string, string>)[value] ?? value; }
+function leaveStatusLabel(value: string) { return ({ pending: "ממתין", approved: "מאושר", partially_approved: "מאושר חלקית", rejected: "נדחה", cancelled: "בוטל" } as Record<string, string>)[value] ?? value; }
 function shortDate(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function shortWeekDate(date: string) { return new Intl.DateTimeFormat("he-IL", { weekday: "short", day: "numeric", month: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
