@@ -68,7 +68,7 @@ function ManagerDashboard({
       <WelcomeCard data={data} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
 
-      <section className="mt-4 overflow-hidden rounded-lg bg-primary text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
+      <section className="mt-4 overflow-hidden rounded-lg bg-primary !text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
         <div className="flex items-center justify-between gap-3 px-4 pt-3.5">
           <p className="text-xs font-medium text-white/70">תמונת מצב תפעולית</p>
           {data.currentPeriod ? (
@@ -187,7 +187,7 @@ function ViewerDashboard({
         <HomeLeaderboard data={data} />
       </div>
 
-      <section className="mt-4 rounded-lg bg-primary px-4 py-4 text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
+      <section className="mt-4 rounded-lg bg-primary px-4 py-4 !text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
         <div className="flex items-center gap-2 text-xs font-medium text-white/70">
           {personal?.state === "home" ? <Home className="size-4" /> : <Users className="size-4" />}
           הסטטוס שלך עכשיו

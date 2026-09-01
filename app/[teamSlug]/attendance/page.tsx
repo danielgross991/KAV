@@ -44,7 +44,7 @@ export default async function AttendancePage({ params, searchParams }: {
         <EmptyState icon={<CalendarX2 className="size-4" />} title="אין תקופת מילואים פעילה" description="לא ניתן לדווח נוכחות ללא תקופה תפעולית לתאריך הזה." />
       ) : (
         <>
-          <section className="overflow-hidden rounded-lg bg-primary text-white">
+          <section className="overflow-hidden rounded-lg bg-primary !text-white">
             <div className="grid grid-cols-4 divide-x divide-x-reverse divide-white/15">
               <Metric label="צפויים" value={day.summary.expected} />
               <Metric label="נוכחים" value={day.summary.present} />
