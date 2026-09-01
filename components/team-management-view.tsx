@@ -153,7 +153,7 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
             <table className="min-w-[1180px] w-full table-fixed text-right text-sm">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
                 <tr>
-                  <th className="w-[15%] px-4 py-3 font-medium">לוחם</th>
+                  <th className="sticky right-0 z-20 w-[15%] bg-muted/95 px-4 py-3 font-medium shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.7)]">לוחם</th>
                   <th className="w-[7%] px-4 py-3 font-medium">סטטוס</th>
                   <th className="w-[12%] px-4 py-3 font-medium">נשק</th>
                   {data.canManageTeam ? <th className="w-[8%] px-4 py-3 font-medium">צ׳ נשק</th> : null}
@@ -172,7 +172,7 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
                   const equipment = summarizeEquipment(person.equipment);
                   return (
                   <tr key={person.id} className="align-top hover:bg-muted/30">
-                    <td className="px-4 py-3">
+                    <td className="sticky right-0 z-10 bg-card px-4 py-3 shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.55)]">
                       <Link
                         className="font-medium text-primary hover:underline"
                         href={`/${data.team.slug}/team/${person.id}`}
@@ -237,7 +237,7 @@ function MobileEquipmentTable({ people }: { people: TeamManagementData["people"]
       <table className="min-w-[860px] w-full table-fixed text-right text-xs">
         <thead className="bg-muted/60 text-muted-foreground">
           <tr>
-            <th className="w-[14rem] px-3 py-2 font-medium">לוחם</th>
+            <th className="sticky right-0 z-20 w-[14rem] bg-muted/95 px-3 py-2 font-medium shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.7)]">לוחם</th>
             <th className="w-[10rem] px-3 py-2 font-medium">נשק</th>
             <th className="w-[8rem] px-3 py-2 font-medium">צ׳ נשק</th>
             <th className="w-[9rem] px-3 py-2 font-medium">כוונת</th>
@@ -252,7 +252,7 @@ function MobileEquipmentTable({ people }: { people: TeamManagementData["people"]
             const equipment = summarizeEquipment(person.equipment);
             return (
               <tr className="align-top" key={person.id}>
-                <td className="px-3 py-2 font-semibold">{person.full_name}</td>
+                <td className="sticky right-0 z-10 bg-card px-3 py-2 font-semibold shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.55)]">{person.full_name}</td>
                 <td className="px-3 py-2 text-muted-foreground">{equipment.weapon.models}</td>
                 <td className="kav-num px-3 py-2 text-muted-foreground">{equipment.weapon.serials}</td>
                 <td className="px-3 py-2 text-muted-foreground">{equipment.optic.models}</td>
