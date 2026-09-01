@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Mail, Phone, Plus, Search, UserRound } from "lucide-react";
+import { Mail, PackageCheck, Phone, Plus, Search, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { createPersonAction } from "@/app/[teamSlug]/team/actions";
@@ -18,6 +18,7 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
   const [status, setStatus] = useState("active");
   const [pakal, setPakal] = useState("all");
   const [rotation, setRotation] = useState("all");
+  const [showMobileEquipment, setShowMobileEquipment] = useState(false);
   const createPerson = createPersonAction.bind(null, data.team.slug);
 
   const filteredPeople = useMemo(() => {
@@ -128,6 +129,26 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
         />
       ) : (
         <>
+          {data.canManageTeam ? (
+            <section className="mb-4 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(20,22,26,0.04)] md:hidden">
+              <Button
+                className="w-full justify-between"
+                type="button"
+                variant={showMobileEquipment ? "secondary" : "outline"}
+                onClick={() => setShowMobileEquipment((value) => !value)}
+              >
+                <span className="flex items-center gap-2">
+                  <PackageCheck className="size-4" />
+                  {showMobileEquipment ? "הסתרת טבלת ציוד" : "הצגת כל הציוד"}
+                </span>
+                <span className="kav-num text-xs text-muted-foreground">
+                  {equipmentItemCount(filteredPeople)}
+                </span>
+              </Button>
+              {showMobileEquipment ? <MobileEquipmentTable people={filteredPeople} /> : null}
+            </section>
+          ) : null}
+
           <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
             <table className="min-w-[1180px] w-full table-fixed text-right text-sm">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
@@ -207,6 +228,44 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
         </>
       )}
     </AppPage>
+  );
+}
+
+function MobileEquipmentTable({ people }: { people: TeamManagementData["people"] }) {
+  return (
+    <div className="mt-3 overflow-x-auto rounded-lg border">
+      <table className="min-w-[860px] w-full table-fixed text-right text-xs">
+        <thead className="bg-muted/60 text-muted-foreground">
+          <tr>
+            <th className="w-[14rem] px-3 py-2 font-medium">לוחם</th>
+            <th className="w-[10rem] px-3 py-2 font-medium">נשק</th>
+            <th className="w-[8rem] px-3 py-2 font-medium">צ׳ נשק</th>
+            <th className="w-[9rem] px-3 py-2 font-medium">כוונת</th>
+            <th className="w-[8rem] px-3 py-2 font-medium">צ׳ כוונת</th>
+            <th className="w-[9rem] px-3 py-2 font-medium">אמר״ל</th>
+            <th className="w-[8rem] px-3 py-2 font-medium">צ׳ אמר״ל</th>
+            <th className="w-[10rem] px-3 py-2 font-medium">פק״ל/נוסף</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y bg-card">
+          {people.map((person) => {
+            const equipment = summarizeEquipment(person.equipment);
+            return (
+              <tr className="align-top" key={person.id}>
+                <td className="px-3 py-2 font-semibold">{person.full_name}</td>
+                <td className="px-3 py-2 text-muted-foreground">{equipment.weapon.models}</td>
+                <td className="kav-num px-3 py-2 text-muted-foreground">{equipment.weapon.serials}</td>
+                <td className="px-3 py-2 text-muted-foreground">{equipment.optic.models}</td>
+                <td className="kav-num px-3 py-2 text-muted-foreground">{equipment.optic.serials}</td>
+                <td className="px-3 py-2 text-muted-foreground">{equipment.amral.models}</td>
+                <td className="kav-num px-3 py-2 text-muted-foreground">{equipment.amral.serials}</td>
+                <td className="px-3 py-2 text-muted-foreground">{equipment.pakal.models !== "אין" ? equipment.pakal.models : equipment.other.models}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -362,6 +421,10 @@ function normalize(value: string | null) {
 
 function activeCount(data: TeamManagementData) {
   return data.people.filter((person) => person.is_active).length;
+}
+
+function equipmentItemCount(people: TeamManagementData["people"]) {
+  return people.reduce((count, person) => count + person.equipment.length, 0);
 }
 
 function initials(name: string) {
