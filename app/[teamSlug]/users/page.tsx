@@ -51,9 +51,9 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
       <PageHeader
         eyebrow={membership.team.name}
         title="ניהול משתמשים"
-        subtitle="קישור מייל לאיש צוות ופתיחת כניסה אישית ללא סיסמה."
+        subtitle="קישור מייל לאיש צוות ופתיחת כניסה אישית ללא סיסמה וללא אישור מייל."
       />
-      {query.linked ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">המייל קושר והמשתמש יכול להיכנס בקישור אימייל.</p> : null}
+      {query.linked ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">המייל קושר והמשתמש יכול להיכנס מיד ללא אישור מייל.</p> : null}
       {query.photo ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">תמונת איש הצוות נשמרה.</p> : null}
 
       {(memberships ?? []).length === 0 ? (
@@ -170,7 +170,8 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
             {(people ?? []).map((person) => (
               <form
                 action={updatePersonPhotoAction.bind(null, teamSlug)}
-                className="grid gap-3 p-3.5 md:grid-cols-[auto_1fr_1.7fr_auto] md:items-center"
+                className="grid gap-3 p-3.5 md:grid-cols-[auto_1fr_1.2fr_1.2fr_auto] md:items-center"
+                encType="multipart/form-data"
                 key={person.id}
               >
                 <input type="hidden" name="person_id" value={person.id} />
@@ -194,6 +195,12 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
                   type="url"
                   defaultValue={person.photo_url ?? ""}
                   placeholder="https://..."
+                />
+                <Input
+                  aria-label={`העלאת תמונה עבור ${person.full_name}`}
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  name="photo_file"
+                  type="file"
                 />
                 <Button variant="secondary">
                   <ImageUp className="size-4" />
