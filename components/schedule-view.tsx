@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   advanceReservePeriodStatusAction, assignRotationMemberAction, createReservePeriodAction, deletePhaseAction,
@@ -14,6 +15,7 @@ import { AppPage, EmptyState, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { KavLoading } from "@/components/kav-loading";
 import { addCalendarDays, calendarDayDifference, eachCalendarDate, getDateInTimeZone, shiftMonth } from "@/lib/kav/dates";
 import { generateRotationBlocks } from "@/lib/kav/schedule-domain";
 import { getDaySchedule, type ScheduleData } from "@/lib/kav/schedule";
@@ -23,10 +25,28 @@ const phaseLabels: Record<string, string> = { preparation: "הכנה", line: "ק
 const eventLabels: Record<string, string> = { briefing: "תדריך", training: "אימון", family: "משפחות", processing: "זיכויים", changeover: "החלפה", holiday: "חג / מועד", other: "אחר" };
 
 export function ScheduleView({ data, initialManage, month, view }: { data: ScheduleData; initialManage: boolean; month?: string; view: string }) {
+  const router = useRouter();
   const [manage, setManage] = useState(initialManage);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const period = data.selectedPeriod;
   const activeMonth = /^\d{4}-\d{2}$/.test(month ?? "") ? month! : (period && data.today >= period.starts_on && data.today <= period.ends_on ? data.today : period?.starts_on ?? data.today).slice(0, 7);
+  const scheduleHref = href(data, view, activeMonth);
+  const showingPending = pendingHref !== null && pendingHref !== scheduleHref;
+
+  useEffect(() => {
+    if (!period) return;
+    [
+      href(data, "month", activeMonth),
+      href(data, "agenda", activeMonth),
+      href(data, "rotations", activeMonth),
+      href(data, "month", shiftMonth(activeMonth, -1)),
+      href(data, "month", shiftMonth(activeMonth, 1)),
+      href(data, "month", data.today.slice(0, 7)),
+    ].forEach((target) => router.prefetch(target));
+  }, [activeMonth, data, data.today, period, router]);
+
   return <AppPage>
+      {showingPending ? <KavLoading label="טוען לו״ז" /> : null}
       <PageHeader
       eyebrow={data.team.name}
       title="לו״ז"
@@ -34,20 +54,20 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
       action={data.canManage ? <Button size="icon" variant={manage ? "secondary" : "outline"} aria-label="ניהול תקופה" onClick={() => setManage((value) => !value)}><Plus className="size-4" /></Button> : null}
     >
       <div className="space-y-2.5">
-        {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={view === "agenda"} href={href(data, "agenda", activeMonth)}>אג׳נדה</Tab><Tab active={view === "month"} href={href(data, "month", activeMonth)}>חודש</Tab><Tab active={view === "rotations"} href={href(data, "rotations", activeMonth)}>סבבים</Tab></nav> : null}
+        {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={view === "agenda"} href={href(data, "agenda", activeMonth)} onPending={setPendingHref}>אג׳נדה</Tab><Tab active={view === "month"} href={href(data, "month", activeMonth)} onPending={setPendingHref}>חודש</Tab><Tab active={view === "rotations"} href={href(data, "rotations", activeMonth)} onPending={setPendingHref}>סבבים</Tab></nav> : null}
       </div>
     </PageHeader>
     {manage && data.canManage ? <Manager data={data} /> : null}
-    {!period ? <Empty /> : view === "month" ? <Month data={data} month={activeMonth} /> : view === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
+    {!period ? <Empty /> : view === "month" ? <Month data={data} month={activeMonth} onPending={setPendingHref} /> : view === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
   </AppPage>;
 }
 
 function Empty() { return <EmptyState icon={<CalendarDays className="size-4" />} title="אין עדיין תקופת מילואים" description="מנהל יכול ליצור תקופה חדשה ולהתחיל לבנות את הלו״ז." />; }
-function Tab({ active, children, href }: { active: boolean; children: React.ReactNode; href: string }) { return <Link aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:text-foreground")} href={href}>{children}</Link>; }
+function Tab({ active, children, href, onPending }: { active: boolean; children: React.ReactNode; href: string; onPending: (href: string) => void }) { return <Link aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-all active:scale-[0.98]", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground")} href={href} onClick={() => { if (!active) onPending(href); }} prefetch>{children}</Link>; }
 function href(data: ScheduleData, view: string, month?: string) { return `/${data.team.slug}/schedule?period=${data.selectedPeriod?.id}&view=${view}${month ? `&month=${month}` : ""}`; }
 function monthLabel(month: string) { return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T12:00:00Z`)); }
 
-function Month({ data, month }: { data: ScheduleData; month: string }) {
+function Month({ data, month, onPending }: { data: ScheduleData; month: string; onPending: (href: string) => void }) {
   const monthStart = `${month}-01`;
   const firstDay = new Date(`${monthStart}T00:00:00Z`).getUTCDay();
   const monthDays = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
@@ -57,12 +77,12 @@ function Month({ data, month }: { data: ScheduleData; month: string }) {
   const todayMonth = data.today.slice(0, 7);
   return <section className="overflow-hidden rounded-lg border bg-card shadow-[0_10px_28px_-24px_rgba(20,22,26,0.5)]">
     <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2.5">
-      <Link aria-label="חודש קודם" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground" href={href(data, "month", shiftMonth(month, -1))}><ChevronRight className="size-4" /></Link>
+      <Link aria-label="חודש קודם" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96]" href={href(data, "month", shiftMonth(month, -1))} onClick={() => onPending(href(data, "month", shiftMonth(month, -1)))} prefetch><ChevronRight className="size-4" /></Link>
       <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
         <span className="text-sm font-bold sm:text-base">{monthLabel(month)}</span>
-        {month !== todayMonth ? <Link className="rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent hover:text-primary" href={href(data, "month", todayMonth)}>היום</Link> : null}
+        {month !== todayMonth ? <Link className="rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-all hover:border-primary/30 hover:bg-accent hover:text-primary active:scale-[0.96]" href={href(data, "month", todayMonth)} onClick={() => onPending(href(data, "month", todayMonth))} prefetch>היום</Link> : null}
       </div>
-      <Link aria-label="חודש הבא" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground" href={href(data, "month", shiftMonth(month, 1))}><ChevronLeft className="size-4" /></Link>
+      <Link aria-label="חודש הבא" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96]" href={href(data, "month", shiftMonth(month, 1))} onClick={() => onPending(href(data, "month", shiftMonth(month, 1)))} prefetch><ChevronLeft className="size-4" /></Link>
     </div>
     <div className="grid grid-cols-7 border-b bg-card px-1 pt-2 text-center text-[0.68rem] font-semibold text-muted-foreground sm:px-2 sm:text-xs">{["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"].map((day) => <div className="px-1 py-2" key={day}>{day}</div>)}</div>
     <div className="kav-month-enter grid grid-cols-7 gap-1 bg-card p-1 sm:gap-1.5 sm:p-2">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} />; })}</div>

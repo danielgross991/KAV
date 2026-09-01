@@ -151,6 +151,11 @@ summary::-webkit-details-marker {
   animation: kav-month-enter 180ms ease-out;
 }
 
+.kav-panel-enter {
+  animation: kav-panel-enter 160ms ease-out;
+  transform-origin: top;
+}
+
 @keyframes kav-spin {
   to {
     transform: rotate(360deg);
@@ -166,6 +171,18 @@ summary::-webkit-details-marker {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes kav-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scaleY(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
   }
 }
 

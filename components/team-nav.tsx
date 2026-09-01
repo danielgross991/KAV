@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { CalendarDays, CalendarOff, ClipboardList, Home, PackageCheck, Settings, UsersRound, UserCheck, type LucideIcon } from "lucide-react";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { KavLoading } from "@/components/kav-loading";
 import { KavMark } from "@/components/kav-mark";
@@ -34,11 +34,21 @@ export function TeamNav({
   teamSlug: string;
   variant: "desktop" | "mobile";
 }) {
+  const router = useRouter();
   const pathname = usePathname();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const items = canManage(role) ? managerItems : viewerItems;
   const base = `/${teamSlug}`;
   const showRouteLoading = pendingHref !== null && !isActivePath(pathname, pendingHref, base);
+
+  useEffect(() => {
+    const routeHrefs = [
+      ...items.map((item) => `${base}${item.href}`),
+      ...(canManage(role) ? [`${base}/leave`, `${base}/settings`, ...(role === "admin" ? [`${base}/users`] : [])] : []),
+    ];
+
+    routeHrefs.forEach((href) => router.prefetch(href));
+  }, [base, items, role, router]);
 
   if (variant === "mobile") {
     return (
