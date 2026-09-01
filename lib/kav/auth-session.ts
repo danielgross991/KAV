@@ -1,5 +1,6 @@
 const AUTH_RESPONSE_HEADERS = ["cache-control", "expires", "pragma"] as const;
 const PUBLIC_FILE = /\.(?:svg|png|jpg|jpeg|gif|webp|ico|txt|xml)$/;
+const PUBLIC_METADATA_ROUTES = new Set(["/opengraph-image", "/twitter-image"]);
 
 type ResponseMetadataSource<TCookie> = {
   cookies: {
@@ -27,5 +28,10 @@ export function shouldRedirectToLogin(pathname: string, claimsPresent: boolean) 
     pathname.startsWith("/auth") ||
     pathname.startsWith("/logout");
 
-  return !claimsPresent && !isAuthRoute && !PUBLIC_FILE.test(pathname);
+  return (
+    !claimsPresent &&
+    !isAuthRoute &&
+    !PUBLIC_FILE.test(pathname) &&
+    !PUBLIC_METADATA_ROUTES.has(pathname)
+  );
 }
