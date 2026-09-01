@@ -1,3 +1,4 @@
+import { saveDailyQuoteAction } from "@/app/[teamSlug]/quotes/actions";
 import {
   createEquipmentTypeAction,
   updateEquipmentTypeAction,
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { DailyQuote } from "@/lib/kav/daily-quotes";
 import type { EquipmentType, PakalType, TeamManagementData } from "@/lib/kav/team-management";
 
 const equipmentCategoryLabels: Record<EquipmentType["category"], string> = {
@@ -23,10 +25,12 @@ const equipmentCategoryOrder: EquipmentType["category"][] = ["WEAPON", "OPTIC", 
 
 export function SettingsManagementView({
   data,
+  dailyQuotes,
   equipmentTypes,
   saved,
 }: {
   data: TeamManagementData;
+  dailyQuotes: DailyQuote[];
   equipmentTypes: EquipmentType[];
   saved?: string;
 }) {
@@ -172,7 +176,98 @@ export function SettingsManagementView({
           </CardContent>
         </Card>
       </section>
+
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_24rem]">
+        <Card>
+          <CardHeader>
+            <CardTitle>משפטים יומיים</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {dailyQuotes.length === 0 ? (
+              <EmptyState title="אין משפטים" description="אפשר להוסיף משפט ראשון מהטופס בצד." />
+            ) : (
+              <div className="grid gap-3">
+                {dailyQuotes.map((quote) => (
+                  <DailyQuoteForm key={quote.id} quote={quote} teamSlug={data.team.slug} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>משפט חדש</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DailyQuoteForm teamSlug={data.team.slug} />
+          </CardContent>
+        </Card>
+      </section>
     </AppPage>
+  );
+}
+
+function DailyQuoteForm({ quote, teamSlug }: { quote?: DailyQuote; teamSlug: string }) {
+  const save = saveDailyQuoteAction.bind(null, teamSlug);
+
+  return (
+    <form action={save} className="grid gap-3 rounded-lg border p-3">
+      {quote ? <input name="id" type="hidden" value={quote.id} /> : null}
+      <TextArea
+        defaultValue={quote?.text ?? ""}
+        fieldId={quote ? `daily_quote_text_${quote.id}` : "daily_quote_text_new"}
+        label="משפט"
+        maxLength={220}
+        name="text"
+        required
+      />
+      <div className="grid gap-3 sm:grid-cols-3">
+        <QuoteStatusSelect defaultValue={quote?.status ?? "approved"} idSuffix={quote?.id ?? "new"} />
+        <div className="grid gap-1.5">
+          <Label htmlFor={quote ? `sort_order_${quote.id}` : "sort_order_new"}>סדר</Label>
+          <Input
+            defaultValue={quote?.sort_order ?? 0}
+            id={quote ? `sort_order_${quote.id}` : "sort_order_new"}
+            name="sort_order"
+            type="number"
+          />
+        </div>
+        <label className="flex items-end gap-2 pb-2 text-sm">
+          <input name="is_active" type="checkbox" defaultChecked={quote?.is_active ?? true} />
+          פעיל
+        </label>
+      </div>
+      {quote?.source === "viewer" ? (
+        <Badge className="justify-self-start" variant={quote.status === "pending" ? "warning" : "outline"}>
+          הצעה ממשתמש
+        </Badge>
+      ) : null}
+      <Button type="submit" variant={quote ? "outline" : "default"}>
+        {quote ? "שמירת משפט" : "הוספת משפט"}
+      </Button>
+    </form>
+  );
+}
+
+function QuoteStatusSelect({ defaultValue, idSuffix }: { defaultValue: DailyQuote["status"]; idSuffix: string }) {
+  const id = `quote_status_${idSuffix}`;
+
+  return (
+    <div className="grid gap-1.5">
+      <Label htmlFor={id}>סטטוס</Label>
+      <select
+        className="h-11 rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        defaultValue={defaultValue}
+        id={id}
+        name="status"
+      >
+        <option value="approved">מאושר</option>
+        <option value="pending">ממתין לאישור</option>
+        <option value="rejected">נדחה</option>
+        <option value="archived">ארכיון</option>
+      </select>
+    </div>
   );
 }
 
@@ -280,21 +375,29 @@ function Field({
 
 function TextArea({
   defaultValue,
+  fieldId,
   label,
+  maxLength,
   name,
+  required,
 }: {
   defaultValue?: string;
+  fieldId?: string;
   label: string;
+  maxLength?: number;
   name: string;
+  required?: boolean;
 }) {
   return (
     <div className="grid gap-1.5">
-      <Label htmlFor={name}>{label}</Label>
+      <Label htmlFor={fieldId ?? name}>{label}</Label>
       <textarea
         className="min-h-20 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
         defaultValue={defaultValue}
-        id={name}
+        id={fieldId ?? name}
+        maxLength={maxLength}
         name={name}
+        required={required}
       />
     </div>
   );
@@ -313,6 +416,7 @@ function savedLabel(saved: string) {
   const labels: Record<string, string> = {
     "equipment-type": "סוג הציוד נוסף",
     "equipment-type-updated": "סוג הציוד נשמר",
+    "daily-quote": "המשפט נשמר",
     "pakal-type": "הפקל נשמר",
     requirement: "דרישת הכשירות נשמרה",
   };

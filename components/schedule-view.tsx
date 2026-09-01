@@ -55,18 +55,18 @@ function Month({ data, month }: { data: ScheduleData; month: string }) {
   const gridStart = addCalendarDays(monthStart, -firstDay);
   const dates = Array.from({ length: weekCount * 7 }, (_, index) => addCalendarDays(gridStart, index));
   const todayMonth = data.today.slice(0, 7);
-  return <section className="overflow-hidden rounded-lg border bg-card">
-    <div className="flex items-center justify-between gap-2 border-b px-3 py-2.5">
-      <Link aria-label="חודש קודם" className="flex size-9 items-center justify-center rounded-md border bg-card text-muted-foreground hover:bg-muted" href={href(data, "month", shiftMonth(month, -1))}><ChevronRight className="size-4" /></Link>
-      <div className="flex items-center gap-2">
-        <span className="font-semibold">{monthLabel(month)}</span>
-        {month !== todayMonth ? <Link className="rounded-md border px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted" href={href(data, "month", todayMonth)}>היום</Link> : null}
+  return <section className="overflow-hidden rounded-lg border bg-card shadow-[0_10px_28px_-24px_rgba(20,22,26,0.5)]">
+    <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2.5">
+      <Link aria-label="חודש קודם" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground" href={href(data, "month", shiftMonth(month, -1))}><ChevronRight className="size-4" /></Link>
+      <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
+        <span className="text-sm font-bold sm:text-base">{monthLabel(month)}</span>
+        {month !== todayMonth ? <Link className="rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/30 hover:bg-accent hover:text-primary" href={href(data, "month", todayMonth)}>היום</Link> : null}
       </div>
-      <Link aria-label="חודש הבא" className="flex size-9 items-center justify-center rounded-md border bg-card text-muted-foreground hover:bg-muted" href={href(data, "month", shiftMonth(month, 1))}><ChevronLeft className="size-4" /></Link>
+      <Link aria-label="חודש הבא" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:text-foreground" href={href(data, "month", shiftMonth(month, 1))}><ChevronLeft className="size-4" /></Link>
     </div>
-    <div className="grid grid-cols-7 border-b bg-muted/40 text-center text-[0.68rem] text-muted-foreground sm:text-xs">{["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"].map((day) => <div className="px-1 py-2" key={day}>{day}</div>)}</div>
-    <div className="grid grid-cols-7">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} />; })}</div>
-    <div className="flex flex-wrap gap-x-3 gap-y-1 border-t bg-muted/25 px-3 py-2 text-xs text-muted-foreground">
+    <div className="grid grid-cols-7 border-b bg-card px-1 pt-2 text-center text-[0.68rem] font-semibold text-muted-foreground sm:px-2 sm:text-xs">{["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"].map((day) => <div className="px-1 py-2" key={day}>{day}</div>)}</div>
+    <div className="kav-month-enter grid grid-cols-7 gap-1 bg-card p-1 sm:gap-1.5 sm:p-2">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} />; })}</div>
+    <div className="flex flex-wrap gap-x-3 gap-y-1 border-t bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
       <LegendDot className="bg-violet-500" label="חג" />
       <LegendDot className="bg-primary" label="משימות" />
       <LegendDot className="bg-sky-500" label="בקשות/יציאות" />
@@ -89,9 +89,9 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
   const attendanceIssue = data.canManage && isPast && ((day.attendance?.absent.length ?? 0) > 0 || (day.attendance?.unreported.length ?? 0) > 0);
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
 
-  return <Link className={cn("min-h-[5.9rem] border-b border-l p-1.5 transition-colors hover:bg-accent/40 sm:min-h-[7.25rem] sm:p-2", !inMonth && "bg-muted/30 text-muted-foreground", viewer?.resolution.state === "home" && "bg-sky-50/60", personalLeaves.length && "border-primary/40 bg-primary/10 ring-2 ring-inset ring-primary/35")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`}>
+  return <Link className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", viewer?.resolution.state === "home" && "bg-sky-50/80", personalLeaves.length && "border-primary/40 bg-primary/10 ring-2 ring-inset ring-primary/25")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`}>
     <div className="mb-1.5 flex items-start justify-between gap-1">
-      <span className={cn("grid size-6 place-items-center rounded-full text-xs sm:size-7 sm:text-sm", date === data.today && "bg-primary text-primary-foreground")}>{Number(date.slice(-2))}</span>
+      <span className={cn("grid size-6 place-items-center rounded-full text-xs font-semibold transition-colors sm:size-7 sm:text-sm", date === data.today ? "bg-primary text-primary-foreground" : "bg-card text-foreground group-hover:bg-accent group-hover:text-primary")}>{Number(date.slice(-2))}</span>
       <span className="mt-1 flex flex-wrap justify-end gap-1">
         {holiday ? <span aria-label={holiday.title} className="size-2 rounded-full bg-violet-500" title={holiday.title} /> : null}
         {otherEvents.length ? <span className="size-2 rounded-full bg-amber-500" /> : null}
@@ -100,10 +100,10 @@ function MonthCell({ data, date, day, inMonth }: { data: ScheduleData; date: str
         {attendanceIssue ? <span className="size-2 rounded-full bg-destructive" /> : null}
       </span>
     </div>
-    {holiday ? <div className="truncate text-[0.68rem] font-medium text-violet-700 sm:text-xs">{holiday.title}</div> : null}
+    {holiday ? <div className="truncate rounded bg-special-soft px-1.5 py-0.5 text-[0.68rem] font-medium text-special sm:text-xs">{holiday.title}</div> : null}
     {data.canManage ? (
       <>
-        {baseGroups.slice(0, 2).map((group) => <div className={cn("mt-1 truncate rounded px-1.5 py-0.5 text-[0.68rem] font-medium sm:text-xs", groupColorClass(group.color_token))} key={group.id}>{group.name} · {stateLabel(group.block?.state)}</div>)}
+        {baseGroups.slice(0, 2).map((group) => <div className={cn("mt-1 truncate rounded-md px-1.5 py-0.5 text-[0.68rem] font-medium sm:text-xs", groupColorClass(group.color_token))} key={group.id}>{group.name} · {stateLabel(group.block?.state)}</div>)}
         {baseGroups.length > 2 ? <div className="mt-1 truncate text-[0.68rem] text-muted-foreground sm:text-xs">+{baseGroups.length - 2} סבבים בבסיס</div> : null}
         {teamLeaveCount ? <div className="mt-1 truncate text-[0.68rem] text-sky-700 sm:text-xs">{teamLeaveCount} יציאות/בקשות</div> : null}
         {day.tasks.length ? <div className="mt-1 truncate text-[0.68rem] text-primary sm:text-xs">{day.tasks.length} משימות</div> : null}

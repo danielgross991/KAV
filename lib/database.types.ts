@@ -41,6 +41,21 @@ export type Database = {
         updated_at: string;
         updated_by: string | null;
       }>;
+      daily_quotes: Row<{
+        approved_at: string | null;
+        approved_by: string | null;
+        created_at: string;
+        id: string;
+        is_active: boolean;
+        sort_order: number;
+        source: "admin" | "viewer";
+        status: "approved" | "pending" | "rejected" | "archived";
+        submitted_by: string | null;
+        submitted_person_id: string | null;
+        team_id: string;
+        text: string;
+        updated_at: string;
+      }>;
       leave_requests: Row<{
         approved_ends_on: string | null;
         approved_starts_on: string | null;

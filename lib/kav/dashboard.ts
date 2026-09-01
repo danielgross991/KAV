@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
+import { getCurrentDailyQuote, type CurrentDailyQuote } from "@/lib/kav/daily-quotes";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { getOperationalDay } from "@/lib/kav/operations";
 import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
@@ -31,6 +32,7 @@ export type DashboardData = {
         status: string;
       }
     | null;
+  dailyQuote: CurrentDailyQuote;
   expectedOnBase: number;
   homeLeaderboard: PersonAttendanceStats[];
   attendanceStats: PersonAttendanceStats[];
@@ -90,6 +92,7 @@ export const getDashboardData = cache(async function getDashboardData(
 
   const [
     activePeopleResult,
+    dailyQuote,
     requirementsResult,
     personPakalsResult,
     currentPersonResult,
@@ -100,6 +103,7 @@ export const getDashboardData = cache(async function getDashboardData(
       .select("id", { count: "exact", head: true })
       .eq("team_id", team.id)
       .eq("is_active", true),
+    getCurrentDailyQuote(supabase, team, today),
     supabase
       .from("team_pakal_requirements")
       .select("required_count, pakal_types!inner(id, name)")
@@ -204,6 +208,7 @@ export const getDashboardData = cache(async function getDashboardData(
           status: currentPeriod.status,
         }
       : null,
+    dailyQuote,
     expectedOnBase,
     homeLeaderboard: teamStats.leaderboard,
     attendanceStats: teamStats.stats,

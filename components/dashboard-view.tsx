@@ -15,6 +15,7 @@ import {
 import { AppPage, PageHeader, SectionHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DailyQuoteCard } from "@/components/daily-quote-card";
 import { LineSelector } from "@/components/line-selector";
 import type { DashboardData } from "@/lib/kav/dashboard";
 import type { getLineSelectionOptions } from "@/lib/kav/line-selection";
@@ -65,8 +66,9 @@ function ManagerDashboard({
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
       <WelcomeCard data={data} />
+      <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
 
-      <section className="overflow-hidden rounded-lg bg-primary text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
+      <section className="mt-4 overflow-hidden rounded-lg bg-primary text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
         <div className="flex items-center justify-between gap-3 px-4 pt-3.5">
           <p className="text-xs font-medium text-white/70">תמונת מצב תפעולית</p>
           {data.currentPeriod ? (
@@ -179,6 +181,7 @@ function ViewerDashboard({
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
       <WelcomeCard data={data} />
+      <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
 
       <div className="mt-4">
         <HomeLeaderboard data={data} />
