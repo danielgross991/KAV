@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center justify-center gap-2 text-2xl font-bold">
-          <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <span className="flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground text-white">
             <ShieldCheck className="size-5" />
           </span>
           KAV

@@ -125,7 +125,7 @@ function MonthCell({ data, date, day, inMonth, onMobilePreview }: { data: Schedu
     }
   }}>
     <div className="mb-1.5 flex items-start justify-between gap-1">
-      <span className={cn("grid size-6 place-items-center rounded-full text-xs font-semibold transition-colors sm:size-7 sm:text-sm", date === data.today ? "bg-primary text-primary-foreground" : "bg-card text-foreground group-hover:bg-accent group-hover:text-primary")}>{Number(date.slice(-2))}</span>
+      <span className={cn("grid size-6 place-items-center rounded-full text-xs font-semibold transition-colors sm:size-7 sm:text-sm", date === data.today ? "bg-primary text-primary-foreground text-white" : "bg-card text-foreground group-hover:bg-accent group-hover:text-primary")}>{Number(date.slice(-2))}</span>
       <span className="mt-1 flex flex-wrap justify-end gap-1">
         {holiday ? <span aria-label={holiday.title} className="size-2 rounded-full bg-violet-500" title={holiday.title} /> : null}
         {otherEvents.length ? <span className="size-2 rounded-full bg-amber-500" /> : null}
@@ -182,7 +182,7 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
           {leaveItems.length ? <div className="space-y-1.5">{leaveItems.map((item) => <PreviewLine key={`${item.id}-${item.status}`} meta={leaveStatusLabel(item.status)} text={peopleById.get(item.personId) ?? "איש צוות"} />)}</div> : <p className="text-muted-foreground">אין בקשות יציאה ביום הזה.</p>}
         </PreviewSection>
       </div>
-      <Link className="mt-4 flex h-10 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground" href={detailHref}>פתיחת פירוט מלא</Link>
+      <Link className="mt-4 flex h-10 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground text-white" href={detailHref}>פתיחת פירוט מלא</Link>
     </aside>
   </>;
 }

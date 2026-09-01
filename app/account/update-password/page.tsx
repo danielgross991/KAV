@@ -11,7 +11,7 @@ export default async function UpdatePasswordPage() {
     <main className="flex min-h-screen items-center justify-center px-4 py-10">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <div className="mb-2 flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+          <div className="mb-2 flex size-10 items-center justify-center rounded-md bg-primary text-primary-foreground text-white">
             <KeyRound className="size-5" />
           </div>
           <CardTitle className="text-xl">הגדרת סיסמה חדשה</CardTitle>
