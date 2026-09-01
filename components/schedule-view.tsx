@@ -25,6 +25,7 @@ const phaseLabels: Record<string, string> = { preparation: "הכנה", line: "ק
 const eventLabels: Record<string, string> = { briefing: "תדריך", training: "אימון", family: "משפחות", processing: "זיכויים", changeover: "החלפה", holiday: "חג / מועד", other: "אחר" };
 const scheduleLoadingHandoffMs = 48;
 const scheduleMinimumLoadingMs = 420;
+const schedulePressFeedbackMs = 520;
 
 export function ScheduleView({ data, initialManage, month, view }: { data: ScheduleData; initialManage: boolean; month?: string; view: string }) {
   const router = useRouter();
@@ -34,8 +35,10 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
   const [activeMonth, setActiveMonth] = useState(initialMonth);
   const [activeView, setActiveView] = useState(view);
   const [localPending, setLocalPending] = useState(false);
+  const [pressedSchedule, setPressedSchedule] = useState<{ month: string; view: string } | null>(null);
   const handoffTimer = useRef<number | null>(null);
   const finishTimer = useRef<number | null>(null);
+  const pressTimer = useRef<number | null>(null);
   const showingPending = localPending;
 
   function switchSchedule(nextView: string, nextMonth = activeMonth) {
@@ -51,8 +54,18 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
       window.clearTimeout(finishTimer.current);
     }
 
+    if (pressTimer.current) {
+      window.clearTimeout(pressTimer.current);
+    }
+
+    setPressedSchedule({ month: nextMonth, view: nextView });
     setLocalPending(true);
     window.history.pushState(null, "", href(data, nextView, nextMonth));
+
+    pressTimer.current = window.setTimeout(() => {
+      setPressedSchedule(null);
+      pressTimer.current = null;
+    }, schedulePressFeedbackMs);
 
     handoffTimer.current = window.setTimeout(() => {
       setActiveView(nextView);
@@ -74,6 +87,10 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
 
       if (finishTimer.current) {
         window.clearTimeout(finishTimer.current);
+      }
+
+      if (pressTimer.current) {
+        window.clearTimeout(pressTimer.current);
       }
     };
   }, []);
@@ -97,20 +114,20 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
       action={data.canManageReservePeriods ? <Button size="icon" type="button" variant={manage ? "secondary" : "outline"} aria-label="ניהול תקופה" onClick={() => setManage((value) => !value)}><Plus className="size-4" /></Button> : null}
     >
       <div className="space-y-2.5">
-        {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={activeView === "agenda"} onSelect={() => switchSchedule("agenda")}>אג׳נדה</Tab><Tab active={activeView === "month"} onSelect={() => switchSchedule("month")}>חודש</Tab><Tab active={activeView === "rotations"} onSelect={() => switchSchedule("rotations")}>סבבים</Tab></nav> : null}
+        {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={activeView === "agenda"} pressed={pressedSchedule?.view === "agenda"} onSelect={() => switchSchedule("agenda")}>אג׳נדה</Tab><Tab active={activeView === "month"} pressed={pressedSchedule?.view === "month"} onSelect={() => switchSchedule("month")}>חודש</Tab><Tab active={activeView === "rotations"} pressed={pressedSchedule?.view === "rotations"} onSelect={() => switchSchedule("rotations")}>סבבים</Tab></nav> : null}
       </div>
     </PageHeader>
     {manage && data.canManageReservePeriods ? <Manager data={data} /> : null}
-    {!period ? <Empty /> : activeView === "month" ? <Month data={data} month={activeMonth} onMonthChange={(nextMonth) => switchSchedule("month", nextMonth)} /> : activeView === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
+    {!period ? <Empty /> : activeView === "month" ? <Month data={data} month={activeMonth} pendingMonth={pressedSchedule?.view === "month" ? pressedSchedule.month : null} onMonthChange={(nextMonth) => switchSchedule("month", nextMonth)} /> : activeView === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
   </AppPage>;
 }
 
 function Empty() { return <EmptyState icon={<CalendarDays className="size-4" />} title="אין עדיין תקופת מילואים" description="מנהל יכול ליצור תקופה חדשה ולהתחיל לבנות את הלו״ז." />; }
-function Tab({ active, children, onSelect }: { active: boolean; children: React.ReactNode; onSelect: () => void }) { return <button aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-all active:scale-[0.98]", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground")} onClick={() => { if (!active) onSelect(); }} type="button">{children}</button>; }
+function Tab({ active, children, onSelect, pressed = false }: { active: boolean; children: React.ReactNode; onSelect: () => void; pressed?: boolean }) { return <button aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-all active:scale-[0.98] active:bg-card active:text-foreground", active || pressed ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground")} onClick={() => { if (!active) onSelect(); }} type="button">{children}</button>; }
 function href(data: ScheduleData, view: string, month?: string) { return `/${data.team.slug}/schedule?period=${data.selectedPeriod?.id}&view=${view}${month ? `&month=${month}` : ""}`; }
 function monthLabel(month: string) { return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T12:00:00Z`)); }
 
-function Month({ data, month, onMonthChange }: { data: ScheduleData; month: string; onMonthChange: (month: string) => void }) {
+function Month({ data, month, onMonthChange, pendingMonth }: { data: ScheduleData; month: string; onMonthChange: (month: string) => void; pendingMonth: string | null }) {
   const monthStart = `${month}-01`;
   const firstDay = new Date(`${monthStart}T00:00:00Z`).getUTCDay();
   const monthDays = new Date(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0).getDate();
@@ -121,12 +138,12 @@ function Month({ data, month, onMonthChange }: { data: ScheduleData; month: stri
   const [selectedDay, setSelectedDay] = useState<{ date: string; day: ReturnType<typeof getDaySchedule> } | null>(null);
   return <section className="overflow-hidden rounded-lg border bg-card shadow-[0_10px_28px_-24px_rgba(20,22,26,0.5)]">
     <div className="flex items-center justify-between gap-2 border-b bg-muted/20 px-3 py-2.5">
-      <button aria-label="חודש קודם" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96]" onClick={() => onMonthChange(shiftMonth(month, -1))} type="button"><ChevronRight className="size-4" /></button>
+      <MonthNavButton active={pendingMonth === shiftMonth(month, -1)} ariaLabel="חודש קודם" onClick={() => onMonthChange(shiftMonth(month, -1))}><ChevronRight className="size-4" /></MonthNavButton>
       <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
         <span className="text-sm font-bold sm:text-base">{monthLabel(month)}</span>
-        {month !== todayMonth ? <button className="rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-all hover:border-primary/30 hover:bg-accent hover:text-primary active:scale-[0.96]" onClick={() => onMonthChange(todayMonth)} type="button">היום</button> : null}
+        {month !== todayMonth ? <button className={cn("rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-all hover:border-primary/30 hover:bg-accent hover:text-primary active:scale-[0.96] active:border-primary/40 active:bg-accent active:text-primary", pendingMonth === todayMonth && "border-primary/40 bg-accent text-primary")} onClick={() => onMonthChange(todayMonth)} type="button">היום</button> : null}
       </div>
-      <button aria-label="חודש הבא" className="flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96]" onClick={() => onMonthChange(shiftMonth(month, 1))} type="button"><ChevronLeft className="size-4" /></button>
+      <MonthNavButton active={pendingMonth === shiftMonth(month, 1)} ariaLabel="חודש הבא" onClick={() => onMonthChange(shiftMonth(month, 1))}><ChevronLeft className="size-4" /></MonthNavButton>
     </div>
     <div className="grid grid-cols-7 border-b bg-card px-1 pt-2 text-center text-[0.68rem] font-semibold text-muted-foreground sm:px-2 sm:text-xs">{["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"].map((day) => <div className="px-1 py-2" key={day}>{day}</div>)}</div>
     <div className="kav-month-enter grid grid-cols-7 gap-1 bg-card p-1 sm:gap-1.5 sm:p-2">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} onMobilePreview={() => setSelectedDay({ date, day })} />; })}</div>
@@ -138,6 +155,10 @@ function Month({ data, month, onMonthChange }: { data: ScheduleData; month: stri
       <LegendDot className="bg-destructive" label="פער נוכחות" />
     </div>
   </section>;
+}
+
+function MonthNavButton({ active, ariaLabel, children, onClick }: { active: boolean; ariaLabel: string; children: React.ReactNode; onClick: () => void }) {
+  return <button aria-label={ariaLabel} className={cn("flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96] active:border-primary/40 active:bg-accent active:text-primary", active && "border-primary/40 bg-accent text-primary")} onClick={onClick} type="button">{children}</button>;
 }
 
 function MonthCell({ data, date, day, inMonth, onMobilePreview }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; inMonth: boolean; onMobilePreview: () => void }) {
