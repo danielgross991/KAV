@@ -8,13 +8,13 @@ import type { Json } from "@/lib/database.types";
 import { addCalendarDays, getDateInTimeZone, localDateTimeToIso } from "@/lib/kav/dates";
 import { requireAuth } from "@/lib/kav/auth";
 import { generateRotationBlocks, overlaps, validateScheduleForPublication, type RotationState } from "@/lib/kav/schedule-domain";
-import { canManage, requireTeamAccess } from "@/lib/kav/teams";
+import { canManage, canManageReservePeriods, requireTeamAccess } from "@/lib/kav/teams";
 
 const PHASE_TYPES = ["preparation", "line", "stand_down", "processing", "other"];
 const EVENT_TYPES = ["briefing", "training", "family", "processing", "changeover", "holiday", "other"];
 
 export async function createReservePeriodAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const startsOn = required(formData, "starts_on", "תאריך התחלה");
   const endsOn = required(formData, "ends_on", "תאריך סיום");
   assertDateRange(startsOn, endsOn);
@@ -29,7 +29,7 @@ export async function createReservePeriodAction(teamSlug: string, formData: Form
 }
 
 export async function savePhaseAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
   assertDraft(period);
   const startsOn = required(formData, "starts_on", "תאריך התחלה");
@@ -56,7 +56,7 @@ export async function savePhaseAction(teamSlug: string, formData: FormData) {
 }
 
 export async function deletePhaseAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const id = required(formData, "id", "שלב");
   const { data: phase } = await context.supabase.from("period_phases").select("reserve_period_id")
     .eq("id", id).eq("team_id", context.team.id).maybeSingle();
@@ -68,7 +68,7 @@ export async function deletePhaseAction(teamSlug: string, formData: FormData) {
 }
 
 export async function saveRotationGroupAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
   assertDraft(period);
   const initialState = enumValue(formData, "initial_state", ["base", "home"], "מצב פתיחה") as RotationState;
@@ -85,7 +85,7 @@ export async function saveRotationGroupAction(teamSlug: string, formData: FormDa
 }
 
 export async function deleteRotationGroupAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const id = required(formData, "id", "סבב");
   const { data: group } = await context.supabase.from("rotation_groups").select("reserve_period_id")
     .eq("id", id).eq("team_id", context.team.id).maybeSingle();
@@ -97,7 +97,7 @@ export async function deleteRotationGroupAction(teamSlug: string, formData: Form
 }
 
 export async function assignRotationMemberAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
   const personId = required(formData, "person_id", "איש צוות");
   const groupId = optional(formData, "rotation_group_id");
@@ -127,7 +127,7 @@ export async function assignRotationMemberAction(teamSlug: string, formData: For
 }
 
 export async function generateRotationBlocksAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
   assertDraft(period);
   const anchorDate = required(formData, "anchor_date", "תאריך עוגן");
@@ -162,7 +162,7 @@ export async function generateRotationBlocksAction(teamSlug: string, formData: F
 }
 
 export async function editRotationBlockAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const state = enumValue(formData, "state", ["base", "home"], "מצב") as RotationState;
   const id = required(formData, "id", "בלוק");
   const { data: block } = await context.supabase.from("rotation_blocks").select("*")
@@ -258,7 +258,7 @@ export async function deleteScheduleEventAction(teamSlug: string, formData: Form
 }
 
 export async function publishReservePeriodAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
   assertDraft(period);
   const [{ data: people }, { data: groups }, { data: phases }, { data: blocks }, { data: overrides }] = await Promise.all([
@@ -287,7 +287,7 @@ export async function publishReservePeriodAction(teamSlug: string, formData: For
 }
 
 export async function advanceReservePeriodStatusAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
+  const context = await adminContext(teamSlug);
   const period = await ownedPeriod(context, required(formData, "reserve_period_id", "תקופה"));
   const transitions: Record<string, string> = { published: "active", active: "completed", completed: "archived" };
   const nextStatus = transitions[period.status];
@@ -304,8 +304,17 @@ export async function advanceReservePeriodStatusAction(teamSlug: string, formDat
 }
 
 async function managerContext(teamSlug: string) {
+  return scheduleContext(teamSlug, "manager");
+}
+
+async function adminContext(teamSlug: string) {
+  return scheduleContext(teamSlug, "admin");
+}
+
+async function scheduleContext(teamSlug: string, mode: "admin" | "manager") {
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
+  if (mode === "admin" && !canManageReservePeriods(membership.role)) throw new Error("רק אדמין יכול לנהל תקופות מילואים וסבבים");
   if (!canManage(membership.role)) throw new Error("אין הרשאה לניהול הלו״ז");
   return { supabase, userId, team: membership.team };
 }

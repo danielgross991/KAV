@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ImageUp, MailPlus, UserCog, UserRound } from "lucide-react";
+import { ImageUp, MailPlus, ShieldCheck, UserCog, UserRound } from "lucide-react";
 
-import { provisionPersonLoginAction, updatePersonPhotoAction } from "@/app/[teamSlug]/users/actions";
+import { provisionPersonLoginAction, updateMembershipRoleAction, updatePersonPhotoAction } from "@/app/[teamSlug]/users/actions";
 import { AppPage, EmptyState, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { requireTeamAccess } from "@/lib/kav/teams";
 
 type UsersPageProps = {
   params: Promise<{ teamSlug: string }>;
-  searchParams: Promise<{ linked?: string; photo?: string }>;
+  searchParams: Promise<{ linked?: string; photo?: string; role?: string }>;
 };
 
 export default async function UsersPage({ params, searchParams }: UsersPageProps) {
@@ -55,6 +55,7 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
       />
       {query.linked ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">המייל קושר והמשתמש יכול להיכנס מיד ללא אישור מייל.</p> : null}
       {query.photo ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">תמונת איש הצוות נשמרה.</p> : null}
+      {query.role ? <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700">הרשאת המשתמש נשמרה.</p> : null}
 
       {(memberships ?? []).length === 0 ? (
         <EmptyState icon={<UserCog className="size-4" />} title="אין משתמשים משויכים לצוות" />
@@ -67,9 +68,10 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
                   <tr>
                     <th className="px-4 py-3 font-medium">איש צוות</th>
                     <th className="px-4 py-3 font-medium">אימייל</th>
-                    <th className="px-4 py-3 font-medium">תפקיד</th>
+                    <th className="px-4 py-3 font-medium">הרשאה</th>
                     <th className="px-4 py-3 font-medium">סטטוס משתמש</th>
                     <th className="px-4 py-3 font-medium">User ID</th>
+                    <th className="px-4 py-3 font-medium">פעולה</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -81,9 +83,12 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
                           {person ? <Link className="text-primary hover:underline" href={`/${teamSlug}/team/${person.id}`}>{person.full_name}</Link> : "לא משויך לאיש צוות"}
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{person?.email ?? "לא מוגדר"}</td>
-                        <td className="px-4 py-3"><RoleBadge role={item.role} /></td>
+                        <td className="px-4 py-3"><RoleEditor item={item} teamSlug={teamSlug} /></td>
                         <td className="px-4 py-3"><Badge variant={item.is_active ? "success" : "muted"}>{item.is_active ? "פעיל" : "לא פעיל"}</Badge></td>
                         <td className="kav-num px-4 py-3 text-xs text-muted-foreground">{shortId(item.user_id)}</td>
+                        <td className="px-4 py-3">
+                          {item.role === "admin" ? <Badge variant="special">מוגן</Badge> : <RoleSubmitButton formId={`role-${item.id}`} />}
+                        </td>
                       </tr>
                     );
                   })}
@@ -103,6 +108,7 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
                       <RoleBadge role={item.role} />
                     </div>
                     <Badge className="mt-3" variant={item.is_active ? "success" : "muted"}>{item.is_active ? "פעיל" : "לא פעיל"}</Badge>
+                    {item.role !== "admin" ? <RoleEditor item={item} teamSlug={teamSlug} mobile /> : null}
                   </div>
                 );
               })}
@@ -125,7 +131,7 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
               return (
                 <form
                   action={provisionPersonLoginAction.bind(null, teamSlug)}
-                  className="grid gap-3 p-3.5 md:grid-cols-[1fr_1.5fr_auto_auto] md:items-center"
+                  className="grid gap-3 p-3.5 md:grid-cols-[1fr_1.5fr_10rem_auto_auto] md:items-center"
                   key={person.id}
                 >
                   <input type="hidden" name="person_id" value={person.id} />
@@ -146,6 +152,7 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
                     placeholder="name@example.com"
                     required
                   />
+                  <RoleSelect defaultValue={membershipItem?.role === "manager" ? "manager" : "viewer"} />
                   <Badge variant={person.auth_user_id ? "info" : "secondary"}>
                     {person.auth_user_id ? "מקושר" : "לא מקושר"}
                   </Badge>
@@ -215,9 +222,62 @@ export default async function UsersPage({ params, searchParams }: UsersPageProps
   );
 }
 
+function RoleEditor({
+  item,
+  mobile = false,
+  teamSlug,
+}: {
+  item: { id: string; role: "admin" | "manager" | "viewer"; is_active: boolean };
+  mobile?: boolean;
+  teamSlug: string;
+}) {
+  if (item.role === "admin") {
+    return <RoleBadge role="admin" />;
+  }
+
+  return (
+    <form
+      action={updateMembershipRoleAction.bind(null, teamSlug)}
+      className={mobile ? "mt-3 grid gap-2" : "grid min-w-44 grid-cols-[1fr_auto] items-center gap-2"}
+      id={`role-${item.id}`}
+    >
+      <input name="membership_id" type="hidden" value={item.id} />
+      <RoleSelect defaultValue={item.role} />
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <input name="is_active" type="checkbox" defaultChecked={item.is_active} />
+        פעיל
+      </label>
+      {mobile ? <RoleSubmitButton /> : null}
+    </form>
+  );
+}
+
+function RoleSelect({ defaultValue }: { defaultValue: "manager" | "viewer" }) {
+  return (
+    <select
+      aria-label="הרשאת משתמש"
+      className="h-10 rounded-md border border-input bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      defaultValue={defaultValue}
+      name="role"
+    >
+      <option value="viewer">צופה</option>
+      <option value="manager">מנהל תפעולי</option>
+    </select>
+  );
+}
+
+function RoleSubmitButton({ formId }: { formId?: string }) {
+  return (
+    <Button form={formId} size="sm" variant="secondary">
+      <ShieldCheck className="size-4" />
+      שמירת הרשאה
+    </Button>
+  );
+}
+
 function RoleBadge({ role }: { role: "admin" | "manager" | "viewer" }) {
   if (role === "admin") return <Badge variant="special">אדמין</Badge>;
-  if (role === "manager") return <Badge variant="info">מנהל</Badge>;
+  if (role === "manager") return <Badge variant="info">מנהל תפעולי</Badge>;
   return <Badge variant="secondary">צופה</Badge>;
 }
 

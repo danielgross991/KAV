@@ -15,7 +15,7 @@ import {
   type RotationState,
 } from "@/lib/kav/schedule-domain";
 import type { TeamMembership } from "@/lib/kav/teams";
-import { canManage } from "@/lib/kav/teams";
+import { canManage, canManageReservePeriods } from "@/lib/kav/teams";
 
 type Client = SupabaseClient<Database>;
 type Row<Name extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][Name]["Row"];
@@ -24,6 +24,7 @@ export type ScheduleData = {
   attendanceByDate: Map<string, { isPresent: boolean; personId: string }[]>;
   blocks: Row<"rotation_blocks">[];
   canManage: boolean;
+  canManageReservePeriods: boolean;
   config: Row<"rotation_generation_configs"> | null;
   events: Row<"schedule_events">[];
   groups: Row<"rotation_groups">[];
@@ -61,6 +62,8 @@ export const getScheduleData = cache(async function getScheduleData(
   assertOk(peopleError, "people");
   assertOk(viewerPerson.error, "viewer person");
   const viewerPersonId = viewerPerson.data?.id ?? null;
+  const manager = canManage(membership.role);
+  const reservePeriodManager = canManageReservePeriods(membership.role);
 
   const allPeriods = periods ?? [];
   const selectedPeriod =
@@ -69,8 +72,8 @@ export const getScheduleData = cache(async function getScheduleData(
 
   if (!selectedPeriod) {
     return {
-      attendanceByDate: new Map(), blocks: [], canManage: canManage(membership.role), config: null, events: [], groups: [], leaves: [],
-      leaveRequests: [], memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
+      attendanceByDate: new Map(), blocks: [], canManage: manager, config: null, events: [], groups: [], leaves: [],
+      canManageReservePeriods: reservePeriodManager, leaveRequests: [], memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
       selectedPeriod: null, team, tasks: [], today, validationIssues: [], viewerPersonId,
     };
   }
@@ -125,7 +128,7 @@ export const getScheduleData = cache(async function getScheduleData(
 
   return {
     attendanceByDate,
-    blocks, canManage: canManage(membership.role), config: configResult.data, events: eventsResult.data ?? [],
+    blocks, canManage: manager, canManageReservePeriods: reservePeriodManager, config: configResult.data, events: eventsResult.data ?? [],
     groups, leaveRequests, leaves, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
     selectedPeriod, team, tasks: tasksResult.data ?? [], today, validationIssues, viewerPersonId,
   };

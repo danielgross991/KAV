@@ -10,6 +10,8 @@ import { requireAuth } from "@/lib/kav/auth";
 import { requireTeamAccess } from "@/lib/kav/teams";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+const ASSIGNABLE_ROLES = ["manager", "viewer"] as const;
+
 export async function provisionPersonLoginAction(teamSlug: string, formData: FormData) {
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
@@ -18,6 +20,7 @@ export async function provisionPersonLoginAction(teamSlug: string, formData: For
   const personId = required(formData, "person_id");
   const email = required(formData, "email").toLowerCase();
   if (!email.includes("@")) throw new Error("כתובת האימייל אינה תקינה");
+  const role = assignableRole(formData);
   const admin = createAdminClient();
 
   const { data: person, error: personError } = await supabase
@@ -37,11 +40,44 @@ export async function provisionPersonLoginAction(teamSlug: string, formData: For
     .eq("team_id", membership.team.id);
   if (updatePersonError) throw new Error(`לא ניתן לקשר את המשתמש: ${updatePersonError.message}`);
 
-  await ensureViewerMembership(admin, membership.team.id, authUser.id);
+  await ensureTeamMembership(admin, membership.team.id, authUser.id, role);
 
   revalidatePath(`/${teamSlug}/users`);
   revalidatePath(`/${teamSlug}/team/${person.id}`);
   redirect(`/${teamSlug}/users?linked=1`);
+}
+
+export async function updateMembershipRoleAction(teamSlug: string, formData: FormData) {
+  const { supabase, userId } = await requireAuth();
+  const membership = await requireTeamAccess(supabase, userId, teamSlug);
+  if (membership.role !== "admin") redirect(`/${teamSlug}`);
+
+  const membershipId = required(formData, "membership_id");
+  const role = assignableRole(formData);
+  const isActive = formData.get("is_active") === "on";
+  const admin = createAdminClient();
+
+  const { data: target, error: targetError } = await admin
+    .from("team_memberships")
+    .select("id, role, user_id")
+    .eq("id", membershipId)
+    .eq("team_id", membership.team.id)
+    .maybeSingle();
+  if (targetError) throw new Error(`לא ניתן לטעון הרשאת משתמש: ${targetError.message}`);
+  if (!target) throw new Error("המשתמש אינו שייך לצוות הנוכחי");
+  if (target.role === "admin" || target.user_id === userId) {
+    throw new Error("אי אפשר לשנות הרשאת אדמין ממסך זה");
+  }
+
+  const { error } = await admin
+    .from("team_memberships")
+    .update({ is_active: isActive, role })
+    .eq("id", target.id)
+    .eq("team_id", membership.team.id);
+  if (error) throw new Error(`לא ניתן לשמור הרשאה: ${error.message}`);
+
+  revalidatePath(`/${teamSlug}/users`);
+  redirect(`/${teamSlug}/users?role=1`);
 }
 
 export async function updatePersonPhotoAction(teamSlug: string, formData: FormData) {
@@ -126,10 +162,11 @@ async function findAuthUserByEmail(
   return null;
 }
 
-async function ensureViewerMembership(
+async function ensureTeamMembership(
   admin: ReturnType<typeof createAdminClient>,
   teamId: string,
   userId: string,
+  requestedRole: "manager" | "viewer",
 ) {
   const { data: existing, error: existingError } = await admin
     .from("team_memberships")
@@ -140,7 +177,7 @@ async function ensureViewerMembership(
   if (existingError) throw new Error(`לא ניתן לבדוק הרשאת צוות: ${existingError.message}`);
 
   if (existing) {
-    const role = existing.role === "admin" || existing.role === "manager" ? existing.role : "viewer";
+    const role = existing.role === "admin" ? existing.role : requestedRole;
     const { error } = await admin
       .from("team_memberships")
       .update({ is_active: true, role })
@@ -151,7 +188,7 @@ async function ensureViewerMembership(
 
   const { error } = await admin
     .from("team_memberships")
-    .insert({ is_active: true, role: "viewer", team_id: teamId, user_id: userId });
+    .insert({ is_active: true, role: requestedRole, team_id: teamId, user_id: userId });
   if (error) throw new Error(`לא ניתן ליצור הרשאת צפייה: ${error.message}`);
 }
 
@@ -204,6 +241,15 @@ function required(data: FormData, key: string) {
   const value = data.get(key);
   if (typeof value !== "string" || !value.trim()) throw new Error("חסר שדה חובה");
   return value.trim();
+}
+
+function assignableRole(data: FormData) {
+  const role = data.get("role");
+  if (typeof role !== "string" || !ASSIGNABLE_ROLES.includes(role as (typeof ASSIGNABLE_ROLES)[number])) {
+    return "viewer";
+  }
+
+  return role as (typeof ASSIGNABLE_ROLES)[number];
 }
 
 function optionalUrl(value: FormDataEntryValue | null) {

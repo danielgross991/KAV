@@ -1,6 +1,7 @@
 import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 
+import { FormPendingOverlay } from "@/components/form-pending-overlay";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
@@ -33,15 +34,21 @@ const buttonVariants = cva(
 
 function Button({
   className,
+  loadingOverlay = true,
+  type,
   variant,
   size,
   ...props
-}: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants>) {
+}: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { loadingOverlay?: boolean }) {
   return (
-    <button
-      className={cn(buttonVariants({ variant, size, className }))}
-      {...props}
-    />
+    <>
+      {loadingOverlay && type !== "button" ? <FormPendingOverlay /> : null}
+      <button
+        className={cn(buttonVariants({ variant, size, className }))}
+        type={type}
+        {...props}
+      />
+    </>
   );
 }
 

@@ -90,3 +90,7 @@ export const requireTeamAccess = cache(async function requireTeamAccess(
 export function canManage(role: TeamRole) {
   return role === "admin" || role === "manager";
 }
+
+export function canManageReservePeriods(role: TeamRole) {
+  return role === "admin";
+}
