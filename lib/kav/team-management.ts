@@ -41,6 +41,7 @@ export type RotationOption = {
 
 export type TeamManagementData = {
   canManageTeam: boolean;
+  equipmentTypes: EquipmentType[];
   people: PersonListItem[];
   pakalTypes: PakalType[];
   rotations: RotationOption[];
@@ -160,6 +161,7 @@ export const getTeamManagementData = cache(async function getTeamManagementData(
 
   return {
     canManageTeam,
+    equipmentTypes,
     people: people.map((person) => ({
       email: person.email,
       equipment: equipmentByPersonId.get(person.id) ?? [],

@@ -4,14 +4,15 @@ import Link from "next/link";
 import { Mail, PackageCheck, Phone, Plus, Search, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { createPersonAction } from "@/app/[teamSlug]/team/actions";
+import { assignEquipmentAction, createPersonAction, quickUpdateEquipmentAction } from "@/app/[teamSlug]/team/actions";
 import { AppPage, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { TeamManagementData } from "@/lib/kav/team-management";
+import type { EquipmentType, PersonListEquipmentItem, TeamManagementData } from "@/lib/kav/team-management";
+import { cn } from "@/lib/utils";
 
 export function TeamManagementView({ data }: { data: TeamManagementData }) {
   const [query, setQuery] = useState("");
@@ -145,26 +146,23 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
                   {equipmentItemCount(filteredPeople)}
                 </span>
               </Button>
-              {showMobileEquipment ? <MobileEquipmentTable people={filteredPeople} /> : null}
+              {showMobileEquipment ? <MobileEquipmentTable data={data} people={filteredPeople} /> : null}
             </section>
           ) : null}
 
           <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
-            <table className="min-w-[1180px] w-full table-fixed text-right text-sm">
+            <table className="min-w-[1040px] w-full table-fixed text-right text-xs">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
                 <tr>
-                  <th className="sticky right-0 z-20 w-[15%] bg-muted/95 px-4 py-3 font-medium shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.7)]">לוחם</th>
-                  <th className="w-[7%] px-4 py-3 font-medium">סטטוס</th>
-                  <th className="w-[12%] px-4 py-3 font-medium">נשק</th>
-                  {data.canManageTeam ? <th className="w-[8%] px-4 py-3 font-medium">צ׳ נשק</th> : null}
-                  <th className="w-[10%] px-4 py-3 font-medium">כוונת</th>
-                  {data.canManageTeam ? <th className="w-[8%] px-4 py-3 font-medium">צ׳ כוונת</th> : null}
-                  <th className="w-[10%] px-4 py-3 font-medium">אמר״ל</th>
-                  {data.canManageTeam ? <th className="w-[8%] px-4 py-3 font-medium">צ׳ אמר״ל</th> : null}
-                  <th className="w-[12%] px-4 py-3 font-medium">פק״לים</th>
-                  <th className="w-[10%] px-4 py-3 font-medium">ציוד נוסף</th>
-                  <th className="w-[10%] px-4 py-3 font-medium">סבב</th>
-                  <th className="w-[8%] px-4 py-3 font-medium">קשר</th>
+                  <th className="sticky right-0 z-20 w-[9rem] bg-muted/95 px-2.5 py-2 font-medium shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.7)]">לוחם</th>
+                  <th className="w-[6rem] px-2.5 py-2 font-medium">סטטוס</th>
+                  <th className="w-[12rem] px-2.5 py-2 font-medium">נשק</th>
+                  <th className="w-[12rem] px-2.5 py-2 font-medium">כוונת</th>
+                  <th className="w-[12rem] px-2.5 py-2 font-medium">אמר״ל</th>
+                  <th className="w-[12rem] px-2.5 py-2 font-medium">פק״ל</th>
+                  <th className="w-[12rem] px-2.5 py-2 font-medium">ציוד נוסף</th>
+                  <th className="w-[8rem] px-2.5 py-2 font-medium">סבב</th>
+                  <th className="w-[5rem] px-2.5 py-2 font-medium">קשר</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -172,32 +170,38 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
                   const equipment = summarizeEquipment(person.equipment);
                   return (
                   <tr key={person.id} className="align-top hover:bg-muted/30">
-                    <td className="sticky right-0 z-10 bg-card px-4 py-3 shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.55)]">
+                    <td className="sticky right-0 z-10 bg-card px-2.5 py-2 shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.55)]">
                       <Link
-                        className="font-medium text-primary hover:underline"
+                        className="block truncate font-semibold text-primary hover:underline"
                         href={`/${data.team.slug}/team/${person.id}`}
                       >
                         {person.full_name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2.5 py-2">
                       <StatusBadge active={person.is_active} />
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">{equipment.weapon.models}</td>
-                    {data.canManageTeam ? <td className="px-4 py-3 kav-num text-muted-foreground">{equipment.weapon.serials}</td> : null}
-                    <td className="px-4 py-3 text-muted-foreground">{equipment.optic.models}</td>
-                    {data.canManageTeam ? <td className="px-4 py-3 kav-num text-muted-foreground">{equipment.optic.serials}</td> : null}
-                    <td className="px-4 py-3 text-muted-foreground">{equipment.amral.models}</td>
-                    {data.canManageTeam ? <td className="px-4 py-3 kav-num text-muted-foreground">{equipment.amral.serials}</td> : null}
-                    <td className="px-4 py-3">
-                      <PakalChips names={person.pakals.map((item) => item.name)} />
-                      {equipment.pakal.models !== "אין" ? <p className="mt-1 text-xs text-muted-foreground">{equipment.pakal.models}</p> : null}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{equipment.other.models}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    {data.canManageTeam ? (
+                      <>
+                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="WEAPON" data={data} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="OPTIC" data={data} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="AMRAL" data={data} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="PAKAL" data={data} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="OTHER" data={data} person={person} /></td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-2.5 py-2 text-muted-foreground">{equipment.weapon.models}</td>
+                        <td className="px-2.5 py-2 text-muted-foreground">{equipment.optic.models}</td>
+                        <td className="px-2.5 py-2 text-muted-foreground">{equipment.amral.models}</td>
+                        <td className="px-2.5 py-2 text-muted-foreground">{equipment.pakal.models}</td>
+                        <td className="px-2.5 py-2 text-muted-foreground">{equipment.other.models}</td>
+                      </>
+                    )}
+                    <td className="px-2.5 py-2 text-muted-foreground">
                       {person.rotation?.name ?? "אין"}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-2.5 py-2">
                       <ContactLinks email={person.email} phone={person.phone} />
                     </td>
                   </tr>
@@ -231,42 +235,108 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
   );
 }
 
-function MobileEquipmentTable({ people }: { people: TeamManagementData["people"] }) {
+function MobileEquipmentTable({ data, people }: { data: TeamManagementData; people: TeamManagementData["people"] }) {
   return (
     <div className="mt-3 overflow-x-auto rounded-lg border">
-      <table className="min-w-[860px] w-full table-fixed text-right text-xs">
+      <table className="min-w-[780px] w-full table-fixed text-right text-[0.72rem]">
         <thead className="bg-muted/60 text-muted-foreground">
           <tr>
-            <th className="sticky right-0 z-20 w-[14rem] bg-muted/95 px-3 py-2 font-medium shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.7)]">לוחם</th>
-            <th className="w-[10rem] px-3 py-2 font-medium">נשק</th>
-            <th className="w-[8rem] px-3 py-2 font-medium">צ׳ נשק</th>
-            <th className="w-[9rem] px-3 py-2 font-medium">כוונת</th>
-            <th className="w-[8rem] px-3 py-2 font-medium">צ׳ כוונת</th>
-            <th className="w-[9rem] px-3 py-2 font-medium">אמר״ל</th>
-            <th className="w-[8rem] px-3 py-2 font-medium">צ׳ אמר״ל</th>
-            <th className="w-[10rem] px-3 py-2 font-medium">פק״ל/נוסף</th>
+            <th className="sticky right-0 z-20 w-[7.5rem] bg-muted/95 px-2 py-2 font-medium shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.7)]">לוחם</th>
+            <th className="w-[10.5rem] px-2 py-2 font-medium">נשק</th>
+            <th className="w-[10.5rem] px-2 py-2 font-medium">כוונת</th>
+            <th className="w-[10.5rem] px-2 py-2 font-medium">אמר״ל</th>
+            <th className="w-[10.5rem] px-2 py-2 font-medium">פק״ל</th>
+            <th className="w-[10.5rem] px-2 py-2 font-medium">נוסף</th>
           </tr>
         </thead>
         <tbody className="divide-y bg-card">
-          {people.map((person) => {
-            const equipment = summarizeEquipment(person.equipment);
-            return (
-              <tr className="align-top" key={person.id}>
-                <td className="sticky right-0 z-10 bg-card px-3 py-2 font-semibold shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.55)]">{person.full_name}</td>
-                <td className="px-3 py-2 text-muted-foreground">{equipment.weapon.models}</td>
-                <td className="kav-num px-3 py-2 text-muted-foreground">{equipment.weapon.serials}</td>
-                <td className="px-3 py-2 text-muted-foreground">{equipment.optic.models}</td>
-                <td className="kav-num px-3 py-2 text-muted-foreground">{equipment.optic.serials}</td>
-                <td className="px-3 py-2 text-muted-foreground">{equipment.amral.models}</td>
-                <td className="kav-num px-3 py-2 text-muted-foreground">{equipment.amral.serials}</td>
-                <td className="px-3 py-2 text-muted-foreground">{equipment.pakal.models !== "אין" ? equipment.pakal.models : equipment.other.models}</td>
-              </tr>
-            );
-          })}
+          {people.map((person) => (
+            <tr className="align-top" key={person.id}>
+              <td className="sticky right-0 z-10 bg-card px-2 py-2 font-semibold shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.55)]">{person.full_name}</td>
+              <td className="px-2 py-2"><EquipmentCategoryEditor category="WEAPON" data={data} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryEditor category="OPTIC" data={data} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryEditor category="AMRAL" data={data} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryEditor category="PAKAL" data={data} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryEditor category="OTHER" data={data} person={person} /></td>
+            </tr>
+          ))}
         </tbody>
       </table>
     </div>
   );
+}
+
+function EquipmentCategoryEditor({
+  category,
+  data,
+  person,
+}: {
+  category: EquipmentType["category"];
+  data: TeamManagementData;
+  person: TeamManagementData["people"][number];
+}) {
+  const types = data.equipmentTypes.filter((type) => type.category === category && type.is_active);
+  const items = person.equipment.filter((item) => (item.equipmentType?.category ?? "OTHER") === category);
+  const assignEquipment = assignEquipmentAction.bind(null, data.team.slug, person.id);
+
+  return (
+    <div className="grid min-w-0 gap-1.5">
+      {items.length ? items.map((item) => (
+        <EquipmentQuickEditForm
+          item={item}
+          key={item.id}
+          personId={person.id}
+          teamSlug={data.team.slug}
+        />
+      )) : <span className="text-muted-foreground">אין</span>}
+      {types.length ? (
+        <form action={assignEquipment} className="grid gap-1 rounded-md border border-dashed bg-background/70 p-1.5">
+          <input name="return_to" type="hidden" value="team" />
+          <CompactSelect aria-label="סוג ציוד" name="equipment_type_id">
+            {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+          </CompactSelect>
+          <CompactInput name="model" placeholder="דגם" />
+          <CompactInput className="kav-num" name="serial_number" placeholder="צ׳" />
+          <input name="status" type="hidden" value="assigned" />
+          <Button className="h-7 px-2 text-[0.7rem]" size="sm" type="submit">הוסף</Button>
+        </form>
+      ) : null}
+    </div>
+  );
+}
+
+function EquipmentQuickEditForm({
+  item,
+  personId,
+  teamSlug,
+}: {
+  item: PersonListEquipmentItem;
+  personId: string;
+  teamSlug: string;
+}) {
+  const update = quickUpdateEquipmentAction.bind(null, teamSlug, personId, item.id);
+
+  return (
+    <form action={update} className="grid gap-1 rounded-md border bg-background/70 p-1.5">
+      <p className="truncate text-[0.68rem] font-semibold text-foreground">{item.equipmentType?.name ?? "ציוד"}</p>
+      <CompactInput defaultValue={item.model ?? ""} name="model" placeholder="דגם" />
+      <CompactInput className="kav-num" defaultValue={item.serial_number ?? ""} name="serial_number" placeholder="צ׳" />
+      <CompactSelect defaultValue={item.status} name="status" aria-label="סטטוס">
+        <option value="assigned">משויך</option>
+        <option value="damaged">פגום</option>
+        <option value="lost">אבד</option>
+      </CompactSelect>
+      <Button className="h-7 px-2 text-[0.7rem]" size="sm" type="submit" variant="secondary">שמור</Button>
+    </form>
+  );
+}
+
+function CompactInput({ className, ...props }: React.ComponentProps<"input">) {
+  return <input className={cn("h-7 min-w-0 rounded-md border bg-card px-1.5 text-[0.72rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/30", className)} {...props} />;
+}
+
+function CompactSelect(props: React.ComponentProps<"select">) {
+  return <select className="h-7 min-w-0 rounded-md border bg-card px-1 text-[0.72rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/30" {...props} />;
 }
 
 function Select({
@@ -325,23 +395,6 @@ function TextArea({ label, name }: { label: string; name: string }) {
         name={name}
         className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
-    </div>
-  );
-}
-
-function PakalChips({ names }: { names: string[] }) {
-  if (names.length === 0) {
-    return <span className="text-sm text-muted-foreground">אין פקלים</span>;
-  }
-
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {names.slice(0, 4).map((name) => (
-        <Badge key={name} variant="outline">
-          {name}
-        </Badge>
-      ))}
-      {names.length > 4 ? <Badge variant="muted">+{names.length - 4}</Badge> : null}
     </div>
   );
 }

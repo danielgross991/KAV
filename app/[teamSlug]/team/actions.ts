@@ -281,6 +281,9 @@ export async function assignEquipmentAction(
   }
 
   revalidateTeam(teamSlug, personId);
+  if (formData.get("return_to") === "team") {
+    redirect(`/${teamSlug}/team?saved=equipment-added`);
+  }
   redirect(`/${teamSlug}/team/${personId}?tab=equipment&saved=equipment-added`);
 }
 
@@ -313,6 +316,34 @@ export async function updateEquipmentAction(
 
   revalidateTeam(teamSlug, personId);
   redirect(`/${teamSlug}/team/${personId}?tab=equipment&saved=equipment-updated`);
+}
+
+export async function quickUpdateEquipmentAction(
+  teamSlug: string,
+  personId: string,
+  equipmentId: string,
+  formData: FormData,
+) {
+  const { membership, supabase } = await requireManager(teamSlug);
+  const status = equipmentStatus(formData);
+
+  const { error } = await supabase
+    .from("person_equipment")
+    .update({
+      model: optionalText(formData, "model"),
+      serial_number: optionalText(formData, "serial_number"),
+      status,
+    })
+    .eq("team_id", membership.team.id)
+    .eq("person_id", personId)
+    .eq("id", equipmentId);
+
+  if (error) {
+    throw new Error(`לא ניתן לעדכן ציוד: ${error.message}`);
+  }
+
+  revalidateTeam(teamSlug, personId);
+  redirect(`/${teamSlug}/team?saved=equipment-updated`);
 }
 
 export async function returnEquipmentAction(
