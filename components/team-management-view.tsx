@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Mail, PackageCheck, Phone, Plus, Search, UserRound } from "lucide-react";
+import { Mail, PackageCheck, Phone, Plus, Search, UserRound, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { assignEquipmentAction, createPersonAction, quickUpdateEquipmentAction } from "@/app/[teamSlug]/team/actions";
@@ -14,12 +14,24 @@ import { Label } from "@/components/ui/label";
 import type { EquipmentType, PersonListEquipmentItem, TeamManagementData } from "@/lib/kav/team-management";
 import { cn } from "@/lib/utils";
 
+const equipmentCategoryLabels: Record<EquipmentType["category"], string> = {
+  AMRAL: "אמר״ל",
+  OPTIC: "כוונת",
+  OTHER: "ציוד נוסף",
+  PAKAL: "פק״ל",
+  WEAPON: "נשק",
+};
+
 export function TeamManagementView({ data }: { data: TeamManagementData }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("active");
   const [pakal, setPakal] = useState("all");
   const [rotation, setRotation] = useState("all");
   const [showMobileEquipment, setShowMobileEquipment] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<{
+    category: EquipmentType["category"];
+    personId: string;
+  } | null>(null);
   const createPerson = createPersonAction.bind(null, data.team.slug);
 
   const filteredPeople = useMemo(() => {
@@ -43,6 +55,10 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
       return matchesQuery && matchesStatus && matchesPakal && matchesRotation;
     });
   }, [data.people, pakal, query, rotation, status]);
+
+  const editingPerson = editingEquipment
+    ? data.people.find((person) => person.id === editingEquipment.personId) ?? null
+    : null;
 
   return (
     <AppPage>
@@ -146,7 +162,12 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
                   {equipmentItemCount(filteredPeople)}
                 </span>
               </Button>
-              {showMobileEquipment ? <MobileEquipmentTable data={data} people={filteredPeople} /> : null}
+              {showMobileEquipment ? (
+                <MobileEquipmentTable
+                  people={filteredPeople}
+                  onEdit={(personId, category) => setEditingEquipment({ category, personId })}
+                />
+              ) : null}
             </section>
           ) : null}
 
@@ -183,11 +204,11 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
                     </td>
                     {data.canManageTeam ? (
                       <>
-                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="WEAPON" data={data} person={person} /></td>
-                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="OPTIC" data={data} person={person} /></td>
-                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="AMRAL" data={data} person={person} /></td>
-                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="PAKAL" data={data} person={person} /></td>
-                        <td className="px-2.5 py-2"><EquipmentCategoryEditor category="OTHER" data={data} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryCell category="WEAPON" onEdit={() => setEditingEquipment({ category: "WEAPON", personId: person.id })} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryCell category="OPTIC" onEdit={() => setEditingEquipment({ category: "OPTIC", personId: person.id })} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryCell category="AMRAL" onEdit={() => setEditingEquipment({ category: "AMRAL", personId: person.id })} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryCell category="PAKAL" onEdit={() => setEditingEquipment({ category: "PAKAL", personId: person.id })} person={person} /></td>
+                        <td className="px-2.5 py-2"><EquipmentCategoryCell category="OTHER" onEdit={() => setEditingEquipment({ category: "OTHER", personId: person.id })} person={person} /></td>
                       </>
                     ) : (
                       <>
@@ -231,11 +252,25 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
           </div>
         </>
       )}
+      {editingEquipment && editingPerson ? (
+        <EquipmentEditDialog
+          category={editingEquipment.category}
+          data={data}
+          person={editingPerson}
+          onClose={() => setEditingEquipment(null)}
+        />
+      ) : null}
     </AppPage>
   );
 }
 
-function MobileEquipmentTable({ data, people }: { data: TeamManagementData; people: TeamManagementData["people"] }) {
+function MobileEquipmentTable({
+  onEdit,
+  people,
+}: {
+  onEdit: (personId: string, category: EquipmentType["category"]) => void;
+  people: TeamManagementData["people"];
+}) {
   return (
     <div className="mt-3 overflow-x-auto rounded-lg border">
       <table className="min-w-[780px] w-full table-fixed text-right text-[0.72rem]">
@@ -253,11 +288,11 @@ function MobileEquipmentTable({ data, people }: { data: TeamManagementData; peop
           {people.map((person) => (
             <tr className="align-top" key={person.id}>
               <td className="sticky right-0 z-10 bg-card px-2 py-2 font-semibold shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.55)]">{person.full_name}</td>
-              <td className="px-2 py-2"><EquipmentCategoryEditor category="WEAPON" data={data} person={person} /></td>
-              <td className="px-2 py-2"><EquipmentCategoryEditor category="OPTIC" data={data} person={person} /></td>
-              <td className="px-2 py-2"><EquipmentCategoryEditor category="AMRAL" data={data} person={person} /></td>
-              <td className="px-2 py-2"><EquipmentCategoryEditor category="PAKAL" data={data} person={person} /></td>
-              <td className="px-2 py-2"><EquipmentCategoryEditor category="OTHER" data={data} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryCell category="WEAPON" onEdit={() => onEdit(person.id, "WEAPON")} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryCell category="OPTIC" onEdit={() => onEdit(person.id, "OPTIC")} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryCell category="AMRAL" onEdit={() => onEdit(person.id, "AMRAL")} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryCell category="PAKAL" onEdit={() => onEdit(person.id, "PAKAL")} person={person} /></td>
+              <td className="px-2 py-2"><EquipmentCategoryCell category="OTHER" onEdit={() => onEdit(person.id, "OTHER")} person={person} /></td>
             </tr>
           ))}
         </tbody>
@@ -266,13 +301,78 @@ function MobileEquipmentTable({ data, people }: { data: TeamManagementData; peop
   );
 }
 
-function EquipmentCategoryEditor({
+function EquipmentCategoryCell({
+  category,
+  onEdit,
+  person,
+}: {
+  category: EquipmentType["category"];
+  onEdit: () => void;
+  person: TeamManagementData["people"][number];
+}) {
+  const items = person.equipment.filter((item) => (item.equipmentType?.category ?? "OTHER") === category);
+
+  return (
+    <button
+      aria-label={`עריכת ציוד ${equipmentCategoryLabels[category]} - ${person.full_name}`}
+      className="group grid min-h-14 w-full min-w-0 content-start gap-1 rounded-md border border-transparent bg-background/60 px-2 py-1.5 text-right transition-colors hover:border-primary/25 hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+      type="button"
+      onClick={onEdit}
+    >
+      {items.length ? (
+        <>
+          {items.slice(0, 2).map((item) => <EquipmentDisplayLine item={item} key={item.id} />)}
+          {items.length > 2 ? (
+            <span className="text-[0.66rem] font-medium text-primary">+{items.length - 2} נוספים</span>
+          ) : null}
+        </>
+      ) : (
+        <>
+          <span className="text-muted-foreground">אין</span>
+          <span className="text-[0.66rem] font-medium text-primary">לחץ להוספה</span>
+        </>
+      )}
+      {items.length ? (
+        <span className="text-[0.66rem] font-medium text-primary opacity-100 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-visible:opacity-100">
+          לחץ לעריכה
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function EquipmentDisplayLine({ item }: { item: PersonListEquipmentItem }) {
+  const details = [item.model, item.serial_number ? `צ׳ ${item.serial_number}` : null].filter(Boolean).join(" · ");
+
+  return (
+    <span className="grid min-w-0 gap-0.5 rounded bg-muted/45 px-1.5 py-1">
+      <span className="truncate font-semibold text-foreground">{item.equipmentType?.name ?? "ציוד"}</span>
+      <span className="truncate text-muted-foreground">{details || equipmentStatusLabel(item.status)}</span>
+    </span>
+  );
+}
+
+function equipmentStatusLabel(status: PersonListEquipmentItem["status"]) {
+  if (status === "damaged") {
+    return "פגום";
+  }
+
+  if (status === "lost") {
+    return "אבד";
+  }
+
+  return "משויך";
+}
+
+function EquipmentEditDialog({
   category,
   data,
+  onClose,
   person,
 }: {
   category: EquipmentType["category"];
   data: TeamManagementData;
+  onClose: () => void;
   person: TeamManagementData["people"][number];
 }) {
   const types = data.equipmentTypes.filter((type) => type.category === category && type.is_active);
@@ -280,28 +380,62 @@ function EquipmentCategoryEditor({
   const assignEquipment = assignEquipmentAction.bind(null, data.team.slug, person.id);
 
   return (
-    <div className="grid min-w-0 gap-1.5">
-      {items.length ? items.map((item) => (
-        <EquipmentQuickEditForm
-          item={item}
-          key={item.id}
-          personId={person.id}
-          teamSlug={data.team.slug}
-        />
-      )) : <span className="text-muted-foreground">אין</span>}
-      {types.length ? (
-        <form action={assignEquipment} className="grid gap-1 rounded-md border border-dashed bg-background/70 p-1.5">
-          <input name="return_to" type="hidden" value="team" />
-          <CompactSelect aria-label="סוג ציוד" name="equipment_type_id">
-            {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
-          </CompactSelect>
-          <CompactInput name="model" placeholder="דגם" />
-          <CompactInput className="kav-num" name="serial_number" placeholder="צ׳" />
-          <input name="status" type="hidden" value="assigned" />
-          <Button className="h-7 px-2 text-[0.7rem]" size="sm" type="submit">הוסף</Button>
-        </form>
-      ) : null}
-    </div>
+    <>
+      <button
+        aria-label="סגירת עריכת ציוד"
+        className="fixed inset-0 z-40 bg-background/35 backdrop-blur-[2px]"
+        type="button"
+        onClick={onClose}
+      />
+      <section
+        aria-modal="true"
+        className="fixed inset-x-3 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-50 max-h-[82vh] overflow-auto rounded-xl border bg-card p-4 text-right shadow-2xl sm:inset-auto sm:left-1/2 sm:top-1/2 sm:w-[34rem] sm:-translate-x-1/2 sm:-translate-y-1/2"
+        role="dialog"
+      >
+        <header className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">{person.full_name}</p>
+            <h3 className="text-lg font-semibold">{equipmentCategoryLabels[category]}</h3>
+          </div>
+          <Button aria-label="סגירה" size="icon" type="button" variant="outline" onClick={onClose}>
+            <X className="size-4" />
+          </Button>
+        </header>
+
+        <div className="grid gap-2">
+          {items.length ? (
+            items.map((item) => (
+              <EquipmentQuickEditForm
+                item={item}
+                key={item.id}
+                personId={person.id}
+                teamSlug={data.team.slug}
+              />
+            ))
+          ) : (
+            <p className="rounded-lg border border-dashed bg-muted/30 p-3 text-sm text-muted-foreground">
+              אין עדיין ציוד בקטגוריה הזו.
+            </p>
+          )}
+        </div>
+
+        {types.length ? (
+          <form action={assignEquipment} className="mt-4 grid gap-2 rounded-lg border border-dashed bg-background/70 p-3">
+            <input name="return_to" type="hidden" value="team" />
+            <p className="text-sm font-semibold">הוספת {equipmentCategoryLabels[category]}</p>
+            <CompactSelect aria-label="סוג ציוד" name="equipment_type_id">
+              {types.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+            </CompactSelect>
+            <div className="grid grid-cols-2 gap-2">
+              <CompactInput name="model" placeholder="דגם" />
+              <CompactInput className="kav-num" name="serial_number" placeholder="צ׳" />
+            </div>
+            <input name="status" type="hidden" value="assigned" />
+            <Button className="h-9 px-3 text-sm" size="sm" type="submit">הוסף</Button>
+          </form>
+        ) : null}
+      </section>
+    </>
   );
 }
 
@@ -317,26 +451,31 @@ function EquipmentQuickEditForm({
   const update = quickUpdateEquipmentAction.bind(null, teamSlug, personId, item.id);
 
   return (
-    <form action={update} className="grid gap-1 rounded-md border bg-background/70 p-1.5">
-      <p className="truncate text-[0.68rem] font-semibold text-foreground">{item.equipmentType?.name ?? "ציוד"}</p>
-      <CompactInput defaultValue={item.model ?? ""} name="model" placeholder="דגם" />
-      <CompactInput className="kav-num" defaultValue={item.serial_number ?? ""} name="serial_number" placeholder="צ׳" />
+    <form action={update} className="grid gap-2 rounded-lg border bg-background/70 p-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="truncate text-sm font-semibold text-foreground">{item.equipmentType?.name ?? "ציוד"}</p>
+        <span className="shrink-0 rounded bg-muted px-2 py-1 text-[0.68rem] text-muted-foreground">{equipmentStatusLabel(item.status)}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <CompactInput defaultValue={item.model ?? ""} name="model" placeholder="דגם" />
+        <CompactInput className="kav-num" defaultValue={item.serial_number ?? ""} name="serial_number" placeholder="צ׳" />
+      </div>
       <CompactSelect defaultValue={item.status} name="status" aria-label="סטטוס">
         <option value="assigned">משויך</option>
         <option value="damaged">פגום</option>
         <option value="lost">אבד</option>
       </CompactSelect>
-      <Button className="h-7 px-2 text-[0.7rem]" size="sm" type="submit" variant="secondary">שמור</Button>
+      <Button className="h-9 px-3 text-sm" size="sm" type="submit" variant="secondary">שמור</Button>
     </form>
   );
 }
 
 function CompactInput({ className, ...props }: React.ComponentProps<"input">) {
-  return <input className={cn("h-7 min-w-0 rounded-md border bg-card px-1.5 text-[0.72rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/30", className)} {...props} />;
+  return <input className={cn("h-9 min-w-0 rounded-md border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30", className)} {...props} />;
 }
 
 function CompactSelect(props: React.ComponentProps<"select">) {
-  return <select className="h-7 min-w-0 rounded-md border bg-card px-1 text-[0.72rem] outline-none focus-visible:ring-2 focus-visible:ring-ring/30" {...props} />;
+  return <select className="h-9 min-w-0 rounded-md border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" {...props} />;
 }
 
 function Select({
