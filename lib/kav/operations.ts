@@ -15,7 +15,8 @@ import type { TeamSummary } from "@/lib/kav/teams";
 type Client = SupabaseClient<Database>;
 type Row<Name extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][Name]["Row"];
 
-export type OperationalPerson = Pick<Row<"people">, "full_name" | "id" | "is_active"> & {
+export type OperationalPerson = Pick<Row<"people">, "full_name" | "id" | "is_active" | "phone"> & {
+  personal_number: string | null;
   resolution: ReturnType<typeof resolveOperationalPerson>;
 };
 
@@ -218,6 +219,7 @@ export const getOperationalDay = cache(async function getOperationalDay(
   team: TeamSummary,
   date = getDateInTimeZone(team.timezone),
   explicitPeriodId?: string,
+  includeContactDetails = false,
 ): Promise<OperationalDay> {
   const [{ data: periods, error: periodsError }, { data: people, error: peopleError }] = await Promise.all([
     supabase.from("reserve_periods").select("*").eq("team_id", team.id),
@@ -231,17 +233,23 @@ export const getOperationalDay = cache(async function getOperationalDay(
     : selectOperationalReservePeriod(periods ?? [], date);
   if (!period) return emptyDay(date);
 
-  const [groupsResult, blocksResult, overridesResult, leaves, attendanceByDate, attendanceDayStatus] = await Promise.all([
+  const [groupsResult, blocksResult, overridesResult, contactDetailsResult, privateDetailsResult, leaves, attendanceByDate, attendanceDayStatus] = await Promise.all([
     supabase.from("rotation_groups").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id),
     supabase.from("rotation_blocks").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
       .lte("starts_on", date).gte("ends_on", date),
     supabase.from("rotation_overrides").select("*").eq("team_id", team.id).eq("reserve_period_id", period.id)
       .lte("starts_on", date).gte("ends_on", date),
+    includeContactDetails
+      ? supabase.from("people").select("id, phone").eq("team_id", team.id).eq("is_active", true)
+      : Promise.resolve({ data: [], error: null }),
+    includeContactDetails
+      ? supabase.from("person_private_details").select("person_id, personal_number").eq("team_id", team.id)
+      : Promise.resolve({ data: [], error: null }),
     getApprovedLeaveWindows(supabase, team.id, period.id, date, date),
     getAttendanceEntriesByDate(supabase, team.id, period.id, date, date),
     getAttendanceDayStatus(supabase, team.id, period.id, date),
   ]);
-  [groupsResult, blocksResult, overridesResult].forEach((result) => assertOk(result.error, "operational day"));
+  [groupsResult, blocksResult, overridesResult, contactDetailsResult, privateDetailsResult].forEach((result) => assertOk(result.error, "operational day"));
 
   const groupIds = (groupsResult.data ?? []).map((group) => group.id);
   const membersResult = groupIds.length
@@ -263,8 +271,12 @@ export const getOperationalDay = cache(async function getOperationalDay(
     toGroupId: item.to_rotation_group_id, startsOn: item.starts_on, endsOn: item.ends_on,
   }] : []);
   const attendanceEntries = attendanceByDate.get(date) ?? [];
+  const contactDetailsByPersonId = new Map((contactDetailsResult.data ?? []).map((item) => [item.id, item]));
+  const privateDetailsByPersonId = new Map((privateDetailsResult.data ?? []).map((item) => [item.person_id, item]));
   const resolvedPeople = (people ?? []).map((person) => ({
     ...person,
+    phone: contactDetailsByPersonId.get(person.id)?.phone ?? null,
+    personal_number: privateDetailsByPersonId.get(person.id)?.personal_number ?? null,
     resolution: resolveOperationalPerson({
       personId: person.id, date, memberships, blocks, overrides, leaves, attendanceEntries,
     }),
