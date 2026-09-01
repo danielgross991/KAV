@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   advanceReservePeriodStatusAction, assignRotationMemberAction, createReservePeriodAction, deletePhaseAction,
@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
 
 const phaseLabels: Record<string, string> = { preparation: "הכנה", line: "קו", stand_down: "ירידה / התארגנות", processing: "זיכויים", other: "אחר" };
 const eventLabels: Record<string, string> = { briefing: "תדריך", training: "אימון", family: "משפחות", processing: "זיכויים", changeover: "החלפה", holiday: "חג / מועד", other: "אחר" };
+const scheduleLoadingHandoffMs = 48;
+const scheduleMinimumLoadingMs = 420;
 
 export function ScheduleView({ data, initialManage, month, view }: { data: ScheduleData; initialManage: boolean; month?: string; view: string }) {
   const router = useRouter();
@@ -32,15 +34,49 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
   const [activeMonth, setActiveMonth] = useState(initialMonth);
   const [activeView, setActiveView] = useState(view);
   const [localPending, setLocalPending] = useState(false);
+  const handoffTimer = useRef<number | null>(null);
+  const finishTimer = useRef<number | null>(null);
   const showingPending = localPending;
 
   function switchSchedule(nextView: string, nextMonth = activeMonth) {
+    if (nextView === activeView && nextMonth === activeMonth) {
+      return;
+    }
+
+    if (handoffTimer.current) {
+      window.clearTimeout(handoffTimer.current);
+    }
+
+    if (finishTimer.current) {
+      window.clearTimeout(finishTimer.current);
+    }
+
     setLocalPending(true);
-    setActiveView(nextView);
-    setActiveMonth(nextMonth);
     window.history.pushState(null, "", href(data, nextView, nextMonth));
-    window.setTimeout(() => setLocalPending(false), 320);
+
+    handoffTimer.current = window.setTimeout(() => {
+      setActiveView(nextView);
+      setActiveMonth(nextMonth);
+      handoffTimer.current = null;
+
+      finishTimer.current = window.setTimeout(() => {
+        setLocalPending(false);
+        finishTimer.current = null;
+      }, scheduleMinimumLoadingMs);
+    }, scheduleLoadingHandoffMs);
   }
+
+  useEffect(() => {
+    return () => {
+      if (handoffTimer.current) {
+        window.clearTimeout(handoffTimer.current);
+      }
+
+      if (finishTimer.current) {
+        window.clearTimeout(finishTimer.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!period) return;
