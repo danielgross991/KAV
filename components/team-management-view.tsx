@@ -4,7 +4,14 @@ import Link from "next/link";
 import { Mail, PackageCheck, Phone, Plus, Search, UserRound, X } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { assignEquipmentAction, createPersonAction, quickUpdateEquipmentAction } from "@/app/[teamSlug]/team/actions";
+import {
+  assignEquipmentAction,
+  createPersonAction,
+  createTeamEquipmentAction,
+  quickUpdateEquipmentAction,
+  transferTeamEquipmentAction,
+  updateTeamEquipmentAction,
+} from "@/app/[teamSlug]/team/actions";
 import { AppPage, PageHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -171,6 +178,8 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
             </section>
           ) : null}
 
+          {data.canManageTeam ? <SharedTeamEquipmentPanel data={data} /> : null}
+
           <div className="hidden overflow-x-auto rounded-lg border bg-card md:block">
             <table className="min-w-[1040px] w-full table-fixed text-right text-xs">
               <thead className="bg-muted/60 text-xs text-muted-foreground">
@@ -261,6 +270,160 @@ export function TeamManagementView({ data }: { data: TeamManagementData }) {
         />
       ) : null}
     </AppPage>
+  );
+}
+
+function SharedTeamEquipmentPanel({ data }: { data: TeamManagementData }) {
+  const create = createTeamEquipmentAction.bind(null, data.team.slug);
+
+  return (
+    <section className="mb-4 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-base font-semibold">ציוד צוותי</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">פריטים ששייכים לצוות ועוברים באחריות בין אנשים.</p>
+        </div>
+        <Badge variant="outline">{data.teamEquipment.length} פריטים</Badge>
+      </div>
+
+      {data.teamEquipment.length ? (
+        <div className="grid gap-2">
+          {data.teamEquipment.map((item) => (
+            <SharedTeamEquipmentItem data={data} item={item} key={item.id} />
+          ))}
+        </div>
+      ) : (
+        <div className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">עוד אין ציוד צוותי.</div>
+      )}
+
+      <details className="mt-3 rounded-lg border border-dashed p-3">
+        <summary className="cursor-pointer text-sm font-semibold">הוספת ציוד צוותי</summary>
+        <form action={create} className="mt-3 grid gap-3 md:grid-cols-4">
+          <Field label="שם ציוד" name="name" required />
+          <TeamEquipmentCategorySelect defaultValue="OTHER" />
+          <Field label="דגם" name="model" />
+          <Field label="מספר סידורי" name="serial_number" />
+          <PersonSelect label="חתום קבוע" name="permanent_owner_person_id" people={data.people} />
+          <PersonSelect label="אחראי נוכחי" name="current_holder_person_id" people={data.people} />
+          <TeamEquipmentStatusSelect defaultValue="in_use" />
+          <Field label="הערת פתיחה" name="transfer_note" />
+          <div className="md:col-span-4">
+            <TextArea label="הערות" name="notes" />
+          </div>
+          <Button className="md:col-span-4" type="submit">הוספת ציוד צוותי</Button>
+        </form>
+      </details>
+    </section>
+  );
+}
+
+function SharedTeamEquipmentItem({
+  data,
+  item,
+}: {
+  data: TeamManagementData;
+  item: TeamManagementData["teamEquipment"][number];
+}) {
+  const transfer = transferTeamEquipmentAction.bind(null, data.team.slug, item.id);
+  const update = updateTeamEquipmentAction.bind(null, data.team.slug, item.id);
+
+  return (
+    <details className="rounded-lg border p-3">
+      <summary className="grid cursor-pointer list-none gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+        <div>
+          <b className="text-sm">{item.name}</b>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {equipmentCategoryLabels[item.category]} · {item.serial_number ?? item.model ?? "ללא מספר/דגם"}
+          </p>
+        </div>
+        <Badge variant={teamEquipmentBadgeVariant(item.status)}>{teamEquipmentStatusLabel(item.status)}</Badge>
+        <span className="text-xs text-muted-foreground">
+          אצל: <b className="text-foreground">{item.currentHolder?.full_name ?? "לא משויך"}</b>
+        </span>
+      </summary>
+      <div className="mt-3 grid gap-3 border-t pt-3 lg:grid-cols-[1fr_1fr]">
+        <form action={transfer} className="grid gap-2 rounded-lg bg-muted/30 p-3">
+          <p className="text-sm font-semibold">העברת אחריות מהירה</p>
+          <PersonSelect defaultValue={item.current_holder_person_id ?? ""} label="אחראי חדש" name="to_person_id" people={data.people} />
+          <Field label="הערת העברה" name="transfer_note" />
+          <Button type="submit" variant="secondary">העבר אחריות</Button>
+        </form>
+        <form action={update} className="grid gap-2 rounded-lg bg-muted/30 p-3">
+          <p className="text-sm font-semibold">עריכת פריט</p>
+          <Field defaultValue={item.name} label="שם ציוד" name="name" required />
+          <TeamEquipmentCategorySelect defaultValue={item.category} />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Field defaultValue={item.model ?? ""} label="דגם" name="model" />
+            <Field defaultValue={item.serial_number ?? ""} label="מספר סידורי" name="serial_number" />
+          </div>
+          <PersonSelect defaultValue={item.permanent_owner_person_id ?? ""} label="חתום קבוע" name="permanent_owner_person_id" people={data.people} />
+          <PersonSelect defaultValue={item.current_holder_person_id ?? ""} label="אחראי נוכחי" name="current_holder_person_id" people={data.people} />
+          <TeamEquipmentStatusSelect defaultValue={item.status} />
+          <TextArea defaultValue={item.notes ?? ""} label="הערות" name="notes" />
+          <Button type="submit">שמירה</Button>
+        </form>
+      </div>
+    </details>
+  );
+}
+
+function PersonSelect({
+  defaultValue = "",
+  label,
+  name,
+  people,
+}: {
+  defaultValue?: string;
+  label: string;
+  name: string;
+  people: TeamManagementData["people"];
+}) {
+  return (
+    <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+      {label}
+      <select
+        className="h-11 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        defaultValue={defaultValue}
+        name={name}
+      >
+        <option value="">ללא</option>
+        {people.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function TeamEquipmentStatusSelect({ defaultValue }: { defaultValue: TeamManagementData["teamEquipment"][number]["status"] }) {
+  return (
+    <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+      סטטוס
+      <select
+        className="h-11 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        defaultValue={defaultValue}
+        name="status"
+      >
+        <option value="available">זמין בצוות</option>
+        <option value="in_use">באחריות</option>
+        <option value="damaged">תקול</option>
+        <option value="lost">אבד</option>
+        <option value="retired">יצא משימוש</option>
+      </select>
+    </label>
+  );
+}
+
+function TeamEquipmentCategorySelect({ defaultValue }: { defaultValue: EquipmentType["category"] }) {
+  return (
+    <label className="grid gap-1 text-xs font-medium text-muted-foreground">
+      קטגוריה
+      <select
+        className="h-11 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        defaultValue={defaultValue}
+        name="category"
+      >
+        {Object.entries(equipmentCategoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+      </select>
+    </label>
   );
 }
 
@@ -507,11 +670,13 @@ function Select({
 }
 
 function Field({
+  defaultValue,
   label,
   name,
   required,
   type = "text",
 }: {
+  defaultValue?: string;
   label: string;
   name: string;
   required?: boolean;
@@ -520,18 +685,19 @@ function Field({
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} required={required} type={type} />
+      <Input defaultValue={defaultValue} id={name} name={name} required={required} type={type} />
     </div>
   );
 }
 
-function TextArea({ label, name }: { label: string; name: string }) {
+function TextArea({ defaultValue, label, name }: { defaultValue?: string; label: string; name: string }) {
   return (
     <div className="grid gap-1.5">
       <Label htmlFor={name}>{label}</Label>
       <textarea
         id={name}
         name={name}
+        defaultValue={defaultValue}
         className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
     </div>
@@ -621,4 +787,24 @@ function equipmentItemCount(people: TeamManagementData["people"]) {
 
 function initials(name: string) {
   return name.split(" ").filter(Boolean).slice(0, 2).map((part) => part[0]).join("");
+}
+
+function teamEquipmentBadgeVariant(status: TeamManagementData["teamEquipment"][number]["status"]) {
+  if (status === "in_use") return "success";
+  if (status === "available") return "info";
+  if (status === "damaged") return "warning";
+  if (status === "lost") return "danger";
+  return "muted";
+}
+
+function teamEquipmentStatusLabel(status: TeamManagementData["teamEquipment"][number]["status"]) {
+  const labels: Record<TeamManagementData["teamEquipment"][number]["status"], string> = {
+    available: "זמין בצוות",
+    damaged: "תקול",
+    in_use: "באחריות",
+    lost: "אבד",
+    retired: "יצא משימוש",
+  };
+
+  return labels[status];
 }

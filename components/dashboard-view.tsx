@@ -7,6 +7,7 @@ import {
   ClipboardList,
   Clock3,
   Home,
+  PackageCheck,
   UserCheck,
   UserRound,
   Users,
@@ -66,6 +67,7 @@ function ManagerDashboard({
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
       <WelcomeCard data={data} />
+      <PersonalEquipmentCard data={data} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
 
       <section className="mt-4 overflow-hidden rounded-lg bg-primary !text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
@@ -201,6 +203,7 @@ function ViewerDashboard({
 
       <div className="mt-4 space-y-4">
         <NextTask data={data} personal />
+        <PersonalEquipmentCard data={data} />
         <PersonalStats data={data} />
         <UpcomingEvent data={data} />
         <CurrentPeriod data={data} compact />
@@ -259,6 +262,51 @@ function PersonalStats({ data }: { data: DashboardData }) {
         <MiniMetric label="נוכחות" value={stats.attendancePercentage === null ? "אין" : `${Math.round(stats.attendancePercentage * 100)}%`} />
       </CardContent>
     </Card>
+  );
+}
+
+function PersonalEquipmentCard({ data }: { data: DashboardData }) {
+  const total = data.personalEquipment.personal.length + data.personalEquipment.team.length;
+  if (!data.viewerProfile || total === 0) return null;
+
+  return (
+    <Card className="mb-4">
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 pb-3">
+        <div>
+          <CardTitle>הציוד שלי</CardTitle>
+          <p className="mt-0.5 text-xs text-muted-foreground">אישי וצוותי שבאחריותך</p>
+        </div>
+        <Badge variant="outline">{total}</Badge>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        {data.personalEquipment.personal.slice(0, 3).map((item) => (
+          <PersonalEquipmentLine key={`personal-${item.id}`} name={item.name} meta={[item.model, item.serialNumber].filter(Boolean).join(" · ") || "ציוד אישי"} />
+        ))}
+        {data.personalEquipment.team.slice(0, 3).map((item) => (
+          <PersonalEquipmentLine
+            key={`team-${item.id}`}
+            name={item.name}
+            meta={item.holderRole === "both" ? "ציוד צוותי · חתום ואחראי" : item.holderRole === "current" ? "ציוד צוותי · אחראי נוכחי" : "ציוד צוותי · חתום קבוע"}
+          />
+        ))}
+        {total > 6 ? <p className="text-xs text-muted-foreground">ועוד {total - 6} פריטים</p> : null}
+        <Link className="mt-1 flex h-9 items-center justify-center rounded-md border text-sm font-medium transition-colors hover:bg-muted" href={`/${data.team.slug}/equipment`}>
+          פתיחת הציוד שלי
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
+function PersonalEquipmentLine({ meta, name }: { meta: string; name: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-muted/35 px-2.5 py-2">
+      <PackageCheck className="size-4 shrink-0 text-primary" />
+      <span className="min-w-0 flex-1">
+        <b className="block truncate text-sm">{name}</b>
+        <span className="block truncate text-xs text-muted-foreground">{meta}</span>
+      </span>
+    </div>
   );
 }
 

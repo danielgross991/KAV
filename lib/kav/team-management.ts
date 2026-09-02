@@ -27,6 +27,11 @@ export type PersonListEquipmentItem = Pick<
   equipmentType: Pick<TableRow<"equipment_types">, "category" | "name"> | null;
 };
 
+export type TeamEquipmentItem = TableRow<"team_equipment_items"> & {
+  currentHolder: Pick<TableRow<"people">, "full_name" | "id"> | null;
+  permanentOwner: Pick<TableRow<"people">, "full_name" | "id"> | null;
+};
+
 export type PakalType = TableRow<"pakal_types"> & {
   assignedCount: number;
   requiredCount: number;
@@ -45,6 +50,7 @@ export type TeamManagementData = {
   people: PersonListItem[];
   pakalTypes: PakalType[];
   rotations: RotationOption[];
+  teamEquipment: TeamEquipmentItem[];
   team: TeamMembership["team"];
 };
 
@@ -57,6 +63,7 @@ export type PersonProfileData = {
   privateDetails: TableRow<"person_private_details"> | null;
   reserveHistory: ReserveHistoryItem[];
   selectedPakals: PersonPakalItem[];
+  teamEquipment: TeamEquipmentItem[];
   team: TeamMembership["team"];
 };
 
@@ -83,7 +90,7 @@ export const getTeamManagementData = cache(async function getTeamManagementData(
   membership: TeamMembership,
 ): Promise<TeamManagementData> {
   const canManageTeam = canManage(membership.role);
-  const [people, pakalTypes, personPakals, requirements, currentRotationContext, equipmentTypes, equipment] =
+  const [people, pakalTypes, personPakals, requirements, currentRotationContext, equipmentTypes, equipment, teamEquipment] =
     await Promise.all([
       selectOrThrow(
         supabase
@@ -137,6 +144,17 @@ export const getTeamManagementData = cache(async function getTeamManagementData(
             "לא ניתן לטעון ציוד צוות",
           )
         : Promise.resolve([]),
+      canManageTeam
+        ? selectOrThrow(
+            supabase
+              .from("team_equipment_items")
+              .select("*")
+              .eq("team_id", membership.team.id)
+              .neq("status", "retired")
+              .order("name", { ascending: true }),
+            "לא ניתן לטעון ציוד צוותי",
+          )
+        : Promise.resolve([]),
     ]);
 
   const pakalsById = new Map(pakalTypes.map((pakal) => [pakal.id, pakal]));
@@ -184,6 +202,7 @@ export const getTeamManagementData = cache(async function getTeamManagementData(
       requiredCount: requirementsByPakalId.get(pakal.id) ?? 0,
     })),
     rotations: currentRotationContext.rotationOptions,
+    teamEquipment: withEquipmentPeople(teamEquipment, people),
     team: membership.team,
   };
 });
@@ -216,7 +235,7 @@ export const getPersonProfileData = cache(async function getPersonProfileData(
     notFound();
   }
 
-  const [pakalTypes, personPakals, requirements, equipmentTypes, equipment, reservePeriods] =
+  const [pakalTypes, personPakals, requirements, equipmentTypes, equipment, reservePeriods, teamEquipment] =
     await Promise.all([
       selectOrThrow(
         supabase
@@ -268,6 +287,15 @@ export const getPersonProfileData = cache(async function getPersonProfileData(
           .eq("team_id", membership.team.id)
           .order("starts_on", { ascending: false }),
         "לא ניתן לטעון היסטוריית מילואים",
+      ),
+      selectOrThrow(
+        supabase
+          .from("team_equipment_items")
+          .select("*")
+          .eq("team_id", membership.team.id)
+          .neq("status", "retired")
+          .order("name", { ascending: true }),
+        "לא ניתן לטעון ציוד צוותי",
       ),
     ]);
 
@@ -360,9 +388,25 @@ export const getPersonProfileData = cache(async function getPersonProfileData(
       ...pakal,
       pakal: pakalById.get(pakal.pakal_type_id) ?? null,
     })),
+    teamEquipment: withEquipmentPeople(teamEquipment, [person]).filter(
+      (item) => item.current_holder_person_id === person.id || item.permanent_owner_person_id === person.id,
+    ),
     team: membership.team,
   };
 });
+
+function withEquipmentPeople(
+  equipment: TableRow<"team_equipment_items">[],
+  people: Array<Pick<TableRow<"people">, "full_name" | "id">>,
+): TeamEquipmentItem[] {
+  const peopleById = new Map(people.map((person) => [person.id, person]));
+
+  return equipment.map((item) => ({
+    ...item,
+    currentHolder: item.current_holder_person_id ? peopleById.get(item.current_holder_person_id) ?? null : null,
+    permanentOwner: item.permanent_owner_person_id ? peopleById.get(item.permanent_owner_person_id) ?? null : null,
+  }));
+}
 
 async function selectMaybePrivateDetails(
   supabase: Client,

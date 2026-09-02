@@ -247,7 +247,7 @@ function EquipmentTab({ data }: { data: PersonProfileData }) {
     <section className="grid gap-4 xl:grid-cols-[1fr_24rem]">
       <Card>
         <CardHeader>
-          <CardTitle>ציוד משויך</CardTitle>
+          <CardTitle>ציוד אישי</CardTitle>
         </CardHeader>
         <CardContent>
           {data.equipment.length === 0 ? (
@@ -279,6 +279,39 @@ function EquipmentTab({ data }: { data: PersonProfileData }) {
                 );
               })}
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>ציוד צוותי</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {data.teamEquipment.length ? (
+            <div className="grid gap-3">
+              {data.teamEquipment.map((item) => (
+                <div className="rounded-lg border p-4" key={item.id}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{item.name}</div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {equipmentCategoryLabels[item.category]} · {[item.model, item.serial_number].filter(Boolean).join(" · ") || "ללא דגם/מספר סידורי"}
+                      </p>
+                    </div>
+                    <Badge variant={item.status === "in_use" ? "success" : item.status === "damaged" ? "warning" : item.status === "lost" ? "danger" : "outline"}>
+                      {teamEquipmentStatusLabel(item.status)}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+                    {item.current_holder_person_id === data.person.id ? <Badge variant="success">אחראי נוכחי</Badge> : null}
+                    {item.permanent_owner_person_id === data.person.id ? <Badge variant="outline">חתום קבוע</Badge> : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState title="אין ציוד צוותי" description="לא נמצא ציוד צוותי שהאדם חתום עליו או אחראי עליו כרגע." />
           )}
         </CardContent>
       </Card>
@@ -590,6 +623,18 @@ function equipmentStatusLabel(status: PersonEquipmentItem["status"]) {
     damaged: "פגום",
     lost: "אבד",
     returned: "הוחזר",
+  };
+
+  return labels[status];
+}
+
+function teamEquipmentStatusLabel(status: PersonProfileData["teamEquipment"][number]["status"]) {
+  const labels: Record<PersonProfileData["teamEquipment"][number]["status"], string> = {
+    available: "זמין בצוות",
+    damaged: "תקול",
+    in_use: "באחריות",
+    lost: "אבד",
+    retired: "יצא משימוש",
   };
 
   return labels[status];

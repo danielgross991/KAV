@@ -47,6 +47,25 @@ export type DashboardData = {
     state: "base" | "home" | null;
   } | null;
   personalStats: PersonAttendanceStats | null;
+  personalEquipment: {
+    personal: Array<{
+      category: string;
+      id: string;
+      model: string | null;
+      name: string;
+      serialNumber: string | null;
+      status: string;
+    }>;
+    team: Array<{
+      category: string;
+      holderRole: "current" | "permanent" | "both";
+      id: string;
+      model: string | null;
+      name: string;
+      serialNumber: string | null;
+      status: string;
+    }>;
+  };
   viewerProfile: {
     fullName: string;
     personId: string;
@@ -193,6 +212,35 @@ export const getDashboardData = cache(async function getDashboardData(
   const personalResolution = currentPerson
     ? operationalDay.people.find((person) => person.id === currentPerson.id)?.resolution
     : null;
+  const [personalEquipmentResult, equipmentTypesResult, teamEquipmentResult] = currentPerson
+    ? await Promise.all([
+        supabase
+          .from("person_equipment")
+          .select("id, equipment_type_id, model, serial_number, status")
+          .eq("team_id", team.id)
+          .eq("person_id", currentPerson.id)
+          .neq("status", "returned")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("equipment_types")
+          .select("id, name, category")
+          .eq("team_id", team.id),
+        supabase
+          .from("team_equipment_items")
+          .select("id, name, category, model, serial_number, status, current_holder_person_id, permanent_owner_person_id")
+          .eq("team_id", team.id)
+          .neq("status", "retired")
+          .order("name", { ascending: true }),
+      ])
+    : [
+        { data: [], error: null },
+        { data: [], error: null },
+        { data: [], error: null },
+      ];
+  assertOk(personalEquipmentResult.error, "personal equipment");
+  assertOk(equipmentTypesResult.error, "equipment types");
+  assertOk(teamEquipmentResult.error, "team equipment");
+  const equipmentTypeById = new Map((equipmentTypesResult.data ?? []).map((type) => [type.id, type]));
 
   return {
     activePeople: activePeopleResult.count ?? 0,
@@ -214,6 +262,32 @@ export const getDashboardData = cache(async function getDashboardData(
     attendanceStats: teamStats.stats,
     issues,
     nextTask,
+    personalEquipment: {
+      personal: (personalEquipmentResult.data ?? []).map((item) => {
+        const type = equipmentTypeById.get(item.equipment_type_id);
+        return {
+          category: type?.category ?? "OTHER",
+          id: item.id,
+          model: item.model,
+          name: type?.name ?? "ציוד",
+          serialNumber: item.serial_number,
+          status: item.status,
+        };
+      }),
+      team: (teamEquipmentResult.data ?? [])
+        .filter((item) => item.current_holder_person_id === currentPerson?.id || item.permanent_owner_person_id === currentPerson?.id)
+        .map((item) => ({
+          category: item.category,
+          holderRole: item.current_holder_person_id === currentPerson?.id && item.permanent_owner_person_id === currentPerson?.id
+            ? "both"
+            : item.current_holder_person_id === currentPerson?.id ? "current" : "permanent",
+          id: item.id,
+          model: item.model,
+          name: item.name,
+          serialNumber: item.serial_number,
+          status: item.status,
+        })),
+    },
     personalStatus: currentPerson && personalResolution
       ? {
           attendance: personalResolution.attendance,

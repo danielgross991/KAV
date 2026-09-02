@@ -9,9 +9,11 @@ import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
 const EQUIPMENT_STATUSES = ["assigned", "returned", "lost", "damaged"] as const;
 const EQUIPMENT_CATEGORIES = ["WEAPON", "OPTIC", "AMRAL", "PAKAL", "OTHER"] as const;
+const TEAM_EQUIPMENT_STATUSES = ["available", "in_use", "damaged", "lost", "retired"] as const;
 
 type EquipmentStatus = (typeof EQUIPMENT_STATUSES)[number];
 type EquipmentCategory = (typeof EQUIPMENT_CATEGORIES)[number];
+type TeamEquipmentStatus = (typeof TEAM_EQUIPMENT_STATUSES)[number];
 
 export async function createPersonAction(teamSlug: string, formData: FormData) {
   const { membership, supabase } = await requireManager(teamSlug);
@@ -369,6 +371,165 @@ export async function returnEquipmentAction(
   redirect(`/${teamSlug}/team/${personId}?tab=equipment&saved=equipment-returned`);
 }
 
+export async function createTeamEquipmentAction(teamSlug: string, formData: FormData) {
+  const { membership, supabase, userId } = await requireManager(teamSlug);
+  const currentHolderPersonId = optionalText(formData, "current_holder_person_id");
+  const permanentOwnerPersonId = optionalText(formData, "permanent_owner_person_id");
+
+  if (currentHolderPersonId) {
+    await assertPersonBelongsToTeam(supabase, membership.team.id, currentHolderPersonId);
+  }
+
+  if (permanentOwnerPersonId) {
+    await assertPersonBelongsToTeam(supabase, membership.team.id, permanentOwnerPersonId);
+  }
+
+  const { data, error } = await supabase
+    .from("team_equipment_items")
+    .insert({
+      category: equipmentCategory(formData),
+      created_by: userId,
+      current_holder_person_id: currentHolderPersonId,
+      model: optionalText(formData, "model"),
+      name: requiredText(formData, "name", "שם ציוד"),
+      notes: optionalText(formData, "notes"),
+      permanent_owner_person_id: permanentOwnerPersonId,
+      serial_number: optionalText(formData, "serial_number"),
+      status: teamEquipmentStatus(formData),
+      team_id: membership.team.id,
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`לא ניתן ליצור ציוד צוותי: ${error.message}`);
+  }
+
+  if (currentHolderPersonId) {
+    const { error: transferError } = await supabase.from("team_equipment_transfers").insert({
+      team_equipment_item_id: data.id,
+      team_id: membership.team.id,
+      to_person_id: currentHolderPersonId,
+      transfer_note: optionalText(formData, "transfer_note"),
+      transferred_by: userId,
+    });
+    if (transferError) {
+      throw new Error(`הציוד נוצר אך לא נשמרה היסטוריית אחריות: ${transferError.message}`);
+    }
+  }
+
+  revalidateTeamEquipment(teamSlug, [currentHolderPersonId, permanentOwnerPersonId]);
+  redirect(`/${teamSlug}/team?saved=team-equipment-added`);
+}
+
+export async function updateTeamEquipmentAction(teamSlug: string, itemId: string, formData: FormData) {
+  const { membership, supabase, userId } = await requireManager(teamSlug);
+  const currentHolderPersonId = optionalText(formData, "current_holder_person_id");
+  const permanentOwnerPersonId = optionalText(formData, "permanent_owner_person_id");
+
+  const existingItem = await assertTeamEquipmentBelongsToTeam(supabase, membership.team.id, itemId);
+  if (currentHolderPersonId) {
+    await assertPersonBelongsToTeam(supabase, membership.team.id, currentHolderPersonId);
+  }
+
+  if (permanentOwnerPersonId) {
+    await assertPersonBelongsToTeam(supabase, membership.team.id, permanentOwnerPersonId);
+  }
+
+  const { error } = await supabase
+    .from("team_equipment_items")
+    .update({
+      category: equipmentCategory(formData),
+      current_holder_person_id: currentHolderPersonId,
+      model: optionalText(formData, "model"),
+      name: requiredText(formData, "name", "שם ציוד"),
+      notes: optionalText(formData, "notes"),
+      permanent_owner_person_id: permanentOwnerPersonId,
+      serial_number: optionalText(formData, "serial_number"),
+      status: teamEquipmentStatus(formData),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("team_id", membership.team.id)
+    .eq("id", itemId);
+
+  if (error) {
+    throw new Error(`לא ניתן לעדכן ציוד צוותי: ${error.message}`);
+  }
+
+  if (existingItem.current_holder_person_id !== currentHolderPersonId) {
+    const { error: transferError } = await supabase.from("team_equipment_transfers").insert({
+      from_person_id: existingItem.current_holder_person_id,
+      team_equipment_item_id: existingItem.id,
+      team_id: membership.team.id,
+      to_person_id: currentHolderPersonId,
+      transfer_note: optionalText(formData, "transfer_note"),
+      transferred_by: userId,
+    });
+
+    if (transferError) {
+      throw new Error(`הציוד עודכן אך לא נשמרה היסטוריית אחריות: ${transferError.message}`);
+    }
+  }
+
+  revalidateTeamEquipment(teamSlug, [
+    existingItem.current_holder_person_id,
+    currentHolderPersonId,
+    permanentOwnerPersonId,
+  ]);
+  redirect(`/${teamSlug}/team?saved=team-equipment-updated`);
+}
+
+export async function transferTeamEquipmentAction(teamSlug: string, itemId: string, formData: FormData) {
+  const { membership, supabase, userId } = await requireManager(teamSlug);
+  const toPersonId = optionalText(formData, "to_person_id");
+
+  if (toPersonId) {
+    await assertPersonBelongsToTeam(supabase, membership.team.id, toPersonId);
+  }
+
+  const { data: item, error: itemError } = await supabase
+    .from("team_equipment_items")
+    .select("id, current_holder_person_id")
+    .eq("team_id", membership.team.id)
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (itemError || !item) {
+    throw new Error("הציוד הצוותי לא נמצא בצוות הנוכחי");
+  }
+
+  const status: TeamEquipmentStatus = toPersonId ? "in_use" : "available";
+  const { error: updateError } = await supabase
+    .from("team_equipment_items")
+    .update({
+      current_holder_person_id: toPersonId,
+      status,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("team_id", membership.team.id)
+    .eq("id", itemId);
+
+  if (updateError) {
+    throw new Error(`לא ניתן להעביר אחריות: ${updateError.message}`);
+  }
+
+  const { error: transferError } = await supabase.from("team_equipment_transfers").insert({
+    from_person_id: item.current_holder_person_id,
+    team_equipment_item_id: item.id,
+    team_id: membership.team.id,
+    to_person_id: toPersonId,
+    transfer_note: optionalText(formData, "transfer_note"),
+    transferred_by: userId,
+  });
+
+  if (transferError) {
+    throw new Error(`האחריות הועברה אך לא נשמרה היסטוריה: ${transferError.message}`);
+  }
+
+  revalidateTeamEquipment(teamSlug, [item.current_holder_person_id, toPersonId]);
+  redirect(`/${teamSlug}/team?saved=team-equipment-transferred`);
+}
+
 async function upsertPrivateDetails(
   teamSlug: string,
   personId: string,
@@ -403,7 +564,7 @@ async function requireManager(teamSlug: string) {
     throw new Error("אין הרשאה לבצע פעולה זו");
   }
 
-  return { membership, supabase };
+  return { membership, supabase, userId };
 }
 
 async function assertPersonBelongsToTeam(
@@ -457,10 +618,39 @@ async function assertEquipmentTypeBelongsToTeam(
   }
 }
 
+async function assertTeamEquipmentBelongsToTeam(
+  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  teamId: string,
+  itemId: string,
+) {
+  const { data, error } = await supabase
+    .from("team_equipment_items")
+    .select("id, current_holder_person_id")
+    .eq("team_id", teamId)
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("הציוד הצוותי לא נמצא בצוות הנוכחי");
+  }
+
+  return data;
+}
+
 function revalidateTeam(teamSlug: string, personId: string) {
   revalidatePath(`/${teamSlug}`);
   revalidatePath(`/${teamSlug}/team`);
   revalidatePath(`/${teamSlug}/team/${personId}`);
+}
+
+function revalidateTeamEquipment(teamSlug: string, personIds: Array<string | null | undefined>) {
+  revalidatePath(`/${teamSlug}`);
+  revalidatePath(`/${teamSlug}/equipment`);
+  revalidatePath(`/${teamSlug}/team`);
+
+  for (const personId of new Set(personIds.filter(Boolean))) {
+    revalidatePath(`/${teamSlug}/team/${personId}`);
+  }
 }
 
 function requiredText(formData: FormData, key: string, label: string) {
@@ -538,4 +728,13 @@ function equipmentCategory(formData: FormData): EquipmentCategory {
   }
 
   return "OTHER";
+}
+
+function teamEquipmentStatus(formData: FormData): TeamEquipmentStatus {
+  const value = formData.get("status");
+  if (typeof value === "string" && TEAM_EQUIPMENT_STATUSES.includes(value as TeamEquipmentStatus)) {
+    return value as TeamEquipmentStatus;
+  }
+
+  return "in_use";
 }

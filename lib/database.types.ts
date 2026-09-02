@@ -288,6 +288,31 @@ export type Database = {
         updated_at: string;
         week_start_day: number;
       }>;
+      team_equipment_items: Row<{
+        category: "WEAPON" | "OPTIC" | "AMRAL" | "PAKAL" | "OTHER";
+        created_at: string;
+        created_by: string | null;
+        current_holder_person_id: string | null;
+        id: string;
+        model: string | null;
+        name: string;
+        notes: string | null;
+        permanent_owner_person_id: string | null;
+        serial_number: string | null;
+        status: "available" | "in_use" | "damaged" | "lost" | "retired";
+        team_id: string;
+        updated_at: string;
+      }>;
+      team_equipment_transfers: Row<{
+        from_person_id: string | null;
+        id: string;
+        team_equipment_item_id: string;
+        team_id: string;
+        to_person_id: string | null;
+        transfer_note: string | null;
+        transferred_at: string;
+        transferred_by: string | null;
+      }>;
       team_pakal_requirements: Row<{
         created_at: string;
         id: string;
