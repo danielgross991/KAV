@@ -66,7 +66,6 @@ function ManagerDashboard({
         }
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
-      <WelcomeCard data={data} />
       <PersonalEquipmentCard data={data} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
 
@@ -182,7 +181,6 @@ function ViewerDashboard({
         subtitle={formatToday(data.team.timezone)}
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
-      <WelcomeCard data={data} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
 
       <div className="mt-4">
@@ -231,21 +229,6 @@ function HomeLineSelector({
         teamSlug={data.team.slug}
       />
     </div>
-  );
-}
-
-function WelcomeCard({ data }: { data: DashboardData }) {
-  const profile = data.viewerProfile;
-  if (!profile) return null;
-  const firstName = profile.fullName.split(" ")[0];
-  return (
-    <section className="mb-4 flex items-center gap-3 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
-      <PersonAvatar name={profile.fullName} photoUrl={profile.photoUrl} featured />
-      <div className="min-w-0">
-        <p className="text-xs font-medium text-muted-foreground">ברוך הבא</p>
-        <h2 className="truncate text-lg font-bold">{firstName}</h2>
-      </div>
-    </section>
   );
 }
 

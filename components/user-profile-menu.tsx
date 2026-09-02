@@ -22,7 +22,7 @@ export function InitialProfileWelcome({
 
   useEffect(() => {
     if (!profile) return;
-    const timeout = window.setTimeout(() => setVisible(false), 1200);
+    const timeout = window.setTimeout(() => setVisible(false), 3000);
     return () => window.clearTimeout(timeout);
   }, [profile]);
 
