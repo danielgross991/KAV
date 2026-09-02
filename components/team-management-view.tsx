@@ -272,16 +272,16 @@ function MobileEquipmentTable({
   people: TeamManagementData["people"];
 }) {
   return (
-    <div className="mt-3 overflow-x-auto rounded-lg border">
+    <div className="mt-3 max-h-[70vh] overflow-auto rounded-lg border">
       <table className="min-w-[780px] w-full table-fixed text-right text-[0.72rem]">
         <thead className="bg-muted/60 text-muted-foreground">
           <tr>
-            <th className="sticky right-0 z-20 w-[7.5rem] bg-muted/95 px-2 py-2 font-medium shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.7)]">לוחם</th>
-            <th className="w-[10.5rem] px-2 py-2 font-medium">נשק</th>
-            <th className="w-[10.5rem] px-2 py-2 font-medium">כוונת</th>
-            <th className="w-[10.5rem] px-2 py-2 font-medium">אמר״ל</th>
-            <th className="w-[10.5rem] px-2 py-2 font-medium">פק״ל</th>
-            <th className="w-[10.5rem] px-2 py-2 font-medium">נוסף</th>
+            <th className="sticky top-0 right-0 z-30 w-[7.5rem] border-b bg-muted/95 px-2 py-2 font-medium shadow-[-10px_0_18px_-18px_rgba(20,22,26,0.7)]">לוחם</th>
+            <th className="sticky top-0 z-20 w-[10.5rem] border-b bg-muted/95 px-2 py-2 font-medium">נשק</th>
+            <th className="sticky top-0 z-20 w-[10.5rem] border-b bg-muted/95 px-2 py-2 font-medium">כוונת</th>
+            <th className="sticky top-0 z-20 w-[10.5rem] border-b bg-muted/95 px-2 py-2 font-medium">אמר״ל</th>
+            <th className="sticky top-0 z-20 w-[10.5rem] border-b bg-muted/95 px-2 py-2 font-medium">פק״ל</th>
+            <th className="sticky top-0 z-20 w-[10.5rem] border-b bg-muted/95 px-2 py-2 font-medium">נוסף</th>
           </tr>
         </thead>
         <tbody className="divide-y bg-card">
