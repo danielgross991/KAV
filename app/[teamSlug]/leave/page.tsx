@@ -54,6 +54,9 @@ export default async function LeavePage({ params, searchParams }: {
     .filter((leave) => view === "active"
       ? leave.starts_on <= today && leave.ends_on >= today
       : view === "upcoming" ? leave.starts_on > today : leave.ends_on < today);
+  const managementLeaves = currentPerson
+    ? filtered.filter((leave) => leave.person_id !== currentPerson.id)
+    : filtered;
   const periodOptions = selectedLinePeriodId
     ? [...(periods ?? []).filter((period) => period.id === selectedLinePeriodId), ...(periods ?? []).filter((period) => period.id !== selectedLinePeriodId)]
     : periods ?? [];
@@ -71,37 +74,32 @@ export default async function LeavePage({ params, searchParams }: {
       teamSlug={teamSlug}
     />
     <section className="divide-y overflow-hidden rounded-lg border bg-card">
-      {filtered.map((leave) => <details key={leave.id}>
-        <summary className="grid min-h-16 cursor-pointer gap-2 p-3.5 sm:grid-cols-[1fr_auto_auto] sm:items-center">
+      {managementLeaves.map((leave) => <details key={leave.id}>
+        <summary className="grid min-h-16 cursor-pointer gap-2 p-3.5 transition-colors hover:bg-muted/40 active:bg-muted sm:grid-cols-[1fr_auto_auto] sm:items-center">
           <div><b>{peopleById.get(leave.person_id)}</b><p className="mt-1 text-sm text-muted-foreground">{range(leave.starts_on, leave.ends_on)} · {periodsById.get(leave.reserve_period_id)?.name}</p></div>
-          <Badge variant={leave.status === "approved" || leave.status === "partially_approved" ? "success" : "secondary"}>{statusLabel(leave.status)}</Badge>
-          {leave.approved_starts_on ? <span className="text-sm">מאושר: {range(leave.approved_starts_on, leave.approved_ends_on!)}</span> : null}
+          <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>{statusLabel(leave.status)}</Badge>
         </summary>
         <form action={saveLeaveAction.bind(null, teamSlug)} className="grid gap-3 border-t bg-muted/30 p-3.5 md:grid-cols-4">
           <input type="hidden" name="id" value={leave.id} />
           <Select label="איש צוות" name="person_id" value={leave.person_id} options={(people ?? []).map((p) => [p.id, p.full_name])} />
-          <Select label="תקופה" name="reserve_period_id" value={leave.reserve_period_id} options={periodOptions.map((p) => [p.id, p.name])} />
+          <PeriodInput options={periodOptions} selectedPeriodId={selectedLinePeriodId} value={leave.reserve_period_id} />
           <Field label="מתאריך" name="starts_on" type="date" defaultValue={leave.starts_on} required />
           <Field label="עד תאריך" name="ends_on" type="date" defaultValue={leave.ends_on} required />
-          <Select label="סטטוס" name="status" value={leave.status} options={statusOptions} />
-          <Field label="מאושר מתאריך" name="approved_starts_on" type="date" defaultValue={leave.approved_starts_on ?? ""} />
-          <Field label="מאושר עד תאריך" name="approved_ends_on" type="date" defaultValue={leave.approved_ends_on ?? ""} />
+          <Select label="אישור" name="status" value={statusFormValue(leave.status)} options={statusOptions} />
           <Field label="סיבה" name="reason" defaultValue={leave.reason ?? ""} />
-          <Field label="הערת מנהל" name="manager_notes" defaultValue={leave.manager_notes ?? ""} />
           <Button className="self-end">שמירת שינויים</Button>
         </form>
         <form action={deleteLeaveAction.bind(null, teamSlug)} className="bg-muted/30 px-3.5 pb-3.5"><input type="hidden" name="id" value={leave.id} /><Button variant="ghost" size="sm"><Trash2 className="size-4" />מחיקה</Button></form>
       </details>)}
-      {!filtered.length ? <div className="grid min-h-52 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין יציאות פעילות</p></div></div> : null}
+      {!managementLeaves.length ? <div className="grid min-h-52 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין יציאות פעילות</p></div></div> : null}
     </section>
     <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave"><h2 className="text-base font-semibold">יציאה חדשה</h2>
       <form action={saveLeaveAction.bind(null, teamSlug)} className="mt-4 grid gap-3 md:grid-cols-4">
         <Select label="איש צוות" name="person_id" options={(people ?? []).filter((p) => p.is_active).map((p) => [p.id, p.full_name])} />
-        <Select label="תקופת מילואים" name="reserve_period_id" options={periodOptions.map((p) => [p.id, p.name])} />
+        <PeriodInput options={periodOptions} selectedPeriodId={selectedLinePeriodId} />
         <Field label="מתאריך" name="starts_on" type="date" required /><Field label="עד תאריך" name="ends_on" type="date" required />
-        <Select label="סטטוס" name="status" value="approved" options={statusOptions} />
-        <Field label="מאושר מתאריך" name="approved_starts_on" type="date" /><Field label="מאושר עד תאריך" name="approved_ends_on" type="date" />
-        <Field label="סיבה" name="reason" /><Field label="הערת מנהל" name="manager_notes" />
+        <input name="status" type="hidden" value="pending" />
+        <Field label="סיבה" name="reason" />
         <Button className="self-end"><Plus className="size-4" />שמירת יציאה</Button>
       </form>
     </section>
@@ -143,13 +141,12 @@ function MyLeaveRequests({
             <div className="rounded-md border p-3" key={leave.id}>
               <div className="flex items-center justify-between gap-2">
                 <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
-                <Badge variant={leave.status === "approved" || leave.status === "partially_approved" ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
+                <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
                   {statusLabel(leave.status)}
                 </Badge>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {periods.find((period) => period.id === leave.reserve_period_id)?.name ?? "סבב מילואים"}
-                {leave.approved_starts_on ? ` · אושר ${range(leave.approved_starts_on, leave.approved_ends_on!)}` : ""}
               </p>
             </div>
           ))}
@@ -158,7 +155,7 @@ function MyLeaveRequests({
         <p className="mb-3 rounded-md border border-dashed p-3 text-sm text-muted-foreground">אין לך בקשות יציאה בתקופה הנבחרת.</p>
       )}
       <form action={createViewerLeaveRequestAction.bind(null, teamSlug)} className="grid gap-3 md:grid-cols-4">
-        <Select label="תקופת מילואים" name="reserve_period_id" options={periodOptions.map((period) => [period.id, period.name])} />
+        <PeriodInput options={periodOptions} selectedPeriodId={selectedPeriodId} />
         <Field label="מתאריך" name="starts_on" type="date" required />
         <Field label="עד תאריך" name="ends_on" type="date" required />
         <Field label="סיבה" name="reason" />
@@ -210,11 +207,10 @@ function ViewerLeavePage({
                   <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {periods.find((period) => period.id === leave.reserve_period_id)?.name ?? "סבב מילואים"}
-                    {leave.approved_starts_on ? ` · אושר ${range(leave.approved_starts_on, leave.approved_ends_on!)}` : ""}
                   </p>
                   {leave.reason ? <p className="mt-2 text-sm">{leave.reason}</p> : null}
                 </div>
-                <Badge variant={leave.status === "approved" || leave.status === "partially_approved" ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
+                <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
                   {statusLabel(leave.status)}
                 </Badge>
               </div>
@@ -224,7 +220,7 @@ function ViewerLeavePage({
           <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave">
             <h2 className="text-base font-semibold">בקשה חדשה</h2>
             <form action={createViewerLeaveRequestAction.bind(null, teamSlug)} className="mt-4 grid gap-3 md:grid-cols-4">
-              <Select label="תקופת מילואים" name="reserve_period_id" options={visiblePeriodOptions.map((period) => [period.id, period.name])} />
+              <PeriodInput options={visiblePeriodOptions} selectedPeriodId={selectedPeriodId} />
               <Field label="מתאריך" name="starts_on" type="date" required />
               <Field label="עד תאריך" name="ends_on" type="date" required />
               <Field label="סיבה" name="reason" />
@@ -237,13 +233,20 @@ function ViewerLeavePage({
   );
 }
 
-const statusOptions = [["pending", "ממתינה"], ["approved", "מאושרת"], ["partially_approved", "מאושרת חלקית"], ["rejected", "נדחתה"]];
+const statusOptions = [["pending", "טרם הוחלט"], ["approved", "כן"], ["rejected", "לא"]];
 function Field({ label, ...props }: React.ComponentProps<"input"> & { label: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<Input {...props} /></label>; }
 function Select({ label, name, options, value }: { label: string; name: string; options: string[][]; value?: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<select className="h-10 rounded-md border bg-background px-2 text-sm" defaultValue={value} name={name} required>{options.map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select></label>; }
-function Tab({ active, children, href }: { active: boolean; children: React.ReactNode; href: string }) { return <Link aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground")} href={href}>{children}</Link>; }
+function PeriodInput({ options, selectedPeriodId, value }: { options: PeriodRow[]; selectedPeriodId: string | null; value?: string }) {
+  const resolvedValue = value ?? selectedPeriodId;
+  if (resolvedValue) return <input name="reserve_period_id" type="hidden" value={resolvedValue} />;
+  return <Select label="תקופת מילואים" name="reserve_period_id" options={options.map((period) => [period.id, period.name])} />;
+}
+function Tab({ active, children, href }: { active: boolean; children: React.ReactNode; href: string }) { return <Link aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors hover:bg-card/70 hover:text-foreground active:bg-card active:text-foreground", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground")} href={href}>{children}</Link>; }
 function range(start: string, end: string) { return `${short(start)}–${short(end)}`; }
 function short(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function statusLabel(value: string) { return Object.fromEntries(statusOptions)[value] ?? value; }
+function statusFormValue(value: string) { return value === "partially_approved" ? "approved" : value; }
+function isApprovedStatus(value: string) { return value === "approved" || value === "partially_approved"; }
 
 type LeaveRow = {
   approved_ends_on: string | null;

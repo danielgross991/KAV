@@ -7,7 +7,7 @@ import { requireAuth } from "@/lib/kav/auth";
 import { overlaps, validateLeaveRange } from "@/lib/kav/schedule-domain";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
-const STATUSES = ["pending", "approved", "partially_approved", "rejected"];
+const STATUSES = ["pending", "approved", "rejected"];
 
 export async function saveLeaveAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
@@ -26,10 +26,10 @@ export async function saveLeaveAction(teamSlug: string, formData: FormData) {
   ]);
   if (!person || !period || (id && !existingResult.data)) throw new Error("פרטי היציאה אינם שייכים לצוות");
 
-  const approved = status === "approved" || status === "partially_approved"
+  const approved = status === "approved"
     ? {
-        startsOn: optional(formData, "approved_starts_on") ?? startsOn,
-        endsOn: optional(formData, "approved_ends_on") ?? endsOn,
+        startsOn,
+        endsOn,
       }
     : null;
   const issues = validateLeaveRange({
