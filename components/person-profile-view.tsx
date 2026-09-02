@@ -511,14 +511,14 @@ function Avatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
     return (
       <div
         aria-label={name}
-        className="size-16 rounded-lg border bg-cover bg-center"
+        className="size-16 rounded-full border bg-cover bg-center"
         style={{ backgroundImage: `url(${photoUrl})` }}
       />
     );
   }
 
   return (
-    <div className="flex size-16 items-center justify-center rounded-lg border bg-accent text-accent-foreground">
+    <div className="flex size-16 items-center justify-center rounded-full border bg-accent text-accent-foreground">
       <UserRound className="size-7" />
     </div>
   );

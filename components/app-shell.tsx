@@ -4,17 +4,21 @@ import { LogOut } from "lucide-react";
 import { KavMark } from "@/components/kav-mark";
 import { Separator } from "@/components/ui/separator";
 import { TeamNav } from "@/components/team-nav";
+import { InitialProfileWelcome, UserProfileMenu, type ShellPersonProfile } from "@/components/user-profile-menu";
 import type { TeamMembership } from "@/lib/kav/teams";
 
 export function AppShell({
   children,
   membership,
+  profile,
 }: {
   children: React.ReactNode;
   membership: TeamMembership;
+  profile: ShellPersonProfile | null;
 }) {
   return (
     <div className="min-h-screen bg-background">
+      <InitialProfileWelcome profile={profile} />
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-60 flex-col border-l bg-card lg:flex">
         <div className="px-4 py-4">
           <Link href={`/${membership.team.slug}`} className="inline-flex items-center gap-2.5" aria-label="KAV - בית">
@@ -28,6 +32,9 @@ export function AppShell({
         <div className="mx-4 rounded-md border bg-muted/55 px-3 py-2.5">
           <p className="truncate text-sm font-semibold">{membership.team.name}</p>
           <p className="mt-0.5 text-xs text-muted-foreground">{roleLabel(membership.role)}</p>
+        </div>
+        <div className="px-4">
+          <UserProfileMenu profile={profile} teamSlug={membership.team.slug} variant="desktop" />
         </div>
         <Separator className="mx-4 my-4 w-auto" />
         <div className="flex-1 px-3">
@@ -58,6 +65,7 @@ export function AppShell({
               <span className="block truncate text-[11px] text-muted-foreground">{membership.team.name}</span>
             </span>
           </Link>
+          <UserProfileMenu profile={profile} teamSlug={membership.team.slug} variant="mobile" />
           <form action="/logout" method="post">
             <button
               type="submit"
