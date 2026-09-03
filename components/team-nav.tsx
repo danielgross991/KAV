@@ -39,7 +39,8 @@ export function TeamNav({
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const items = canManage(role) ? managerItems : viewerItems;
   const base = `/${teamSlug}`;
-  const showRouteLoading = pendingHref !== null && !isActivePath(pathname, pendingHref, base);
+  const effectivePendingHref = pendingHref && !isActivePath(pathname, pendingHref, base) ? pendingHref : null;
+  const showRouteLoading = effectivePendingHref !== null;
 
   useEffect(() => {
     const routeHrefs = [
@@ -50,6 +51,12 @@ export function TeamNav({
     routeHrefs.forEach((href) => router.prefetch(href));
   }, [base, items, role, router]);
 
+  useEffect(() => {
+    if (!pendingHref) return;
+    const timeout = window.setTimeout(() => setPendingHref(null), 9000);
+    return () => window.clearTimeout(timeout);
+  }, [pendingHref]);
+
   if (variant === "mobile") {
     return (
       <>
@@ -59,7 +66,7 @@ export function TeamNav({
             {items.map((item) => {
               const href = `${base}${item.href}`;
               const active = item.href === "" ? pathname === href : pathname.startsWith(href);
-              const pending = pendingHref === href && !active;
+              const pending = effectivePendingHref === href && !active;
               const Icon = item.icon;
 
               return (
@@ -99,7 +106,7 @@ export function TeamNav({
           icon={item.icon}
           key={`${base}${item.href}`}
           label={item.label}
-          pending={pendingHref === `${base}${item.href}`}
+          pending={effectivePendingHref === `${base}${item.href}`}
           setPendingHref={setPendingHref}
         />)}
         {canManage(role) ? (
@@ -112,11 +119,11 @@ export function TeamNav({
             className={cn(
               "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               pathname.startsWith(`${base}/leave`) && "bg-accent text-primary",
-              pendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) && "text-primary",
+              effectivePendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) && "text-primary",
             )}
           >
-            <ActiveRail active={pathname.startsWith(`${base}/leave`) || pendingHref === `${base}/leave`} />
-            {pendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <CalendarOff className="size-4" />}
+            <ActiveRail active={pathname.startsWith(`${base}/leave`) || effectivePendingHref === `${base}/leave`} />
+            {effectivePendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <CalendarOff className="size-4" />}
             יציאות
           </Link><Link
             href={`${base}/settings`}
@@ -127,11 +134,11 @@ export function TeamNav({
             className={cn(
               "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               pathname.startsWith(`${base}/settings`) && "bg-accent text-primary",
-              pendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) && "text-primary",
+              effectivePendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) && "text-primary",
             )}
           >
-            <ActiveRail active={pathname.startsWith(`${base}/settings`) || pendingHref === `${base}/settings`} />
-            {pendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <Settings className="size-4" />}
+            <ActiveRail active={pathname.startsWith(`${base}/settings`) || effectivePendingHref === `${base}/settings`} />
+            {effectivePendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <Settings className="size-4" />}
             הגדרות
           </Link>{role === "admin" ? <Link
             href={`${base}/users`}
@@ -142,11 +149,11 @@ export function TeamNav({
             className={cn(
               "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               pathname.startsWith(`${base}/users`) && "bg-accent text-primary",
-              pendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) && "text-primary",
+              effectivePendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) && "text-primary",
             )}
           >
-            <ActiveRail active={pathname.startsWith(`${base}/users`) || pendingHref === `${base}/users`} />
-            {pendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <UsersRound className="size-4" />}
+            <ActiveRail active={pathname.startsWith(`${base}/users`) || effectivePendingHref === `${base}/users`} />
+            {effectivePendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <UsersRound className="size-4" />}
             משתמשים
           </Link> : null}</div>
         ) : null}
