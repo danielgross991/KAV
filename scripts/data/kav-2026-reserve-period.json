@@ -2,43 +2,50 @@
   "period": {
     "name": "קו עותניאל",
     "location": "קו עותניאל",
-    "starts_on": "2026-09-06",
+    "starts_on": "2026-09-09",
     "ends_on": "2026-12-02",
     "status": "published"
   },
   "phases": [
-    { "name": "הכנת מפקדים / גיוס", "phase_type": "preparation", "starts_on": "2026-09-06", "ends_on": "2026-09-10", "sort_order": 0 },
-    { "name": "ראש השנה בבית", "phase_type": "other", "starts_on": "2026-09-11", "ends_on": "2026-09-13", "sort_order": 1 },
+    { "name": "חתימה על נשקים ואל״ת", "phase_type": "preparation", "starts_on": "2026-09-09", "ends_on": "2026-09-09", "sort_order": 0 },
+    { "name": "ראש השנה בבית", "phase_type": "other", "starts_on": "2026-09-10", "ends_on": "2026-09-13", "sort_order": 1 },
     { "name": "אימון לפני הפעלה", "phase_type": "preparation", "starts_on": "2026-09-14", "ends_on": "2026-09-16", "sort_order": 2 },
     { "name": "פעילות מבצעית / קו", "phase_type": "line", "starts_on": "2026-09-17", "ends_on": "2026-12-01", "sort_order": 3 },
     { "name": "ירידה מהמשימה", "phase_type": "stand_down", "starts_on": "2026-12-02", "ends_on": "2026-12-02", "sort_order": 4 }
   ],
+  "rotationGroups": [
+    { "name": "כל הצוות", "initial_state": "base", "color_token": "green", "sort_order": 0, "members": "all_active" }
+  ],
+  "rotationBlocks": [
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-09-09", "ends_on": "2026-09-09", "notes": "חתימה על נשקים ותחילת אל״ת בבא״פ לכיש" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-09-10", "ends_on": "2026-09-13", "notes": "כולם בבית לראש השנה" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-09-14", "ends_on": "2026-09-17", "notes": "חזרה לאל״ת בבא״פ לכיש, עלייה לגזרת עותניאל ב-17/09" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-09-18", "ends_on": "2026-09-21", "notes": "בית עד אחרי יום כיפור" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-09-22", "ends_on": "2026-09-28", "notes": "סגירת שבוע כולל סוכות א׳" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-09-29", "ends_on": "2026-10-05", "notes": "שבוע בית כולל סוכות ב׳" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-10-06", "ends_on": "2026-10-12" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-10-13", "ends_on": "2026-10-19" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-10-20", "ends_on": "2026-10-26" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-10-27", "ends_on": "2026-11-02" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-11-03", "ends_on": "2026-11-09" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-11-10", "ends_on": "2026-11-16" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-11-17", "ends_on": "2026-11-23" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-11-24", "ends_on": "2026-11-30" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-12-01", "ends_on": "2026-12-02", "notes": "סיום וירידה מהמשימה" }
+  ],
   "events": [
     {
-      "title": "יום הכנת מפקדים",
+      "title": "חתימה על נשקים ותחילת אל״ת",
       "event_type": "training",
-      "starts_on": "2026-09-06",
-      "is_all_day": true,
-      "notes": "יום הכנת מפקדים מרמת מ\"כ בראשות מח\"ט יהודה · קהל: כלל המפקדים בפלוגה"
-    },
-    {
-      "title": "גיוס וחיול מפקדים",
-      "event_type": "other",
       "starts_on": "2026-09-09",
       "is_all_day": true,
-      "notes": "גיוס וחיול מפקדים בבא\"פ לכיש · קהל: כלל המפקדים בפלוגה"
+      "location": "בא״פ לכיש",
+      "notes": "נפגשים בבא״פ לכיש. שעה וציוד יעודכנו בהמשך · קהל: כולם"
     },
     {
-      "title": "גיוס גוף עיקרי",
-      "event_type": "other",
-      "starts_on": "2026-09-10",
-      "is_all_day": true,
-      "notes": "קהל: כולם"
-    },
-    {
-      "title": "ראש השנה בבית",
+      "title": "חוזרים הביתה לראש השנה",
       "event_type": "family",
-      "starts_on": "2026-09-11",
+      "starts_on": "2026-09-10",
       "ends_on": "2026-09-13",
       "is_all_day": true,
       "notes": "הנחיה מבצעית מפורשת: כולם בבית · קהל: כולם"
@@ -47,9 +54,10 @@
       "title": "התייצבות בבא\"פ",
       "event_type": "changeover",
       "starts_on": "2026-09-14",
-      "starts_time": "10:00",
+      "starts_time": "12:00",
       "is_all_day": false,
-      "notes": "תחילת תכנים של אימון לפני הפעלה · הגעה עד 10:00 · קהל: כולם"
+      "location": "בא״פ לכיש",
+      "notes": "חזרה מהבית לאל״ת בצום גדליה · קהל: כולם"
     },
     {
       "title": "המשך אימון לפני הפעלה",
@@ -60,12 +68,22 @@
       "notes": "קהל: כולם"
     },
     {
-      "title": "זיכויים ועלייה לקו",
+      "title": "עלייה לגזרת עותניאל",
       "event_type": "changeover",
       "starts_on": "2026-09-17",
       "starts_time": "14:00",
       "is_all_day": false,
-      "notes": "14:00 תפיסת אחריות · קהל: כולם"
+      "location": "עותניאל",
+      "notes": "עולים לגזרה, מתמקמים, ואז הצוות יוצא הביתה עד אחרי יום כיפור · קהל: כולם"
+    },
+    {
+      "title": "חזרה לבסיס לסגירת שבוע",
+      "event_type": "changeover",
+      "starts_on": "2026-09-22",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "location": "עותניאל",
+      "notes": "חזרה לבסיס לסגור שבוע · קהל: כולם"
     },
     {
       "title": "ירידה מהמשימה",

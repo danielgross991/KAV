@@ -18,18 +18,48 @@ const legacyLeaveSeed = JSON.parse(
 test("2026 reserve period seed is the upcoming Otniel line with exact requested dates", () => {
   assert.equal(periodSeed.period.name, "קו עותניאל");
   assert.equal(periodSeed.period.location, "קו עותניאל");
-  assert.equal(periodSeed.period.starts_on, "2026-09-06");
+  assert.equal(periodSeed.period.starts_on, "2026-09-09");
   assert.equal(periodSeed.period.ends_on, "2026-12-02");
   assert.equal(periodSeed.period.status, "published");
 });
 
 test("Rosh Hashanah home instruction is modeled as an event, not fake leave requests", () => {
-  const roshHashanah = periodSeed.events.find((event) => event.title === "ראש השנה בבית");
+  const roshHashanah = periodSeed.events.find((event) => event.title === "חוזרים הביתה לראש השנה");
   assert.ok(roshHashanah);
-  assert.equal(roshHashanah.starts_on, "2026-09-11");
+  assert.equal(roshHashanah.starts_on, "2026-09-10");
   assert.equal(roshHashanah.ends_on, "2026-09-13");
   assert.match(roshHashanah.notes, /כולם בבית/);
   assert.equal(periodSeed.pendingLeaveRequests.some((request) => request.reason === "ראש השנה בבית"), false);
+});
+
+test("2026 Otniel rotations are whole-team week-on week-off", () => {
+  assert.deepEqual(periodSeed.rotationGroups.map((group) => group.name), ["כל הצוות"]);
+  assert.equal(periodSeed.rotationGroups[0].members, "all_active");
+
+  const blocks = periodSeed.rotationBlocks ?? [];
+  assert.equal(blocks[0].starts_on, "2026-09-09");
+  assert.equal(blocks.at(-1).ends_on, "2026-12-02");
+  assert.ok(blocks.some((block) =>
+    block.state === "home" &&
+    block.starts_on === "2026-09-10" &&
+    block.ends_on === "2026-09-13"));
+  assert.ok(blocks.some((block) =>
+    block.state === "home" &&
+    block.starts_on === "2026-09-18" &&
+    block.ends_on === "2026-09-21"));
+  assert.ok(blocks.some((block) =>
+    block.state === "base" &&
+    block.starts_on === "2026-09-22" &&
+    block.ends_on === "2026-09-28"));
+  assert.ok(blocks.some((block) =>
+    block.state === "home" &&
+    block.starts_on === "2026-09-29" &&
+    block.ends_on === "2026-10-05"));
+  for (let index = 1; index < blocks.length; index += 1) {
+    assert.equal(blocks[index].group_name, "כל הצוות");
+    assert.ok(blocks[index].starts_on > blocks[index - 1].ends_on);
+    assert.notEqual(blocks[index].state, blocks[index - 1].state);
+  }
 });
 
 test("historical Kishufim seed includes non-overlapping rotation blocks for both rounds", () => {

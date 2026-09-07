@@ -46,6 +46,8 @@ const report = {
   pendingLeaveImported: [], pendingLeaveSkipped: [], historicalLeaveImported: [], historicalLeaveSkipped: [],
   equipmentTypesCreated: [], equipmentTypesSkipped: [],
   equipmentImported: [],
+  currentPhasesRemoved: [], currentRotationGroupsCreated: [], currentRotationGroupsUpdated: [], currentRotationGroupsRemoved: [],
+  currentRotationMembershipCreated: [], currentRotationBlocksSynced: [],
   historicalAttendanceDates: [], historicalPresenceRowsCreated: [], historicalPresenceRowsUpdated: [],
   historicalRotationBlocksCreated: [], historicalRotationBlocksSkipped: [], historicalRotationMembership: [],
   skippedRows: [], ambiguousNames: [], missingDates: [],
@@ -87,7 +89,14 @@ async function main() {
 
   // ---- B/C/J: 2026 reserve period, fixed events, holidays, pending leave ----
   const period2026 = await getOrCreatePeriod(team.id, reservePeriod2026.period);
+  await removeOutdatedCurrentPhases(team.id, period2026.id, reservePeriod2026.phases ?? []);
   await createPhases(team.id, period2026.id, reservePeriod2026.phases ?? []);
+  const currentGroupIds = await syncCurrentRotationGroups(team.id, period2026.id, reservePeriod2026.rotationGroups ?? [], people);
+  await syncCurrentRotationBlocks(team.id, period2026.id, reservePeriod2026.rotationBlocks ?? [], currentGroupIds);
+  await removeOutdatedCurrentEvents(team.id, period2026.id, [
+    ...(reservePeriod2026.events ?? []),
+    ...(reservePeriod2026.holidays ?? []),
+  ]);
   await createEvents(team, period2026.id, reservePeriod2026.events ?? [], "event");
   // The current schedule schema intentionally has no separate holiday event type;
   // holidays are displayed as all-day calendar events with the valid generic type.
@@ -233,10 +242,29 @@ async function findPeriodByDateRange(teamId, period) {
 
 async function createPhases(teamId, reservePeriodId, phases) {
   for (const phase of phases) {
-    const { data: existing, error } = await supabase.from("period_phases").select("id")
+    const { data: existing, error } = await supabase.from("period_phases").select("*")
       .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId).eq("name", phase.name).maybeSingle();
     if (error) throw new Error(`Unable to look up phase '${phase.name}': ${error.message}`);
-    if (existing) { report.phasesSkipped.push({ name: phase.name, reason: "already exists" }); continue; }
+    if (existing) {
+      const updates = {
+        phase_type: phase.phase_type,
+        starts_on: phase.starts_on,
+        ends_on: phase.ends_on,
+        sort_order: phase.sort_order ?? 0,
+      };
+      const needsUpdate = existing.phase_type !== updates.phase_type ||
+        existing.starts_on !== updates.starts_on ||
+        existing.ends_on !== updates.ends_on ||
+        existing.sort_order !== updates.sort_order;
+      if (needsUpdate) {
+        const { error: updateError } = await supabase.from("period_phases").update(updates).eq("id", existing.id);
+        if (updateError) throw new Error(`Unable to update phase '${phase.name}': ${updateError.message}`);
+        report.phasesCreated.push({ name: phase.name, updated: true });
+      } else {
+        report.phasesSkipped.push({ name: phase.name, reason: "already exists" });
+      }
+      continue;
+    }
     const { error: insertError } = await supabase.from("period_phases").insert({
       team_id: teamId, reserve_period_id: reservePeriodId, name: phase.name, phase_type: phase.phase_type,
       starts_on: phase.starts_on, ends_on: phase.ends_on, sort_order: phase.sort_order ?? 0,
@@ -244,6 +272,139 @@ async function createPhases(teamId, reservePeriodId, phases) {
     if (insertError) throw new Error(`Unable to create phase '${phase.name}': ${insertError.message}`);
     report.phasesCreated.push({ name: phase.name });
   }
+}
+
+async function removeOutdatedCurrentPhases(teamId, reservePeriodId, phases) {
+  const expectedNames = phases.map((phase) => phase.name);
+  const { data: existing, error } = await supabase.from("period_phases").select("id, name")
+    .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId);
+  if (error) throw new Error(`Unable to load current phases: ${error.message}`);
+  const stale = (existing ?? []).filter((phase) => !expectedNames.includes(phase.name));
+  for (const phase of stale) {
+    const { error: deleteError } = await supabase.from("period_phases").delete().eq("id", phase.id);
+    if (deleteError) throw new Error(`Unable to remove outdated phase '${phase.name}': ${deleteError.message}`);
+    report.currentPhasesRemoved.push({ name: phase.name });
+  }
+}
+
+async function removeOutdatedCurrentEvents(teamId, reservePeriodId, events) {
+  const expectedTitles = new Set(events.map((event) => event.title));
+  const outdatedTitles = [
+    "יום הכנת מפקדים",
+    "גיוס וחיול מפקדים",
+    "גיוס גוף עיקרי",
+    "ראש השנה בבית",
+    "זיכויים ועלייה לקו",
+  ].filter((title) => !expectedTitles.has(title));
+  if (!outdatedTitles.length) return;
+  const { error } = await supabase.from("schedule_events").delete()
+    .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId).in("title", outdatedTitles);
+  if (error) throw new Error(`Unable to remove outdated current events: ${error.message}`);
+}
+
+async function syncCurrentRotationGroups(teamId, reservePeriodId, groups, people) {
+  const expectedNames = new Set(groups.map((group) => group.name));
+  const { data: existingGroups, error } = await supabase.from("rotation_groups").select("*")
+    .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId);
+  if (error) throw new Error(`Unable to load current rotation groups: ${error.message}`);
+
+  const staleGroups = (existingGroups ?? []).filter((group) => !expectedNames.has(group.name));
+  if (staleGroups.length) {
+    const staleIds = staleGroups.map((group) => group.id);
+    const { error: memberDeleteError } = await supabase.from("rotation_members").delete()
+      .eq("team_id", teamId).in("rotation_group_id", staleIds);
+    if (memberDeleteError) throw new Error(`Unable to remove outdated current rotation memberships: ${memberDeleteError.message}`);
+    const { error: blockDeleteError } = await supabase.from("rotation_blocks").delete()
+      .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId).in("rotation_group_id", staleIds);
+    if (blockDeleteError) throw new Error(`Unable to remove outdated current rotation blocks: ${blockDeleteError.message}`);
+    const { error: groupDeleteError } = await supabase.from("rotation_groups").delete()
+      .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId).in("id", staleIds);
+    if (groupDeleteError) throw new Error(`Unable to remove outdated current rotation groups: ${groupDeleteError.message}`);
+    report.currentRotationGroupsRemoved.push(...staleGroups.map((group) => ({ name: group.name })));
+  }
+
+  const freshExisting = (existingGroups ?? []).filter((group) => expectedNames.has(group.name));
+  const groupIds = new Map(freshExisting.map((group) => [group.name, group.id]));
+  for (const group of groups) {
+    const existing = freshExisting.find((item) => item.name === group.name);
+    if (existing) {
+      const updates = {
+        initial_state: group.initial_state,
+        color_token: group.color_token ?? "blue",
+        sort_order: group.sort_order ?? 0,
+      };
+      const needsUpdate = existing.initial_state !== updates.initial_state ||
+        existing.color_token !== updates.color_token ||
+        existing.sort_order !== updates.sort_order;
+      if (needsUpdate) {
+        const { error: updateError } = await supabase.from("rotation_groups").update(updates).eq("id", existing.id);
+        if (updateError) throw new Error(`Unable to update rotation group '${group.name}': ${updateError.message}`);
+        report.currentRotationGroupsUpdated.push({ name: group.name });
+      }
+    } else {
+      const { data: created, error: insertError } = await supabase.from("rotation_groups").insert({
+        team_id: teamId,
+        reserve_period_id: reservePeriodId,
+        name: group.name,
+        initial_state: group.initial_state,
+        color_token: group.color_token ?? "blue",
+        sort_order: group.sort_order ?? 0,
+      }).select("id").single();
+      if (insertError) throw new Error(`Unable to create current rotation group '${group.name}': ${insertError.message}`);
+      groupIds.set(group.name, created.id);
+      report.currentRotationGroupsCreated.push({ name: group.name });
+    }
+
+    if (group.members === "all_active") {
+      const groupId = groupIds.get(group.name);
+      await ensureAllActiveMembers(teamId, groupId, people);
+    }
+  }
+  return groupIds;
+}
+
+async function ensureAllActiveMembers(teamId, rotationGroupId, people) {
+  const { data: existing, error } = await supabase.from("rotation_members").select("person_id")
+    .eq("team_id", teamId).eq("rotation_group_id", rotationGroupId);
+  if (error) throw new Error(`Unable to load current rotation membership: ${error.message}`);
+  const existingIds = new Set((existing ?? []).map((item) => item.person_id));
+  const rows = people
+    .filter((person) => !existingIds.has(person.id))
+    .map((person) => ({ team_id: teamId, rotation_group_id: rotationGroupId, person_id: person.id, starts_on: null, ends_on: null }));
+  if (!rows.length) return;
+  const { error: insertError } = await supabase.from("rotation_members").insert(rows);
+  if (insertError) throw new Error(`Unable to create all-team current rotation membership: ${insertError.message}`);
+  report.currentRotationMembershipCreated.push(...rows.map((row) => ({ person_id: row.person_id })));
+}
+
+async function syncCurrentRotationBlocks(teamId, reservePeriodId, blocks, groupIdByName) {
+  if (!blocks.length) return;
+  const { error: deleteError } = await supabase.from("rotation_blocks").delete()
+    .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId);
+  if (deleteError) throw new Error(`Unable to clear current rotation blocks: ${deleteError.message}`);
+
+  const rows = blocks.map((block, index) => {
+    const rotationGroupId = groupIdByName.get(block.group_name);
+    if (!rotationGroupId) throw new Error(`Rotation group '${block.group_name}' was not created`);
+    return {
+      team_id: teamId,
+      reserve_period_id: reservePeriodId,
+      rotation_group_id: rotationGroupId,
+      state: block.state,
+      starts_on: block.starts_on,
+      ends_on: block.ends_on,
+      source: "manual",
+      sequence_no: index,
+    };
+  });
+  const { error: insertError } = await supabase.from("rotation_blocks").insert(rows);
+  if (insertError) throw new Error(`Unable to create current rotation blocks: ${insertError.message}`);
+  report.currentRotationBlocksSynced.push(...blocks.map((block) => ({
+    group: block.group_name,
+    state: block.state,
+    starts_on: block.starts_on,
+    ends_on: block.ends_on,
+  })));
 }
 
 async function createEvents(team, reservePeriodId, events, kind) {

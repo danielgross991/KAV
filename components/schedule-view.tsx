@@ -111,13 +111,13 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
       eyebrow={data.team.name}
       title="לו״ז"
       subtitle={period ? periodSubtitle(period) : "תכנון תקופות, סבבים ואירועים"}
-      action={data.canManageReservePeriods ? <Button size="icon" type="button" variant={manage ? "secondary" : "outline"} aria-label="ניהול תקופה" onClick={() => setManage((value) => !value)}><Plus className="size-4" /></Button> : null}
+      action={data.canManage && (data.canManageReservePeriods || period) ? <Button size="icon" type="button" variant={manage ? "secondary" : "outline"} aria-label={data.canManageReservePeriods ? "ניהול תקופה" : "עריכת לו״ז הקו"} onClick={() => setManage((value) => !value)}><Plus className="size-4" /></Button> : null}
     >
       <div className="space-y-2.5">
         {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={activeView === "agenda"} pressed={pressedSchedule?.view === "agenda"} onSelect={() => switchSchedule("agenda")}>אג׳נדה</Tab><Tab active={activeView === "month"} pressed={pressedSchedule?.view === "month"} onSelect={() => switchSchedule("month")}>חודש</Tab><Tab active={activeView === "rotations"} pressed={pressedSchedule?.view === "rotations"} onSelect={() => switchSchedule("rotations")}>סבבים</Tab></nav> : null}
       </div>
     </PageHeader>
-    {manage && data.canManageReservePeriods ? <Manager data={data} /> : null}
+    {manage && data.canManage ? <Manager data={data} /> : null}
     {!period ? <Empty /> : activeView === "month" ? <Month data={data} month={activeMonth} pendingMonth={pressedSchedule?.view === "month" ? pressedSchedule.month : null} onMonthChange={(nextMonth) => switchSchedule("month", nextMonth)} /> : activeView === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
   </AppPage>;
 }
@@ -271,8 +271,8 @@ function Timeline({ data }: { data: ScheduleData }) {
 }
 
 function Manager({ data }: { data: ScheduleData }) {
-  const create = createReservePeriodAction.bind(null, data.team.slug); const period = data.selectedPeriod;
-  return <section className="mb-5 rounded-lg border bg-card p-4 shadow-[0_1px_2px_rgba(20,22,26,0.04)]"><div className="mb-4 flex justify-between gap-3"><div><h2 className="text-base font-semibold">ניהול תקופת מילואים</h2><p className="mt-0.5 text-sm text-muted-foreground">התקופה נשמרת כטיוטה עד לפרסום.</p></div>{period ? <Badge variant="outline">{statusLabel(period.status)}</Badge> : null}</div><details className="border-b py-3" open={!period}><summary className="cursor-pointer font-medium">1. פרטי תקופה</summary><form action={create} className="mt-4 grid gap-3 md:grid-cols-4"><Field name="name" label="שם התקופה" required /><Field name="location" label="מיקום" /><Field name="starts_on" label="תאריך התחלה" type="date" required /><Field name="ends_on" label="תאריך סיום" type="date" required /><div><Button>יצירת תקופה כטיוטה</Button></div></form></details>{period ? <><Phases data={data} /><Groups data={data} /><Assignments data={data} /><Generator data={data} /><Blocks data={data} /><Overrides data={data} /><Events data={data} /><Publish data={data} /></> : null}</section>;
+  const create = createReservePeriodAction.bind(null, data.team.slug); const period = data.selectedPeriod; const admin = data.canManageReservePeriods;
+  return <section className="mb-5 rounded-lg border bg-card p-4 shadow-[0_1px_2px_rgba(20,22,26,0.04)]"><div className="mb-4 flex justify-between gap-3"><div><h2 className="text-base font-semibold">{admin ? "ניהול תקופת מילואים" : "עריכת לו״ז הקו"}</h2><p className="mt-0.5 text-sm text-muted-foreground">{admin ? "התקופה נשמרת כטיוטה עד לפרסום." : "אפשר לעדכן אירועי קו וחריגי סבב בתקופה הנבחרת."}</p></div>{period ? <Badge variant="outline">{statusLabel(period.status)}</Badge> : null}</div>{admin ? <details className="border-b py-3" open={!period}><summary className="cursor-pointer font-medium">1. פרטי תקופה</summary><form action={create} className="mt-4 grid gap-3 md:grid-cols-4"><Field name="name" label="שם התקופה" required /><Field name="location" label="מיקום" /><Field name="starts_on" label="תאריך התחלה" type="date" required /><Field name="ends_on" label="תאריך סיום" type="date" required /><div><Button>יצירת תקופה כטיוטה</Button></div></form></details> : null}{period ? <>{admin ? <><Phases data={data} /><Groups data={data} /><Assignments data={data} /><Generator data={data} /><Blocks data={data} /></> : null}<Overrides data={data} /><Events data={data} />{admin ? <Publish data={data} /> : null}</> : null}</section>;
 }
 
 function Phases({ data }: { data: ScheduleData }) {
