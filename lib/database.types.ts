@@ -19,6 +19,29 @@ export type Database = {
   };
   public: {
     Tables: {
+      activity_events: Row<{
+        actor_person_id: string | null;
+        actor_user_id: string | null;
+        created_at: string;
+        details: string | null;
+        entity_id: string | null;
+        entity_type: string;
+        event_type:
+          | "auth.sign_in"
+          | "leave.request_created"
+          | "leave.request_updated"
+          | "leave.request_deleted"
+          | "equipment.assigned"
+          | "equipment.updated"
+          | "equipment.returned"
+          | "team_equipment.created"
+          | "team_equipment.updated"
+          | "team_equipment.transferred";
+        id: string;
+        metadata: Json;
+        team_id: string;
+        title: string;
+      }>;
       attendance_days: Row<{
         attendance_date: string;
         created_at: string;

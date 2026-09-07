@@ -15,7 +15,7 @@ export default async function TasksPage({ params, searchParams }: TasksPageProps
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
   const selectedLinePeriodId = await getSelectedLinePeriodId(teamSlug);
   const data = await getTasksData(supabase, membership, userId, {
-    periodId: query.period ?? selectedLinePeriodId ?? undefined,
+    periodId: selectedLinePeriodId ?? query.period ?? undefined,
     selectedTaskId: query.task,
     week: query.week,
   });

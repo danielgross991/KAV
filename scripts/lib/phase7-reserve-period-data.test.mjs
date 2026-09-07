@@ -35,6 +35,7 @@ test("Rosh Hashanah home instruction is modeled as an event, not fake leave requ
 test("2026 Otniel rotations are whole-team week-on week-off", () => {
   assert.deepEqual(periodSeed.rotationGroups.map((group) => group.name), ["כל הצוות"]);
   assert.equal(periodSeed.rotationGroups[0].members, "all_active");
+  assert.deepEqual(periodSeed.rotationGroups[0].excluded_members, ["עמנואל אלמו", "אריאל דויב", "אריאל דוייב"]);
 
   const blocks = periodSeed.rotationBlocks ?? [];
   assert.equal(blocks[0].starts_on, "2026-09-09");

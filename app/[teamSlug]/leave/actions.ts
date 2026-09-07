@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireAuth } from "@/lib/kav/auth";
+import { logActivityEvent } from "@/lib/kav/activity";
 import { overlaps, validateLeaveRange } from "@/lib/kav/schedule-domain";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
@@ -60,6 +61,16 @@ export async function saveLeaveAction(teamSlug: string, formData: FormData) {
     ? await context.supabase.from("leave_requests").update(payload).eq("id", id).eq("team_id", context.teamId).select("id").single()
     : await context.supabase.from("leave_requests").insert({ ...payload, created_by: context.userId }).select("id").single();
   assertOk(result.error);
+  await logActivityEvent(context.supabase, {
+    actorUserId: context.userId,
+    details: `${startsOn}–${endsOn}`,
+    entityId: result.data?.id,
+    entityType: "leave_request",
+    eventType: id ? "leave.request_updated" : "leave.request_created",
+    metadata: { personId, status },
+    teamId: context.teamId,
+    title: id ? "בקשת יציאה עודכנה" : "בקשת יציאה נוצרה",
+  });
   refresh(teamSlug);
   redirect(`/${teamSlug}/leave?saved=1`);
 }
@@ -70,6 +81,14 @@ export async function deleteLeaveAction(teamSlug: string, formData: FormData) {
     .eq("id", required(formData, "id")).eq("team_id", context.teamId).select("id").single();
   assertOk(error);
   if (!data) throw new Error("היציאה לא נמצאה");
+  await logActivityEvent(context.supabase, {
+    actorUserId: context.userId,
+    entityId: data.id,
+    entityType: "leave_request",
+    eventType: "leave.request_deleted",
+    teamId: context.teamId,
+    title: "בקשת יציאה נמחקה",
+  });
   refresh(teamSlug);
   redirect(`/${teamSlug}/leave?deleted=1`);
 }
@@ -107,7 +126,7 @@ export async function createViewerLeaveRequestAction(teamSlug: string, formData:
   });
   if (issues.length) throw new Error("טווח תאריכי היציאה אינו תקין");
 
-  const { error } = await supabase.from("leave_requests").insert({
+  const { data: createdLeave, error } = await supabase.from("leave_requests").insert({
     team_id: membership.team.id,
     reserve_period_id: period.id,
     person_id: person.id,
@@ -116,8 +135,19 @@ export async function createViewerLeaveRequestAction(teamSlug: string, formData:
     status: "pending",
     reason: optional(formData, "reason"),
     created_by: userId,
-  });
+  }).select("id").single();
   assertOk(error);
+  await logActivityEvent(supabase, {
+    actorPersonId: person.id,
+    actorUserId: userId,
+    details: `${startsOn}–${endsOn}`,
+    entityId: createdLeave?.id,
+    entityType: "leave_request",
+    eventType: "leave.request_created",
+    metadata: { personId: person.id, status: "pending" },
+    teamId: membership.team.id,
+    title: "בקשת יציאה חדשה",
+  });
   refresh(teamSlug);
   redirect(`/${teamSlug}/leave?saved=1`);
 }

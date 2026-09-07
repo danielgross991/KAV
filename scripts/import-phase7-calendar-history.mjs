@@ -357,18 +357,29 @@ async function syncCurrentRotationGroups(teamId, reservePeriodId, groups, people
 
     if (group.members === "all_active") {
       const groupId = groupIds.get(group.name);
-      await ensureAllActiveMembers(teamId, groupId, people);
+      await ensureAllActiveMembers(teamId, groupId, people, group.excluded_members ?? []);
     }
   }
   return groupIds;
 }
 
-async function ensureAllActiveMembers(teamId, rotationGroupId, people) {
+async function ensureAllActiveMembers(teamId, rotationGroupId, people, excludedNames) {
   const { data: existing, error } = await supabase.from("rotation_members").select("person_id")
     .eq("team_id", teamId).eq("rotation_group_id", rotationGroupId);
   if (error) throw new Error(`Unable to load current rotation membership: ${error.message}`);
+  const excluded = new Set(excludedNames);
+  const eligiblePeople = people.filter((person) => !excluded.has(person.full_name));
+  const eligibleIds = new Set(eligiblePeople.map((person) => person.id));
   const existingIds = new Set((existing ?? []).map((item) => item.person_id));
-  const rows = people
+  const staleIds = [...existingIds].filter((personId) => !eligibleIds.has(personId));
+  if (staleIds.length) {
+    const { error: deleteError } = await supabase.from("rotation_members").delete()
+      .eq("team_id", teamId)
+      .eq("rotation_group_id", rotationGroupId)
+      .in("person_id", staleIds);
+    if (deleteError) throw new Error(`Unable to remove excluded current rotation members: ${deleteError.message}`);
+  }
+  const rows = eligiblePeople
     .filter((person) => !existingIds.has(person.id))
     .map((person) => ({ team_id: teamId, rotation_group_id: rotationGroupId, person_id: person.id, starts_on: null, ends_on: null }));
   if (!rows.length) return;

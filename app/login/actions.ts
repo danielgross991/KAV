@@ -11,6 +11,7 @@ import {
   getPostLoginPath,
   sanitizeNextPath,
 } from "@/lib/kav/auth-config";
+import { logActivityEvent } from "@/lib/kav/activity";
 import { getUserTeams } from "@/lib/kav/teams";
 
 export type LoginState = {
@@ -41,7 +42,8 @@ export async function signInWithPassword(
     return { message: GENERIC_LOGIN_ERROR };
   }
 
-  const memberships = next === "/" ? await getUserTeams(supabase, data.user.id) : [];
+  const memberships = await getUserTeams(supabase, data.user.id);
+  await recordSignIn(supabase, data.user.id, memberships);
   redirect(getPostLoginPath(next, memberships.map(({ team }) => team.slug)));
 }
 
@@ -91,7 +93,8 @@ export async function signInWithEmailOnly(
 
   await linkUserToEligiblePeople(admin, data.user, eligiblePeople);
 
-  const memberships = next === "/" ? await getUserTeams(supabase, data.user.id) : [];
+  const memberships = await getUserTeams(supabase, data.user.id);
+  await recordSignIn(supabase, data.user.id, memberships);
   redirect(getPostLoginPath(next, memberships.map(({ team }) => team.slug)));
 }
 
@@ -155,5 +158,30 @@ async function linkUserToEligiblePeople(
         .insert({ team_id: teamId, user_id: user.id, role: "viewer", is_active: true });
       if (error) throw new Error(`לא ניתן ליצור הרשאת צפייה: ${error.message}`);
     }
+  }
+}
+
+async function recordSignIn(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  memberships: Awaited<ReturnType<typeof getUserTeams>>,
+) {
+  for (const { team } of memberships) {
+    const { data: person } = await supabase
+      .from("people")
+      .select("id, full_name")
+      .eq("team_id", team.id)
+      .eq("auth_user_id", userId)
+      .maybeSingle();
+
+    await logActivityEvent(supabase, {
+      actorPersonId: person?.id,
+      actorUserId: userId,
+      details: person?.full_name ? `${person.full_name} נכנס למערכת` : "משתמש נכנס למערכת",
+      entityType: "auth",
+      eventType: "auth.sign_in",
+      teamId: team.id,
+      title: "כניסה למערכת",
+    });
   }
 }

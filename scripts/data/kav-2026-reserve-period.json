@@ -14,7 +14,14 @@
     { "name": "ירידה מהמשימה", "phase_type": "stand_down", "starts_on": "2026-12-02", "ends_on": "2026-12-02", "sort_order": 4 }
   ],
   "rotationGroups": [
-    { "name": "כל הצוות", "initial_state": "base", "color_token": "green", "sort_order": 0, "members": "all_active" }
+    {
+      "name": "כל הצוות",
+      "initial_state": "base",
+      "color_token": "gray",
+      "sort_order": 0,
+      "members": "all_active",
+      "excluded_members": ["עמנואל אלמו", "אריאל דויב", "אריאל דוייב"]
+    }
   ],
   "rotationBlocks": [
     { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-09-09", "ends_on": "2026-09-09", "notes": "חתימה על נשקים ותחילת אל״ת בבא״פ לכיש" },

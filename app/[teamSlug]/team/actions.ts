@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireAuth } from "@/lib/kav/auth";
+import { logActivityEvent } from "@/lib/kav/activity";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
@@ -259,14 +260,14 @@ export async function assignEquipmentAction(
   personId: string,
   formData: FormData,
 ) {
-  const { membership, supabase } = await requireManager(teamSlug);
+  const { membership, supabase, userId } = await requireManager(teamSlug);
   const equipmentTypeId = requiredText(formData, "equipment_type_id", "סוג ציוד");
   const status = equipmentStatus(formData);
 
   await assertPersonBelongsToTeam(supabase, membership.team.id, personId);
   await assertEquipmentTypeBelongsToTeam(supabase, membership.team.id, equipmentTypeId);
 
-  const { error } = await supabase.from("person_equipment").insert({
+  const { data, error } = await supabase.from("person_equipment").insert({
     assigned_at: optionalDate(formData, "assigned_at"),
     equipment_type_id: equipmentTypeId,
     model: optionalText(formData, "model"),
@@ -276,12 +277,22 @@ export async function assignEquipmentAction(
     serial_number: optionalText(formData, "serial_number"),
     status,
     team_id: membership.team.id,
-  });
+  }).select("id").single();
 
   if (error) {
     throw new Error(`לא ניתן לשייך ציוד: ${error.message}`);
   }
 
+  await logActivityEvent(supabase, {
+    actorUserId: userId,
+    details: "ציוד אישי שויך לאיש צוות",
+    entityId: data.id,
+    entityType: "person_equipment",
+    eventType: "equipment.assigned",
+    metadata: { personId, status },
+    teamId: membership.team.id,
+    title: "ציוד אישי שויך",
+  });
   revalidateTeam(teamSlug, personId);
   if (formData.get("return_to") === "team") {
     redirect(`/${teamSlug}/team?saved=equipment-added`);
@@ -295,7 +306,7 @@ export async function updateEquipmentAction(
   equipmentId: string,
   formData: FormData,
 ) {
-  const { membership, supabase } = await requireManager(teamSlug);
+  const { membership, supabase, userId } = await requireManager(teamSlug);
   const status = equipmentStatus(formData);
 
   const { error } = await supabase
@@ -316,6 +327,16 @@ export async function updateEquipmentAction(
     throw new Error(`לא ניתן לעדכן ציוד: ${error.message}`);
   }
 
+  await logActivityEvent(supabase, {
+    actorUserId: userId,
+    details: "ציוד אישי עודכן",
+    entityId: equipmentId,
+    entityType: "person_equipment",
+    eventType: "equipment.updated",
+    metadata: { personId, status },
+    teamId: membership.team.id,
+    title: "ציוד אישי עודכן",
+  });
   revalidateTeam(teamSlug, personId);
   redirect(`/${teamSlug}/team/${personId}?tab=equipment&saved=equipment-updated`);
 }
@@ -326,7 +347,7 @@ export async function quickUpdateEquipmentAction(
   equipmentId: string,
   formData: FormData,
 ) {
-  const { membership, supabase } = await requireManager(teamSlug);
+  const { membership, supabase, userId } = await requireManager(teamSlug);
   const status = equipmentStatus(formData);
 
   const { error } = await supabase
@@ -344,6 +365,16 @@ export async function quickUpdateEquipmentAction(
     throw new Error(`לא ניתן לעדכן ציוד: ${error.message}`);
   }
 
+  await logActivityEvent(supabase, {
+    actorUserId: userId,
+    details: "ציוד אישי עודכן מהטבלה",
+    entityId: equipmentId,
+    entityType: "person_equipment",
+    eventType: "equipment.updated",
+    metadata: { personId, status },
+    teamId: membership.team.id,
+    title: "ציוד אישי עודכן",
+  });
   revalidateTeam(teamSlug, personId);
   redirect(`/${teamSlug}/team?saved=equipment-updated`);
 }
@@ -353,7 +384,7 @@ export async function returnEquipmentAction(
   personId: string,
   equipmentId: string,
 ) {
-  const { membership, supabase } = await requireManager(teamSlug);
+  const { membership, supabase, userId } = await requireManager(teamSlug);
   const today = getDateInTimeZone(membership.team.timezone);
 
   const { error } = await supabase
@@ -367,6 +398,16 @@ export async function returnEquipmentAction(
     throw new Error(`לא ניתן להחזיר ציוד: ${error.message}`);
   }
 
+  await logActivityEvent(supabase, {
+    actorUserId: userId,
+    details: `הוחזר בתאריך ${today}`,
+    entityId: equipmentId,
+    entityType: "person_equipment",
+    eventType: "equipment.returned",
+    metadata: { personId },
+    teamId: membership.team.id,
+    title: "ציוד אישי הוחזר",
+  });
   revalidateTeam(teamSlug, personId);
   redirect(`/${teamSlug}/team/${personId}?tab=equipment&saved=equipment-returned`);
 }
@@ -418,6 +459,16 @@ export async function createTeamEquipmentAction(teamSlug: string, formData: Form
     }
   }
 
+  await logActivityEvent(supabase, {
+    actorUserId: userId,
+    details: requiredText(formData, "name", "שם ציוד"),
+    entityId: data.id,
+    entityType: "team_equipment_item",
+    eventType: "team_equipment.created",
+    metadata: { currentHolderPersonId, permanentOwnerPersonId },
+    teamId: membership.team.id,
+    title: "ציוד צוותי נוצר",
+  });
   revalidateTeamEquipment(teamSlug, [currentHolderPersonId, permanentOwnerPersonId]);
   redirect(`/${teamSlug}/team?saved=team-equipment-added`);
 }
@@ -471,6 +522,16 @@ export async function updateTeamEquipmentAction(teamSlug: string, itemId: string
     }
   }
 
+  await logActivityEvent(supabase, {
+    actorUserId: userId,
+    details: requiredText(formData, "name", "שם ציוד"),
+    entityId: itemId,
+    entityType: "team_equipment_item",
+    eventType: "team_equipment.updated",
+    metadata: { currentHolderPersonId, permanentOwnerPersonId },
+    teamId: membership.team.id,
+    title: "ציוד צוותי עודכן",
+  });
   revalidateTeamEquipment(teamSlug, [
     existingItem.current_holder_person_id,
     currentHolderPersonId,
@@ -526,6 +587,16 @@ export async function transferTeamEquipmentAction(teamSlug: string, itemId: stri
     throw new Error(`האחריות הועברה אך לא נשמרה היסטוריה: ${transferError.message}`);
   }
 
+  await logActivityEvent(supabase, {
+    actorUserId: userId,
+    details: "אחריות על ציוד צוותי הועברה",
+    entityId: item.id,
+    entityType: "team_equipment_item",
+    eventType: "team_equipment.transferred",
+    metadata: { fromPersonId: item.current_holder_person_id, toPersonId },
+    teamId: membership.team.id,
+    title: "אחריות ציוד צוותי הועברה",
+  });
   revalidateTeamEquipment(teamSlug, [item.current_holder_person_id, toPersonId]);
   redirect(`/${teamSlug}/team?saved=team-equipment-transferred`);
 }

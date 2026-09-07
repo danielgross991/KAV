@@ -22,7 +22,7 @@ export default async function ScheduleDayPage({ params, searchParams }: DayPageP
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
   const selectedLinePeriodId = await getSelectedLinePeriodId(teamSlug);
-  const data = await getScheduleData(supabase, membership, query.period ?? selectedLinePeriodId ?? undefined, userId);
+  const data = await getScheduleData(supabase, membership, selectedLinePeriodId ?? query.period ?? undefined, userId);
   const period = data.selectedPeriod;
   if (!period || date < period.starts_on || date > period.ends_on) notFound();
   const day = getDaySchedule(data, date);

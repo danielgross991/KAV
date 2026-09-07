@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, CalendarOff, ClipboardList, Home, PackageCheck, Settings, UsersRound, UserCheck, type LucideIcon } from "lucide-react";
+import { Bell, CalendarDays, CalendarOff, ClipboardList, Home, PackageCheck, Settings, UsersRound, UserCheck, type LucideIcon } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -16,6 +16,7 @@ const managerItems = [
   { href: "/tasks", label: "משימות", icon: ClipboardList },
   { href: "/attendance", label: "נוכחות", icon: UserCheck },
   { href: "/team", label: "צוות", icon: UsersRound },
+  { href: "/notifications", label: "עדכונים", icon: Bell },
 ];
 
 const viewerItems = [
@@ -45,7 +46,7 @@ export function TeamNav({
   useEffect(() => {
     const routeHrefs = [
       ...items.map((item) => `${base}${item.href}`),
-      ...(canManage(role) ? [`${base}/leave`, `${base}/settings`, ...(role === "admin" ? [`${base}/users`] : [])] : []),
+      ...(canManage(role) ? [`${base}/leave`, `${base}/settings`, `${base}/notifications`, ...(role === "admin" ? [`${base}/users`] : [])] : []),
     ];
 
     routeHrefs.forEach((href) => router.prefetch(href));
