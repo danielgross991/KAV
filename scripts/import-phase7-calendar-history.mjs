@@ -426,25 +426,37 @@ async function createEvents(team, reservePeriodId, events, kind) {
     const startsAt = localDateTimeToIso(team.timezone, event.starts_on, startsTime);
     const endsAt = localDateTimeToIso(team.timezone, endsOn, endsTime);
 
-    const { data: existing, error } = await supabase.from("schedule_events").select("id")
+    const { data: existingRows, error } = await supabase.from("schedule_events").select("id")
       .eq("team_id", team.id).eq("reserve_period_id", reservePeriodId)
-      .eq("title", event.title).eq("starts_at", startsAt).maybeSingle();
+      .eq("title", event.title);
     if (error) throw new Error(`Unable to look up event '${event.title}': ${error.message}`);
+    const existing = existingRows?.[0] ?? null;
     const bucket = kind === "holiday" ? report.holidaysSkipped : report.eventsSkipped;
-    if (existing) { bucket.push({ title: event.title, starts_on: event.starts_on, reason: "already exists" }); continue; }
 
     // Holidays in the legacy extract use a semantic label that is not part of the
     // schedule_events constraint. Preserve them as all-day events using the valid
     // generic category; the title and all-day flag retain the calendar meaning.
     const eventType = ["briefing", "training", "family", "processing", "changeover", "other"]
       .includes(event.event_type) ? event.event_type : "other";
-    const { error: insertError } = await supabase.from("schedule_events").insert({
+    const payload = {
       team_id: team.id, reserve_period_id: reservePeriodId, title: event.title,
       event_type: eventType, starts_at: startsAt, ends_at: endsAt,
       is_all_day: Boolean(event.is_all_day), notes: event.notes ?? null, location: event.location ?? null,
-    });
+    };
+    const { error: insertError } = existing
+      ? await supabase.from("schedule_events").update(payload).eq("id", existing.id)
+      : await supabase.from("schedule_events").insert(payload);
     if (insertError) throw new Error(`Unable to create event '${event.title}': ${insertError.message}`);
-    (kind === "holiday" ? report.holidaysCreated : report.eventsCreated).push({ title: event.title, starts_on: event.starts_on });
+    const duplicateIds = (existingRows ?? []).slice(1).map((row) => row.id);
+    if (duplicateIds.length) {
+      const { error: deleteDuplicateError } = await supabase.from("schedule_events").delete().in("id", duplicateIds);
+      if (deleteDuplicateError) throw new Error(`Unable to remove duplicate events for '${event.title}': ${deleteDuplicateError.message}`);
+    }
+    if (existing) {
+      bucket.push({ title: event.title, starts_on: event.starts_on, reason: "updated existing event" });
+    } else {
+      (kind === "holiday" ? report.holidaysCreated : report.eventsCreated).push({ title: event.title, starts_on: event.starts_on });
+    }
   }
 }
 

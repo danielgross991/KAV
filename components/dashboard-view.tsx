@@ -8,6 +8,7 @@ import {
   Clock3,
   Home,
   PackageCheck,
+  PlaneTakeoff,
   UserCheck,
   UserRound,
   Users,
@@ -66,6 +67,7 @@ function ManagerDashboard({
         }
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
+      <ManagerLeaveRequests data={data} />
       <PersonalEquipmentCard data={data} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
 
@@ -153,6 +155,7 @@ function ManagerDashboard({
           <CurrentPeriod data={data} />
           <UpcomingEvent data={data} />
           <HomeLeaderboard data={data} />
+          <LeaveRequestLeaderboard data={data} />
           <AttendanceByPerson data={data} />
           <QualificationReadiness data={data} />
         </div>
@@ -186,6 +189,9 @@ function ViewerDashboard({
       <div className="mt-4">
         <HomeLeaderboard data={data} />
       </div>
+      <div className="mt-4">
+        <LeaveRequestLeaderboard data={data} />
+      </div>
 
       <section className="mt-4 rounded-lg bg-primary px-4 py-4 !text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
         <div className="flex items-center gap-2 text-xs font-medium text-white/70">
@@ -207,6 +213,46 @@ function ViewerDashboard({
         <CurrentPeriod data={data} compact />
       </div>
     </AppPage>
+  );
+}
+
+function ManagerLeaveRequests({ data }: { data: DashboardData }) {
+  if (!data.canManage) return null;
+
+  return (
+    <Card className="mb-4">
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 pb-3">
+        <div>
+          <CardTitle>בקשות יציאה</CardTitle>
+          <p className="mt-0.5 text-xs text-muted-foreground">כל הבקשות בקו הנבחר</p>
+        </div>
+        <Badge variant="outline">{data.managerLeaveRequests.length}</Badge>
+      </CardHeader>
+      <CardContent>
+        {data.managerLeaveRequests.length ? (
+          <div className="grid gap-2 md:grid-cols-2">
+            {data.managerLeaveRequests.slice(0, 8).map((request) => (
+              <Link
+                className="grid gap-1 rounded-md border bg-background px-3 py-2.5 text-sm transition-colors hover:border-primary/30 hover:bg-accent/50"
+                href={`/${data.team.slug}/leave?view=all`}
+                key={request.id}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <b>{request.personName}</b>
+                  <Badge variant={isApprovedStatus(request.status) ? "success" : request.status === "rejected" ? "danger" : "secondary"}>
+                    {leaveStatusLabel(request.status)}
+                  </Badge>
+                </span>
+                <span className="text-muted-foreground">{shortDate(request.startsOn)}–{shortDate(request.endsOn)}</span>
+                <span className="line-clamp-2 text-foreground">{request.reason ?? "ללא סיבה"}</span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">אין בקשות יציאה בקו הנבחר.</p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -329,6 +375,47 @@ function HomeLeaderboard({ data }: { data: DashboardData }) {
                 <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
                 <span className="kav-num mt-1 text-xs text-muted-foreground">
                   {item.homeDays} ימים · {Math.round(item.homePercentage * 100)}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function LeaveRequestLeaderboard({ data }: { data: DashboardData }) {
+  if (!data.leaveRequestLeaderboard.length) return null;
+  const podium = [
+    data.leaveRequestLeaderboard[1],
+    data.leaveRequestLeaderboard[0],
+    data.leaveRequestLeaderboard[2],
+  ].filter(Boolean);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle>אלופי בקשות יציאה</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-3 items-end gap-2">
+          {podium.map((item) => {
+            const rank = data.leaveRequestLeaderboard.findIndex((candidate) => candidate.personId === item.personId) + 1;
+            return (
+              <div
+                className={cn(
+                  "grid min-h-32 place-items-center rounded-lg border border-sky-200 bg-sky-50/60 p-2 text-center",
+                  rank === 1 && "min-h-40 border-sky-400 bg-sky-100",
+                )}
+                key={item.personId}
+              >
+                <span className="text-xl" aria-hidden>{MEDALS[rank - 1]}</span>
+                <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} featured={rank === 1} />
+                <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
+                <span className="kav-num mt-1 inline-flex items-center gap-1 text-xs text-sky-800">
+                  <PlaneTakeoff className="size-3.5" />
+                  {item.requestCount}
                 </span>
               </div>
             );
@@ -559,4 +646,15 @@ function statusLabel(status: string) {
   if (status === "published") return "פורסמה";
   if (status === "draft") return "טיוטה";
   return status;
+}
+
+function leaveStatusLabel(status: string) {
+  if (status === "approved" || status === "partially_approved") return "מאושר";
+  if (status === "rejected") return "לא מאושר";
+  if (status === "cancelled") return "בוטל";
+  return "ממתין";
+}
+
+function isApprovedStatus(status: string) {
+  return status === "approved" || status === "partially_approved";
 }

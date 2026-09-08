@@ -4,7 +4,8 @@ import { cache } from "react";
 import type { Database } from "@/lib/database.types";
 import { getCurrentDailyQuote, type CurrentDailyQuote } from "@/lib/kav/daily-quotes";
 import { getDateInTimeZone } from "@/lib/kav/dates";
-import { getOperationalDay } from "@/lib/kav/operations";
+import { getManagerLeaveRequests, type ManagerLeaveRequestSummary } from "@/lib/kav/manager-leave";
+import { getLeaveRequestCounts, getOperationalDay } from "@/lib/kav/operations";
 import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
 import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
 import { getNextPersonalTask } from "@/lib/kav/tasks";
@@ -35,6 +36,13 @@ export type DashboardData = {
   dailyQuote: CurrentDailyQuote;
   expectedOnBase: number;
   homeLeaderboard: PersonAttendanceStats[];
+  leaveRequestLeaderboard: Array<{
+    fullName: string;
+    personId: string;
+    photoUrl: string | null;
+    requestCount: number;
+  }>;
+  managerLeaveRequests: ManagerLeaveRequestSummary[];
   attendanceStats: PersonAttendanceStats[];
   issues: string[];
   nextTask: Awaited<ReturnType<typeof getNextPersonalTask>>;
@@ -110,7 +118,7 @@ export const getDashboardData = cache(async function getDashboardData(
   const now = new Date().toISOString();
 
   const [
-    activePeopleResult,
+    peopleResult,
     dailyQuote,
     requirementsResult,
     personPakalsResult,
@@ -119,9 +127,10 @@ export const getDashboardData = cache(async function getDashboardData(
   ] = await Promise.all([
     supabase
       .from("people")
-      .select("id", { count: "exact", head: true })
+      .select("id, full_name, is_active, photo_url")
       .eq("team_id", team.id)
-      .eq("is_active", true),
+      .order("display_order")
+      .order("full_name"),
     getCurrentDailyQuote(supabase, team, today),
     supabase
       .from("team_pakal_requirements")
@@ -147,7 +156,7 @@ export const getDashboardData = cache(async function getDashboardData(
       .order("starts_on", { ascending: false }),
   ]);
 
-  assertOk(activePeopleResult.error, "active people");
+  assertOk(peopleResult.error, "people");
   assertOk(requirementsResult.error, "pakal requirements");
   assertOk(personPakalsResult.error, "person pakals");
   assertOk(currentPersonResult.error, "current person");
@@ -168,11 +177,23 @@ export const getDashboardData = cache(async function getDashboardData(
     upcomingEventQuery = upcomingEventQuery.eq("reserve_period_id", selectedPeriod.id);
   }
 
-  const [operationalDay, nextTask, teamStats, upcomingEventResult] = await Promise.all([
+  const people = peopleResult.data ?? [];
+  const peopleById = new Map(people.map((person) => [person.id, person]));
+
+  const [
+    operationalDay,
+    nextTask,
+    teamStats,
+    upcomingEventResult,
+    leaveRequestCounts,
+    managerLeaveRequests,
+  ] = await Promise.all([
     getOperationalDay(supabase, team, today, selectedPeriod?.id),
     userId ? getNextPersonalTask(supabase, team, userId, selectedPeriod?.id) : Promise.resolve(null),
     getTeamStats(supabase, team, today, selectedPeriod?.id),
     upcomingEventQuery.maybeSingle(),
+    selectedPeriod ? getLeaveRequestCounts(supabase, team.id, selectedPeriod.id) : Promise.resolve([]),
+    manager ? getManagerLeaveRequests(supabase, team.id, selectedPeriod?.id ?? null, peopleById) : Promise.resolve([]),
   ]);
   assertOk(upcomingEventResult.error, "upcoming event");
   const currentPeriod = selectedPeriod ?? operationalDay.period;
@@ -243,7 +264,7 @@ export const getDashboardData = cache(async function getDashboardData(
   const equipmentTypeById = new Map((equipmentTypesResult.data ?? []).map((type) => [type.id, type]));
 
   return {
-    activePeople: activePeopleResult.count ?? 0,
+    activePeople: people.filter((person) => person.is_active).length,
     canManage: manager,
     approvedLeaveToday: operationalDay.summary.leave,
     attendance,
@@ -259,6 +280,20 @@ export const getDashboardData = cache(async function getDashboardData(
     dailyQuote,
     expectedOnBase,
     homeLeaderboard: teamStats.leaderboard,
+    leaveRequestLeaderboard: leaveRequestCounts
+      .map((item) => {
+        const person = peopleById.get(item.personId);
+        return person ? {
+          fullName: person.full_name,
+          personId: person.id,
+          photoUrl: person.photo_url,
+          requestCount: item.requestCount,
+        } : null;
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort((a, b) => b.requestCount - a.requestCount || a.fullName.localeCompare(b.fullName, "he"))
+      .slice(0, 3),
+    managerLeaveRequests,
     attendanceStats: teamStats.stats,
     issues,
     nextTask,

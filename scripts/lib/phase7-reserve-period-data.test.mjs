@@ -56,6 +56,15 @@ test("2026 Otniel rotations are whole-team week-on week-off", () => {
     block.state === "home" &&
     block.starts_on === "2026-09-29" &&
     block.ends_on === "2026-10-05"));
+  assert.ok(blocks.some((block) =>
+    block.state === "base" &&
+    block.starts_on === "2026-10-06" &&
+    block.ends_on === "2026-10-10"));
+  assert.ok(blocks.some((block) =>
+    block.state === "home" &&
+    block.starts_on === "2026-10-11" &&
+    block.ends_on === "2026-10-17"));
+  assert.ok(blocks.slice(7).every((block) => new Date(`${block.starts_on}T12:00:00Z`).getUTCDay() === 0));
   for (let index = 1; index < blocks.length; index += 1) {
     assert.equal(blocks[index].group_name, "כל הצוות");
     assert.ok(blocks[index].starts_on > blocks[index - 1].ends_on);

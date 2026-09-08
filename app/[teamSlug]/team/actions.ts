@@ -730,7 +730,7 @@ function requiredText(formData: FormData, key: string, label: string) {
     throw new Error(`${label} הוא שדה חובה`);
   }
 
-  return value;
+  return value.toLowerCase();
 }
 
 function optionalText(formData: FormData, key: string) {

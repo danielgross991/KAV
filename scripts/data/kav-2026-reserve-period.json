@@ -30,15 +30,15 @@
     { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-09-18", "ends_on": "2026-09-21", "notes": "בית עד אחרי יום כיפור" },
     { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-09-22", "ends_on": "2026-09-28", "notes": "סגירת שבוע כולל סוכות א׳" },
     { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-09-29", "ends_on": "2026-10-05", "notes": "שבוע בית כולל סוכות ב׳" },
-    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-10-06", "ends_on": "2026-10-12" },
-    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-10-13", "ends_on": "2026-10-19" },
-    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-10-20", "ends_on": "2026-10-26" },
-    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-10-27", "ends_on": "2026-11-02" },
-    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-11-03", "ends_on": "2026-11-09" },
-    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-11-10", "ends_on": "2026-11-16" },
-    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-11-17", "ends_on": "2026-11-23" },
-    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-11-24", "ends_on": "2026-11-30" },
-    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-12-01", "ends_on": "2026-12-02", "notes": "סיום וירידה מהמשימה" }
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-10-06", "ends_on": "2026-10-10", "notes": "חזרה לבסיס ל-5 ימים" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-10-11", "ends_on": "2026-10-17", "notes": "יציאה ביום ראשון ומעבר למתכונת שבוע-שבוע" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-10-18", "ends_on": "2026-10-24" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-10-25", "ends_on": "2026-10-31" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-11-01", "ends_on": "2026-11-07" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-11-08", "ends_on": "2026-11-14" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-11-15", "ends_on": "2026-11-21" },
+    { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-11-22", "ends_on": "2026-11-28" },
+    { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-11-29", "ends_on": "2026-12-02", "notes": "שבוע בסיס אחרון עד סיום המשימה" }
   ],
   "events": [
     {
@@ -91,6 +91,31 @@
       "is_all_day": false,
       "location": "עותניאל",
       "notes": "חזרה לבסיס לסגור שבוע · קהל: כולם"
+    },
+    {
+      "title": "יוצאים לשבוע בבית",
+      "event_type": "changeover",
+      "starts_on": "2026-09-29",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "notes": "כל הצוות יוצא לשבוע בבית · קהל: כולם"
+    },
+    {
+      "title": "חזרה לבסיס ל-5 ימים",
+      "event_type": "changeover",
+      "starts_on": "2026-10-06",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "location": "עותניאל",
+      "notes": "כל הצוות חוזר לבסיס ל-5 ימים · קהל: כולם"
+    },
+    {
+      "title": "יציאה הביתה ותחילת שבוע-שבוע",
+      "event_type": "changeover",
+      "starts_on": "2026-10-11",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "notes": "מכאן ההחלפות בכל יום ראשון: שבוע בית / שבוע בסיס לסירוגין · קהל: כולם"
     },
     {
       "title": "ירידה מהמשימה",

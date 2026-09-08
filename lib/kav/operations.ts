@@ -46,6 +46,11 @@ export type OperationalRange = {
   resolve: (personId: string, date: string) => ReturnType<typeof resolveOperationalPerson>;
 };
 
+export type LeaveRequestCount = {
+  personId: string;
+  requestCount: number;
+};
+
 // Every function in this file reaches leave/attendance data ONLY through the
 // get_team_approved_leave_windows / get_team_attendance_entries / get_team_attendance_day_status
 // RPCs (supabase/migrations/20260828150500_phase7_safe_operational_facts_rpcs.sql). Those RPCs
@@ -108,6 +113,23 @@ export const getLeaveRequestMarkers = cache(async function getLeaveRequestMarker
       approvedStartsOn: null,
       approvedEndsOn: null,
     }));
+});
+
+export const getLeaveRequestCounts = cache(async function getLeaveRequestCounts(
+  supabase: Client,
+  teamId: string,
+  reservePeriodId: string,
+): Promise<LeaveRequestCount[]> {
+  const { data, error } = await supabase.rpc("get_team_leave_request_counts", {
+    target_team_id: teamId,
+    target_reserve_period_id: reservePeriodId,
+  });
+  assertOk(error, "leave request counts");
+
+  return (data ?? []).map((item) => ({
+    personId: item.person_id,
+    requestCount: Number(item.request_count),
+  }));
 });
 
 export const getAttendanceEntriesByDate = cache(async function getAttendanceEntriesByDate(

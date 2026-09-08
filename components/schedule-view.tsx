@@ -174,8 +174,10 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
   const isPast = date < data.today;
   const attendanceIssue = data.canManage && isPast && ((day.attendance?.absent.length ?? 0) > 0 || (day.attendance?.unreported.length ?? 0) > 0);
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
+  const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null;
+  const isChangeover = isChangeoverDate(data, date, dominantState);
 
-  return <Link aria-haspopup="dialog" className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-card hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", viewer?.resolution.state === "home" && "bg-sky-50/80", personalLeaves.length && "border-primary/40 bg-primary/10 ring-2 ring-inset ring-primary/25")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
+  return <Link aria-haspopup="dialog" className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "bg-emerald-50", dominantState === "home" && "bg-sky-50/80", isChangeover && "bg-[linear-gradient(135deg,rgb(236_253_245)_0%,rgb(236_253_245)_50%,rgb(240_249_255)_50%,rgb(240_249_255)_100%)]", personalLeaves.length && "border-primary/40 ring-2 ring-inset ring-primary/25")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
     event.preventDefault();
     onPreview();
   }}>
@@ -185,7 +187,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
         {holiday ? <span aria-label={holiday.title} className="size-2 rounded-full bg-violet-500" title={holiday.title} /> : null}
         {otherEvents.length ? <span className="size-2 rounded-full bg-amber-500" /> : null}
         {day.tasks.length ? <span className="size-2 rounded-full bg-primary" /> : null}
-        {teamLeaveCount ? <span className="size-2 rounded-full bg-sky-500" /> : null}
+        {teamLeaveCount ? <span className="kav-num min-w-5 rounded-full bg-sky-600 px-1 text-center text-[0.62rem] font-bold leading-5 text-white">{teamLeaveCount}</span> : null}
         {attendanceIssue ? <span className="size-2 rounded-full bg-destructive" /> : null}
       </span>
     </div>
@@ -194,7 +196,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
       <>
         {baseGroups.slice(0, 2).map((group) => <div className={cn("mt-1 truncate rounded-md px-1.5 py-0.5 text-[0.68rem] font-medium sm:text-xs", groupColorClass(group.color_token))} key={group.id}>{group.name} · {stateLabel(group.block?.state)}</div>)}
         {baseGroups.length > 2 ? <div className="mt-1 truncate text-[0.68rem] text-muted-foreground sm:text-xs">+{baseGroups.length - 2} סבבים בבסיס</div> : null}
-        {teamLeaveCount ? <div className="mt-1 truncate text-[0.68rem] text-sky-700 sm:text-xs">{teamLeaveCount} יציאות/בקשות</div> : null}
+        {teamLeaveCount ? <div className="mt-1 truncate text-[0.68rem] font-medium text-sky-800 sm:text-xs">{teamLeaveCount} בקשות יציאה</div> : null}
         {day.tasks.length ? <div className="mt-1 truncate text-[0.68rem] text-primary sm:text-xs">{day.tasks.length} משימות</div> : null}
       </>
     ) : viewer ? (
@@ -358,4 +360,15 @@ function groupColorClass(color: string | null) {
   if (color === "amber") return "bg-amber-100 text-amber-900";
   if (color === "gray") return "bg-slate-100 text-slate-800";
   return "bg-sky-100 text-sky-900";
+}
+
+function isChangeoverDate(data: ScheduleData, date: string, state: string | null) {
+  if (!state) return false;
+
+  const previousDate = addCalendarDays(date, -1);
+  const nextDate = addCalendarDays(date, 1);
+  const previousState = data.blocks.find((block) => block.starts_on <= previousDate && block.ends_on >= previousDate)?.state ?? null;
+  const nextState = data.blocks.find((block) => block.starts_on <= nextDate && block.ends_on >= nextDate)?.state ?? null;
+
+  return (previousState !== null && previousState !== state) || (nextState !== null && nextState !== state);
 }

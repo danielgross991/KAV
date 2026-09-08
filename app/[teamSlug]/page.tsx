@@ -24,7 +24,7 @@ export default async function TeamDashboardPage({ params, searchParams }: TeamDa
     membership.team,
     canManage(membership.role),
     userId,
-    query.statsPeriod ?? selectedLinePeriodId ?? undefined,
+    selectedLinePeriodId ?? query.statsPeriod ?? undefined,
   );
 
   return <DashboardView data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />;

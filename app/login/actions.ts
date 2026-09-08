@@ -99,6 +99,7 @@ export async function signInWithEmailOnly(
 }
 
 type EligiblePerson = {
+  email: string | null;
   id: string;
   team_id: string;
 };
@@ -109,15 +110,14 @@ async function getEligiblePeopleForEmail(
 ): Promise<EligiblePerson[]> {
   const { data, error } = await admin
     .from("people")
-    .select("id, team_id")
-    .eq("email", email)
+    .select("id, team_id, email")
     .eq("is_active", true);
 
   if (error) {
     throw new Error(`לא ניתן לבדוק את האימייל: ${error.message}`);
   }
 
-  return data ?? [];
+  return (data ?? []).filter((person) => person.email?.trim().toLowerCase() === email);
 }
 
 async function linkUserToEligiblePeople(

@@ -21,7 +21,7 @@ export default async function LeavePage({ params, searchParams }: {
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
   const today = getDateInTimeZone(membership.team.timezone);
   const isManager = canManage(membership.role);
-  const selectedLinePeriodId = query.period ?? await getSelectedLinePeriodId(teamSlug);
+  const selectedLinePeriodId = await getSelectedLinePeriodId(teamSlug) ?? query.period ?? null;
   const currentPersonPromise = supabase
     .from("people")
     .select("id, full_name")
@@ -48,10 +48,12 @@ export default async function LeavePage({ params, searchParams }: {
 
   const peopleById = new Map((people ?? []).map((person) => [person.id, person.full_name]));
   const periodsById = new Map((periods ?? []).map((period) => [period.id, period]));
-  const view = ["active", "upcoming", "history"].includes(query.view ?? "") ? query.view! : "active";
+  const view = ["all", "active", "upcoming", "history"].includes(query.view ?? "") ? query.view! : "all";
   const filtered = (leaves ?? [])
     .filter((leave) => selectedLinePeriodId ? leave.reserve_period_id === selectedLinePeriodId : true)
-    .filter((leave) => view === "active"
+    .filter((leave) => view === "all"
+      ? true
+      : view === "active"
       ? leave.starts_on <= today && leave.ends_on >= today
       : view === "upcoming" ? leave.starts_on > today : leave.ends_on < today);
   const managementLeaves = currentPerson
@@ -63,7 +65,7 @@ export default async function LeavePage({ params, searchParams }: {
 
   return <AppPage className="max-w-6xl">
     <PageHeader eyebrow={membership.team.name} title="יציאות" subtitle="ניהול בקשות וטווחים מאושרים" action={<a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="יציאה חדשה"><Plus className="size-4" /></a>}>
-      <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1"><Tab active={view === "active"} href={`/${teamSlug}/leave?view=active`}>פעילות</Tab><Tab active={view === "upcoming"} href={`/${teamSlug}/leave?view=upcoming`}>קרובות</Tab><Tab active={view === "history"} href={`/${teamSlug}/leave?view=history`}>היסטוריה</Tab></nav>
+      <nav className="grid grid-cols-4 gap-1 rounded-md border bg-muted p-1"><Tab active={view === "all"} href={`/${teamSlug}/leave?view=all`}>הכל</Tab><Tab active={view === "active"} href={`/${teamSlug}/leave?view=active`}>פעילות</Tab><Tab active={view === "upcoming"} href={`/${teamSlug}/leave?view=upcoming`}>קרובות</Tab><Tab active={view === "history"} href={`/${teamSlug}/leave?view=history`}>היסטוריה</Tab></nav>
     </PageHeader>
     {query.saved ? <SuccessNotice>היציאה נשמרה</SuccessNotice> : null}{query.deleted ? <SuccessNotice>היציאה נמחקה</SuccessNotice> : null}
     <MyLeaveRequests
@@ -76,7 +78,7 @@ export default async function LeavePage({ params, searchParams }: {
     <section className="divide-y overflow-hidden rounded-lg border bg-card">
       {managementLeaves.map((leave) => <details key={leave.id}>
         <summary className="grid min-h-16 cursor-pointer gap-2 p-3.5 transition-colors hover:bg-muted/40 active:bg-muted sm:grid-cols-[1fr_auto_auto] sm:items-center">
-          <div><b>{peopleById.get(leave.person_id)}</b><p className="mt-1 text-sm text-muted-foreground">{range(leave.starts_on, leave.ends_on)} · {periodsById.get(leave.reserve_period_id)?.name}</p></div>
+          <div><b>{peopleById.get(leave.person_id)}</b><p className="mt-1 text-sm text-muted-foreground">{range(leave.starts_on, leave.ends_on)} · {periodsById.get(leave.reserve_period_id)?.name}</p>{leave.reason ? <p className="mt-1 text-sm font-medium">{leave.reason}</p> : null}</div>
           <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>{statusLabel(leave.status)}</Badge>
         </summary>
         <form action={saveLeaveAction.bind(null, teamSlug)} className="grid gap-3 border-t bg-muted/30 p-3.5 md:grid-cols-4">
@@ -91,7 +93,7 @@ export default async function LeavePage({ params, searchParams }: {
         </form>
         <form action={deleteLeaveAction.bind(null, teamSlug)} className="bg-muted/30 px-3.5 pb-3.5"><input type="hidden" name="id" value={leave.id} /><Button variant="ghost" size="sm"><Trash2 className="size-4" />מחיקה</Button></form>
       </details>)}
-      {!managementLeaves.length ? <div className="grid min-h-52 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין יציאות פעילות</p></div></div> : null}
+      {!managementLeaves.length ? <div className="grid min-h-52 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין בקשות יציאה להצגה</p></div></div> : null}
     </section>
     <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave"><h2 className="text-base font-semibold">יציאה חדשה</h2>
       <form action={saveLeaveAction.bind(null, teamSlug)} className="mt-4 grid gap-3 md:grid-cols-4">
