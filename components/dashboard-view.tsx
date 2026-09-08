@@ -67,7 +67,6 @@ function ManagerDashboard({
         }
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
-      <ManagerLeaveRequests data={data} />
       <PersonalEquipmentCard data={data} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
 
@@ -213,46 +212,6 @@ function ViewerDashboard({
         <CurrentPeriod data={data} compact />
       </div>
     </AppPage>
-  );
-}
-
-function ManagerLeaveRequests({ data }: { data: DashboardData }) {
-  if (!data.canManage) return null;
-
-  return (
-    <Card className="mb-4">
-      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 pb-3">
-        <div>
-          <CardTitle>בקשות יציאה</CardTitle>
-          <p className="mt-0.5 text-xs text-muted-foreground">כל הבקשות בקו הנבחר</p>
-        </div>
-        <Badge variant="outline">{data.managerLeaveRequests.length}</Badge>
-      </CardHeader>
-      <CardContent>
-        {data.managerLeaveRequests.length ? (
-          <div className="grid gap-2 md:grid-cols-2">
-            {data.managerLeaveRequests.slice(0, 8).map((request) => (
-              <Link
-                className="grid gap-1 rounded-md border bg-background px-3 py-2.5 text-sm transition-colors hover:border-primary/30 hover:bg-accent/50"
-                href={`/${data.team.slug}/leave?view=all`}
-                key={request.id}
-              >
-                <span className="flex items-center justify-between gap-2">
-                  <b>{request.personName}</b>
-                  <Badge variant={isApprovedStatus(request.status) ? "success" : request.status === "rejected" ? "danger" : "secondary"}>
-                    {leaveStatusLabel(request.status)}
-                  </Badge>
-                </span>
-                <span className="text-muted-foreground">{shortDate(request.startsOn)}–{shortDate(request.endsOn)}</span>
-                <span className="line-clamp-2 text-foreground">{request.reason ?? "ללא סיבה"}</span>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">אין בקשות יציאה בקו הנבחר.</p>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 
@@ -415,7 +374,7 @@ function LeaveRequestLeaderboard({ data }: { data: DashboardData }) {
                 <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
                 <span className="kav-num mt-1 inline-flex items-center gap-1 text-xs text-sky-800">
                   <PlaneTakeoff className="size-3.5" />
-                  {item.requestCount}
+                  {item.requestDays} ימי בקשה
                 </span>
               </div>
             );
@@ -646,15 +605,4 @@ function statusLabel(status: string) {
   if (status === "published") return "פורסמה";
   if (status === "draft") return "טיוטה";
   return status;
-}
-
-function leaveStatusLabel(status: string) {
-  if (status === "approved" || status === "partially_approved") return "מאושר";
-  if (status === "rejected") return "לא מאושר";
-  if (status === "cancelled") return "בוטל";
-  return "ממתין";
-}
-
-function isApprovedStatus(status: string) {
-  return status === "approved" || status === "partially_approved";
 }

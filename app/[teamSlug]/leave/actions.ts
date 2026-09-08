@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 
 import { requireAuth } from "@/lib/kav/auth";
 import { logActivityEvent } from "@/lib/kav/activity";
+import { eachCalendarDate } from "@/lib/kav/dates";
+import { getOperationalRange } from "@/lib/kav/operations";
 import { overlaps, validateLeaveRange } from "@/lib/kav/schedule-domain";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
@@ -109,7 +111,7 @@ export async function createViewerLeaveRequestAction(teamSlug: string, formData:
       .maybeSingle(),
     supabase
       .from("reserve_periods")
-      .select("id, starts_on, ends_on")
+      .select("*")
       .eq("id", periodId)
       .eq("team_id", membership.team.id)
       .in("status", ["active", "published", "draft"])
@@ -125,6 +127,14 @@ export async function createViewerLeaveRequestAction(teamSlug: string, formData:
     period: { startsOn: period.starts_on, endsOn: period.ends_on },
   });
   if (issues.length) throw new Error("טווח תאריכי היציאה אינו תקין");
+
+  const operationalRange = await getOperationalRange(supabase, membership.team, period, startsOn, endsOn);
+  const hasBaseDay = eachCalendarDate(startsOn, endsOn).some((date) =>
+    operationalRange.resolve(person.id, date).plannedState === "base",
+  );
+  if (!hasBaseDay) {
+    throw new Error("אופס! יצאת חמור - בקשת היציאה שלך היא לתאריך שאנחנו במילא בבית!");
+  }
 
   const { data: createdLeave, error } = await supabase.from("leave_requests").insert({
     team_id: membership.team.id,

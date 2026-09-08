@@ -4,8 +4,7 @@ import { cache } from "react";
 import type { Database } from "@/lib/database.types";
 import { getCurrentDailyQuote, type CurrentDailyQuote } from "@/lib/kav/daily-quotes";
 import { getDateInTimeZone } from "@/lib/kav/dates";
-import { getManagerLeaveRequests, type ManagerLeaveRequestSummary } from "@/lib/kav/manager-leave";
-import { getLeaveRequestCounts, getOperationalDay } from "@/lib/kav/operations";
+import { getLeaveRequestDayCounts, getOperationalDay } from "@/lib/kav/operations";
 import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
 import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
 import { getNextPersonalTask } from "@/lib/kav/tasks";
@@ -40,9 +39,8 @@ export type DashboardData = {
     fullName: string;
     personId: string;
     photoUrl: string | null;
-    requestCount: number;
+    requestDays: number;
   }>;
-  managerLeaveRequests: ManagerLeaveRequestSummary[];
   attendanceStats: PersonAttendanceStats[];
   issues: string[];
   nextTask: Awaited<ReturnType<typeof getNextPersonalTask>>;
@@ -185,15 +183,13 @@ export const getDashboardData = cache(async function getDashboardData(
     nextTask,
     teamStats,
     upcomingEventResult,
-    leaveRequestCounts,
-    managerLeaveRequests,
+    leaveRequestDayCounts,
   ] = await Promise.all([
     getOperationalDay(supabase, team, today, selectedPeriod?.id),
     userId ? getNextPersonalTask(supabase, team, userId, selectedPeriod?.id) : Promise.resolve(null),
     getTeamStats(supabase, team, today, selectedPeriod?.id),
     upcomingEventQuery.maybeSingle(),
-    selectedPeriod ? getLeaveRequestCounts(supabase, team.id, selectedPeriod.id) : Promise.resolve([]),
-    manager ? getManagerLeaveRequests(supabase, team.id, selectedPeriod?.id ?? null, peopleById) : Promise.resolve([]),
+    selectedPeriod ? getLeaveRequestDayCounts(supabase, team.id, selectedPeriod.id) : Promise.resolve([]),
   ]);
   assertOk(upcomingEventResult.error, "upcoming event");
   const currentPeriod = selectedPeriod ?? operationalDay.period;
@@ -280,20 +276,19 @@ export const getDashboardData = cache(async function getDashboardData(
     dailyQuote,
     expectedOnBase,
     homeLeaderboard: teamStats.leaderboard,
-    leaveRequestLeaderboard: leaveRequestCounts
+    leaveRequestLeaderboard: leaveRequestDayCounts
       .map((item) => {
         const person = peopleById.get(item.personId);
         return person ? {
           fullName: person.full_name,
           personId: person.id,
           photoUrl: person.photo_url,
-          requestCount: item.requestCount,
+          requestDays: item.requestDays,
         } : null;
       })
       .filter((item): item is NonNullable<typeof item> => item !== null)
-      .sort((a, b) => b.requestCount - a.requestCount || a.fullName.localeCompare(b.fullName, "he"))
+      .sort((a, b) => b.requestDays - a.requestDays || a.fullName.localeCompare(b.fullName, "he"))
       .slice(0, 3),
-    managerLeaveRequests,
     attendanceStats: teamStats.stats,
     issues,
     nextTask,

@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/database.types";
-import { addCalendarDays, eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
+import { eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
 import { getLegacyLineStatsOverride } from "@/lib/kav/legacy-line-stats";
 import { getOperationalRange } from "@/lib/kav/operations";
 import { selectOperationalReservePeriod } from "@/lib/kav/schedule-domain";
@@ -52,7 +52,7 @@ export async function getTeamStats(
       );
   if (!period) return { leaderboard: [], periodId: null, stats: [] };
 
-  const elapsedEnd = today < period.ends_on ? addCalendarDays(today, -1) : period.ends_on;
+  const elapsedEnd = today < period.ends_on ? today : period.ends_on;
   if (elapsedEnd < period.starts_on) {
     const previousPeriod = (periods ?? [])
       .filter((item) => item.status === "completed" && item.ends_on < period.starts_on)

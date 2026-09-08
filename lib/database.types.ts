@@ -467,6 +467,16 @@ export type Database = {
           request_count: number;
         }[];
       };
+      get_team_leave_request_day_counts: {
+        Args: {
+          target_reserve_period_id: string;
+          target_team_id: string;
+        };
+        Returns: {
+          person_id: string;
+          request_days: number;
+        }[];
+      };
       get_person_attendance_summary: {
         Args: {
           target_person_id: string;

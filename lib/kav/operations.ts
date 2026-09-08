@@ -46,9 +46,9 @@ export type OperationalRange = {
   resolve: (personId: string, date: string) => ReturnType<typeof resolveOperationalPerson>;
 };
 
-export type LeaveRequestCount = {
+export type LeaveRequestDayCount = {
   personId: string;
-  requestCount: number;
+  requestDays: number;
 };
 
 // Every function in this file reaches leave/attendance data ONLY through the
@@ -115,20 +115,20 @@ export const getLeaveRequestMarkers = cache(async function getLeaveRequestMarker
     }));
 });
 
-export const getLeaveRequestCounts = cache(async function getLeaveRequestCounts(
+export const getLeaveRequestDayCounts = cache(async function getLeaveRequestDayCounts(
   supabase: Client,
   teamId: string,
   reservePeriodId: string,
-): Promise<LeaveRequestCount[]> {
-  const { data, error } = await supabase.rpc("get_team_leave_request_counts", {
+): Promise<LeaveRequestDayCount[]> {
+  const { data, error } = await supabase.rpc("get_team_leave_request_day_counts", {
     target_team_id: teamId,
     target_reserve_period_id: reservePeriodId,
   });
-  assertOk(error, "leave request counts");
+  assertOk(error, "leave request day counts");
 
   return (data ?? []).map((item) => ({
     personId: item.person_id,
-    requestCount: Number(item.request_count),
+    requestDays: Number(item.request_days),
   }));
 });
 

@@ -3,6 +3,7 @@ import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone, overlapsCalendarDayInTimeZone } from "@/lib/kav/dates";
+import { getManagerLeaveRequests, type ManagerLeaveRequestSummary } from "@/lib/kav/manager-leave";
 import { getApprovedLeaveWindows, getAttendanceEntriesByDate, getLeaveRequestMarkers } from "@/lib/kav/operations";
 import {
   resolveOperationalPerson,
@@ -30,6 +31,7 @@ export type ScheduleData = {
   groups: Row<"rotation_groups">[];
   leaveRequests: LeaveInput[];
   leaves: LeaveInput[];
+  managerLeaveRequests: ManagerLeaveRequestSummary[];
   memberships: Row<"rotation_members">[];
   overrides: Row<"rotation_overrides">[];
   people: Pick<Row<"people">, "full_name" | "id" | "is_active">[];
@@ -74,13 +76,13 @@ export const getScheduleData = cache(async function getScheduleData(
     return {
       attendanceByDate: new Map(), blocks: [], canManage: manager, config: null, events: [], groups: [], leaves: [],
       canManageReservePeriods: reservePeriodManager, leaveRequests: [], memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
-      selectedPeriod: null, team, tasks: [], today, validationIssues: [], viewerPersonId,
+      managerLeaveRequests: [], selectedPeriod: null, team, tasks: [], today, validationIssues: [], viewerPersonId,
     };
   }
 
   const [
     phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult,
-    leaves, leaveRequests, attendanceByDate, tasksResult,
+    leaves, leaveRequests, attendanceByDate, tasksResult, managerLeaveRequests,
   ] = await Promise.all([
     supabase.from("period_phases").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("sort_order"),
     supabase.from("rotation_groups").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("sort_order"),
@@ -92,6 +94,12 @@ export const getScheduleData = cache(async function getScheduleData(
     getLeaveRequestMarkers(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
     getAttendanceEntriesByDate(supabase, team.id, selectedPeriod.id, selectedPeriod.starts_on, selectedPeriod.ends_on),
     supabase.from("task_instances").select("*").eq("team_id", team.id).eq("reserve_period_id", selectedPeriod.id).order("starts_at"),
+    manager ? getManagerLeaveRequests(
+      supabase,
+      team.id,
+      selectedPeriod.id,
+      new Map((people ?? []).map((person) => [person.id, person])),
+    ) : Promise.resolve([]),
   ]);
   [phasesResult, groupsResult, blocksResult, overridesResult, eventsResult, configResult, tasksResult].forEach((result) => assertOk(result.error, "schedule"));
 
@@ -129,7 +137,7 @@ export const getScheduleData = cache(async function getScheduleData(
   return {
     attendanceByDate,
     blocks, canManage: manager, canManageReservePeriods: reservePeriodManager, config: configResult.data, events: eventsResult.data ?? [],
-    groups, leaveRequests, leaves, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
+    groups, leaveRequests, leaves, managerLeaveRequests, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
     selectedPeriod, team, tasks: tasksResult.data ?? [], today, validationIssues, viewerPersonId,
   };
 });

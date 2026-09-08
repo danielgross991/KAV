@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, PlaneTakeoff, Plus, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
@@ -40,6 +40,7 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
   const finishTimer = useRef<number | null>(null);
   const pressTimer = useRef<number | null>(null);
   const showingPending = localPending;
+  const effectiveView = activeView === "leaveRequests" && !data.canManage ? "month" : activeView;
 
   function switchSchedule(nextView: string, nextMonth = activeMonth) {
     if (nextView === activeView && nextMonth === activeMonth) {
@@ -114,16 +115,16 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
       action={data.canManage && (data.canManageReservePeriods || period) ? <Button size="icon" type="button" variant={manage ? "secondary" : "outline"} aria-label={data.canManageReservePeriods ? "ניהול תקופה" : "עריכת לו״ז הקו"} onClick={() => setManage((value) => !value)}><Plus className="size-4" /></Button> : null}
     >
       <div className="space-y-2.5">
-        {period ? <nav className="grid grid-cols-3 gap-1 rounded-md border bg-muted p-1" aria-label="תצוגת לוח זמנים"><Tab active={activeView === "agenda"} pressed={pressedSchedule?.view === "agenda"} onSelect={() => switchSchedule("agenda")}>אג׳נדה</Tab><Tab active={activeView === "month"} pressed={pressedSchedule?.view === "month"} onSelect={() => switchSchedule("month")}>חודש</Tab><Tab active={activeView === "rotations"} pressed={pressedSchedule?.view === "rotations"} onSelect={() => switchSchedule("rotations")}>סבבים</Tab></nav> : null}
+        {period ? <nav className={cn("grid gap-1 rounded-md border bg-muted p-1", data.canManage ? "grid-cols-4 md:grid-cols-3" : "grid-cols-3")} aria-label="תצוגת לוח זמנים"><Tab active={effectiveView === "agenda"} pressed={pressedSchedule?.view === "agenda"} onSelect={() => switchSchedule("agenda")}>אג׳נדה</Tab><Tab active={effectiveView === "month"} pressed={pressedSchedule?.view === "month"} onSelect={() => switchSchedule("month")}>חודש</Tab><Tab active={effectiveView === "rotations"} pressed={pressedSchedule?.view === "rotations"} onSelect={() => switchSchedule("rotations")}>סבבים</Tab>{data.canManage ? <Tab active={effectiveView === "leaveRequests"} className="md:hidden" pressed={pressedSchedule?.view === "leaveRequests"} onSelect={() => switchSchedule("leaveRequests")}>בקשות</Tab> : null}</nav> : null}
       </div>
     </PageHeader>
     {manage && data.canManage ? <Manager data={data} /> : null}
-    {!period ? <Empty /> : activeView === "month" ? <Month data={data} month={activeMonth} pendingMonth={pressedSchedule?.view === "month" ? pressedSchedule.month : null} onMonthChange={(nextMonth) => switchSchedule("month", nextMonth)} /> : activeView === "rotations" ? <Timeline data={data} /> : <Agenda data={data} />}
+    {!period ? <Empty /> : effectiveView === "month" ? <Month data={data} month={activeMonth} pendingMonth={pressedSchedule?.view === "month" ? pressedSchedule.month : null} onMonthChange={(nextMonth) => switchSchedule("month", nextMonth)} /> : effectiveView === "rotations" ? <Timeline data={data} /> : effectiveView === "leaveRequests" ? <ScheduleLeaveRequests data={data} /> : <Agenda data={data} />}
   </AppPage>;
 }
 
 function Empty() { return <EmptyState icon={<CalendarDays className="size-4" />} title="אין עדיין תקופת מילואים" description="מנהל יכול ליצור תקופה חדשה ולהתחיל לבנות את הלו״ז." />; }
-function Tab({ active, children, onSelect, pressed = false }: { active: boolean; children: React.ReactNode; onSelect: () => void; pressed?: boolean }) { return <button aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-all active:scale-[0.98] active:bg-card active:text-foreground", active || pressed ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground")} onClick={() => { if (!active) onSelect(); }} type="button">{children}</button>; }
+function Tab({ active, children, className, onSelect, pressed = false }: { active: boolean; children: React.ReactNode; className?: string; onSelect: () => void; pressed?: boolean }) { return <button aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-all active:scale-[0.98] active:bg-card active:text-foreground", active || pressed ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground", className)} onClick={() => { if (!active) onSelect(); }} type="button">{children}</button>; }
 function href(data: ScheduleData, view: string, month?: string) { return `/${data.team.slug}/schedule?period=${data.selectedPeriod?.id}&view=${view}${month ? `&month=${month}` : ""}`; }
 function monthLabel(month: string) { return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T12:00:00Z`)); }
 
@@ -149,9 +150,12 @@ function Month({ data, month, onMonthChange, pendingMonth }: { data: ScheduleDat
     <div className="kav-month-enter grid grid-cols-7 gap-1 bg-card p-1 sm:gap-1.5 sm:p-2">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} onPreview={() => setSelectedDay({ date, day })} />; })}</div>
     {selectedDay ? <DayPreview data={data} date={selectedDay.date} day={selectedDay.day} onClose={() => setSelectedDay(null)} /> : null}
     <div className="flex flex-wrap gap-x-3 gap-y-1 border-t bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
+      <LegendDot className="bg-emerald-500" label="בבסיס" />
+      <LegendDot className="bg-sky-500" label="בבית" />
+      <LegendDot className="bg-gradient-to-l from-emerald-500 to-sky-500" label="חילוף" />
       <LegendDot className="bg-violet-500" label="חג" />
       <LegendDot className="bg-primary" label="משימות" />
-      <LegendDot className="bg-sky-500" label="בקשות/יציאות" />
+      <LegendDot className="bg-fuchsia-600" label="בקשות/יציאות" />
       <LegendDot className="bg-destructive" label="פער נוכחות" />
     </div>
   </section>;
@@ -177,7 +181,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
   const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null;
   const isChangeover = isChangeoverDate(data, date, dominantState);
 
-  return <Link aria-haspopup="dialog" className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "bg-emerald-50", dominantState === "home" && "bg-sky-50/80", isChangeover && "bg-[linear-gradient(135deg,rgb(236_253_245)_0%,rgb(236_253_245)_50%,rgb(240_249_255)_50%,rgb(240_249_255)_100%)]", personalLeaves.length && "border-primary/40 ring-2 ring-inset ring-primary/25")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
+  return <Link aria-haspopup="dialog" className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
     event.preventDefault();
     onPreview();
   }}>
@@ -187,7 +191,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
         {holiday ? <span aria-label={holiday.title} className="size-2 rounded-full bg-violet-500" title={holiday.title} /> : null}
         {otherEvents.length ? <span className="size-2 rounded-full bg-amber-500" /> : null}
         {day.tasks.length ? <span className="size-2 rounded-full bg-primary" /> : null}
-        {teamLeaveCount ? <span className="kav-num min-w-5 rounded-full bg-sky-600 px-1 text-center text-[0.62rem] font-bold leading-5 text-white">{teamLeaveCount}</span> : null}
+        {teamLeaveCount ? <span className="kav-num min-w-5 rounded-full bg-fuchsia-700 px-1 text-center text-[0.62rem] font-bold leading-5 text-white">{teamLeaveCount}</span> : null}
         {attendanceIssue ? <span className="size-2 rounded-full bg-destructive" /> : null}
       </span>
     </div>
@@ -196,7 +200,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
       <>
         {baseGroups.slice(0, 2).map((group) => <div className={cn("mt-1 truncate rounded-md px-1.5 py-0.5 text-[0.68rem] font-medium sm:text-xs", groupColorClass(group.color_token))} key={group.id}>{group.name} · {stateLabel(group.block?.state)}</div>)}
         {baseGroups.length > 2 ? <div className="mt-1 truncate text-[0.68rem] text-muted-foreground sm:text-xs">+{baseGroups.length - 2} סבבים בבסיס</div> : null}
-        {teamLeaveCount ? <div className="mt-1 truncate text-[0.68rem] font-medium text-sky-800 sm:text-xs">{teamLeaveCount} בקשות יציאה</div> : null}
+        {teamLeaveCount ? <div className="mt-1 truncate text-[0.68rem] font-bold text-fuchsia-900 sm:text-xs">{teamLeaveCount} בקשות יציאה</div> : null}
         {day.tasks.length ? <div className="mt-1 truncate text-[0.68rem] text-primary sm:text-xs">{day.tasks.length} משימות</div> : null}
       </>
     ) : viewer ? (
@@ -244,6 +248,40 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
   </>;
 }
 
+function ScheduleLeaveRequests({ data }: { data: ScheduleData }) {
+  const requests = data.managerLeaveRequests;
+
+  return <section className="rounded-lg border bg-card shadow-[0_10px_28px_-24px_rgba(20,22,26,0.5)]">
+    <div className="flex items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
+      <div>
+        <h2 className="flex items-center gap-2 text-base font-bold"><PlaneTakeoff className="size-4 text-primary" />בקשות יציאה</h2>
+        <p className="mt-0.5 text-xs text-muted-foreground">כל הבקשות בקו הנבחר</p>
+      </div>
+      <Badge variant="outline">{requests.length}</Badge>
+    </div>
+    <div className="grid gap-2 p-3">
+      {requests.length ? requests.map((request) => (
+        <Link
+          className="grid gap-1 rounded-md border bg-background px-3 py-2.5 text-sm transition-colors hover:border-primary/30 hover:bg-accent/50 active:bg-accent"
+          href={`/${data.team.slug}/leave?view=all`}
+          key={request.id}
+        >
+          <span className="flex items-center justify-between gap-2">
+            <b>{request.personName}</b>
+            <Badge variant={isApprovedStatus(request.status) ? "success" : request.status === "rejected" ? "danger" : "secondary"}>
+              {leaveStatusLabel(request.status)}
+            </Badge>
+          </span>
+          <span className="text-muted-foreground">{shortDate(request.startsOn)}–{shortDate(request.endsOn)}</span>
+          <span className="line-clamp-2 text-foreground">{request.reason ?? "ללא סיבה"}</span>
+        </Link>
+      )) : (
+        <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">אין בקשות יציאה בקו הנבחר.</p>
+      )}
+    </div>
+  </section>;
+}
+
 function PreviewSection({ children, title }: { children: React.ReactNode; title: string }) {
   return <section className="rounded-lg border bg-background/70 p-3"><h4 className="mb-2 text-xs font-semibold text-muted-foreground">{title}</h4>{children}</section>;
 }
@@ -269,7 +307,7 @@ function Summary({ count, groups, label }: { count: number; groups: string[]; la
 
 function Timeline({ data }: { data: ScheduleData }) {
   const period = data.selectedPeriod!; const days = calendarDayDifference(period.starts_on, period.ends_on) + 1;
-  return <section className="rounded-lg border bg-card"><div className="border-b p-4"><h2 className="font-semibold">ציר סבבים</h2><p className="mt-1 text-xs text-muted-foreground">{days} ימים</p></div><div className="hidden overflow-x-auto p-4 md:block"><div className="min-w-[760px] space-y-4">{data.groups.map((group) => <div className="grid grid-cols-[8rem_1fr] items-center gap-3" key={group.id}><b>{group.name}</b><div className="relative h-14 rounded-md bg-muted">{data.blocks.filter((block) => block.rotation_group_id === group.id).map((block) => { const start = calendarDayDifference(period.starts_on, block.starts_on); const length = calendarDayDifference(block.starts_on, block.ends_on) + 1; return <div className={cn("absolute inset-y-1 grid place-items-center overflow-hidden rounded text-xs font-medium", block.state === "base" ? "bg-emerald-100 text-emerald-900" : "bg-sky-100 text-sky-900")} key={block.id} style={{ right: `${start / days * 100}%`, width: `${length / days * 100}%` }}>{stateLabel(block.state)}</div>; })}</div></div>)}</div></div><div className="divide-y md:hidden">{data.groups.map((group) => <div className="p-4" key={group.id}><b>{group.name}</b><div className="mt-2 space-y-2">{data.blocks.filter((block) => block.rotation_group_id === group.id).map((block) => <div className="flex justify-between rounded-md bg-muted p-3 text-sm" key={block.id}><span>{shortDate(block.starts_on)}–{shortDate(block.ends_on)}</span><State state={block.state} /></div>)}</div></div>)}</div></section>;
+  return <section className="rounded-lg border bg-card"><div className="border-b p-4"><h2 className="font-semibold">ציר סבבים</h2><p className="mt-1 text-xs text-muted-foreground">{days} ימים</p></div><div className="hidden overflow-x-auto p-4 md:block"><div className="min-w-[760px] space-y-4">{data.groups.map((group) => <div className="grid grid-cols-[8rem_1fr] items-center gap-3" key={group.id}><b>{group.name}</b><div className="relative h-14 rounded-md bg-muted">{data.blocks.filter((block) => block.rotation_group_id === group.id).map((block) => { const start = calendarDayDifference(period.starts_on, block.starts_on); const length = calendarDayDifference(block.starts_on, block.ends_on) + 1; return <div className={cn("absolute inset-y-1 grid place-items-center overflow-hidden rounded text-xs font-bold", block.state === "base" ? "bg-emerald-300 text-emerald-950" : "bg-sky-300 text-sky-950")} key={block.id} style={{ right: `${start / days * 100}%`, width: `${length / days * 100}%` }}>{stateLabel(block.state)}</div>; })}</div></div>)}</div></div><div className="divide-y md:hidden">{data.groups.map((group) => <div className="p-4" key={group.id}><b>{group.name}</b><div className="mt-2 space-y-2">{data.blocks.filter((block) => block.rotation_group_id === group.id).map((block) => <div className={cn("flex justify-between rounded-md p-3 text-sm font-medium", block.state === "base" ? "bg-emerald-200 text-emerald-950" : "bg-sky-200 text-sky-950")} key={block.id}><span>{shortDate(block.starts_on)}–{shortDate(block.ends_on)}</span><State state={block.state} /></div>)}</div></div>)}</div></section>;
 }
 
 function Manager({ data }: { data: ScheduleData }) {
@@ -329,6 +367,7 @@ function State({ state }: { state: string }) { return <Badge variant={state === 
 function stateLabel(value?: string | null) { return value === "base" ? "בסיס" : value === "home" ? "בית" : "לא הוגדר"; }
 function statusLabel(value: string) { return ({ draft: "טיוטה", published: "פורסם", active: "פעיל", completed: "הושלם", archived: "ארכיון" } as Record<string, string>)[value] ?? value; }
 function leaveStatusLabel(value: string) { return ({ pending: "ממתין", approved: "מאושר", partially_approved: "מאושר", rejected: "נדחה", cancelled: "בוטל" } as Record<string, string>)[value] ?? value; }
+function isApprovedStatus(status: string) { return status === "approved" || status === "partially_approved"; }
 function shortDate(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function shortWeekDate(date: string) { return new Intl.DateTimeFormat("he-IL", { weekday: "short", day: "numeric", month: "numeric", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
@@ -356,10 +395,10 @@ function isHolidayEvent(event: ScheduleData["events"][number]) {
 }
 
 function groupColorClass(color: string | null) {
-  if (color === "green") return "bg-emerald-100 text-emerald-900";
-  if (color === "amber") return "bg-amber-100 text-amber-900";
-  if (color === "gray") return "bg-slate-100 text-slate-800";
-  return "bg-sky-100 text-sky-900";
+  if (color === "green") return "bg-emerald-300 text-emerald-950";
+  if (color === "amber") return "bg-amber-300 text-amber-950";
+  if (color === "gray") return "bg-slate-300 text-slate-950";
+  return "bg-sky-300 text-sky-950";
 }
 
 function isChangeoverDate(data: ScheduleData, date: string, state: string | null) {
