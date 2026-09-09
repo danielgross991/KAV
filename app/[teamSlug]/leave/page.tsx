@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { AlertTriangle, CalendarOff, Filter, Plus, Trash2 } from "lucide-react";
 
 import { AppPage, EmptyState, PageHeader, SuccessNotice } from "@/components/ui/app-page";
@@ -11,7 +10,6 @@ import { requireAuth } from "@/lib/kav/auth";
 import { eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
 import { getSelectedLinePeriodId } from "@/lib/kav/line-selection.server";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
-import { cn } from "@/lib/utils";
 
 export default async function LeavePage({ params, searchParams }: {
   params: Promise<{ teamSlug: string }>;
@@ -71,9 +69,7 @@ export default async function LeavePage({ params, searchParams }: {
     : periods ?? [];
 
   return <AppPage className="max-w-6xl">
-    <PageHeader eyebrow={membership.team.name} title="יציאות" subtitle="ניהול בקשות וטווחים מאושרים" action={<a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="יציאה חדשה"><Plus className="size-4" /></a>}>
-      <nav className="grid grid-cols-4 gap-1 rounded-md border bg-muted p-1"><Tab active={view === "all"} href={leaveHref(teamSlug, query, { view: "all", person: selectedPersonId })}>הכל</Tab><Tab active={view === "active"} href={leaveHref(teamSlug, query, { view: "active", person: selectedPersonId })}>פעילות</Tab><Tab active={view === "upcoming"} href={leaveHref(teamSlug, query, { view: "upcoming", person: selectedPersonId })}>קרובות</Tab><Tab active={view === "history"} href={leaveHref(teamSlug, query, { view: "history", person: selectedPersonId })}>היסטוריה</Tab></nav>
-    </PageHeader>
+    <PageHeader eyebrow={membership.team.name} title="יציאות" subtitle="ניהול בקשות וטווחים מאושרים" action={<a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="יציאה חדשה"><Plus className="size-4" /></a>} />
     {query.saved ? <SuccessNotice>היציאה נשמרה</SuccessNotice> : null}{query.deleted ? <SuccessNotice>היציאה נמחקה</SuccessNotice> : null}
     <LeaveFilters
       period={query.period}
@@ -92,9 +88,16 @@ export default async function LeavePage({ params, searchParams }: {
     />
     <section className="divide-y overflow-hidden rounded-lg border bg-card">
       {managementLeaves.map((leave) => <details key={leave.id}>
-        <summary className="grid min-h-16 cursor-pointer gap-2 p-3.5 transition-colors hover:bg-muted/40 active:bg-muted sm:grid-cols-[1fr_auto_auto] sm:items-center">
-          <div><b>{peopleById.get(leave.person_id)}</b><p className="mt-1 text-sm text-muted-foreground">{range(leave.starts_on, leave.ends_on)} · {periodsById.get(leave.reserve_period_id)?.name}</p>{leave.reason ? <p className="mt-1 text-sm font-medium">{leave.reason}</p> : null}</div>
-          <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>{statusLabel(leave.status)}</Badge>
+        <summary className="grid min-h-16 cursor-pointer gap-3 p-3.5 transition-colors hover:bg-muted/40 active:bg-muted sm:grid-cols-[8rem_1fr_auto] sm:items-center">
+          <div className="kav-num rounded-md bg-muted px-2.5 py-2 text-center text-sm font-bold">{range(leave.starts_on, leave.ends_on)}</div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <b>{peopleById.get(leave.person_id)}</b>
+              <span className="text-xs text-muted-foreground">{periodsById.get(leave.reserve_period_id)?.name}</span>
+            </div>
+            <p className="mt-1 truncate text-sm text-muted-foreground">{leave.reason || "ללא סיבה"}</p>
+          </div>
+          <Badge variant={statusVariant(leave.status)}>{statusLabel(leave.status)}</Badge>
         </summary>
         <form action={saveLeaveAction.bind(null, teamSlug)} className="grid gap-3 border-t bg-muted/30 p-3.5 md:grid-cols-4">
           <input type="hidden" name="id" value={leave.id} />
@@ -254,16 +257,24 @@ function LeaveFilters({
 }) {
   return (
     <form action={`/${teamSlug}/leave`} className="mb-4 flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
-      <input name="view" type="hidden" value={view} />
       {period ? <input name="period" type="hidden" value={period} /> : null}
-      <label className="grid min-w-52 flex-1 gap-1.5 text-xs font-medium text-muted-foreground">
+      <label className="grid min-w-44 flex-1 gap-1.5 text-xs font-medium text-muted-foreground">
+        תצוגה
+        <select className="h-10 rounded-md border bg-background px-2 text-sm" defaultValue={view} name="view">
+          <option value="all">כל הבקשות</option>
+          <option value="active">פעילות עכשיו</option>
+          <option value="upcoming">קרובות</option>
+          <option value="history">היסטוריה</option>
+        </select>
+      </label>
+      <label className="grid min-w-44 flex-1 gap-1.5 text-xs font-medium text-muted-foreground">
         סינון לפי איש צוות
         <select className="h-10 rounded-md border bg-background px-2 text-sm" defaultValue={selectedPersonId} name="person">
           <option value="all">כל האנשים</option>
           {people.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
         </select>
       </label>
-      <div className="rounded-md bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">ברירת מחדל: ממויין לפי תאריכים</div>
+      <div className="rounded-md bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">ממויין לפי תאריך</div>
       <Button className="self-end" size="sm"><Filter className="size-4" />סינון</Button>
     </form>
   );
@@ -312,13 +323,6 @@ function buildRiskDays(leaves: LeaveRow[], peopleById: Map<string, string>): Ris
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-function leaveHref(teamSlug: string, query: { period?: string }, next: { person: string; view: string }) {
-  const params = new URLSearchParams({ view: next.view });
-  if (next.person !== "all") params.set("person", next.person);
-  if (query.period) params.set("period", query.period);
-  return `/${teamSlug}/leave?${params.toString()}`;
-}
-
 function Field({ label, ...props }: React.ComponentProps<"input"> & { label: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<Input {...props} /></label>; }
 function Select({ label, name, options, value }: { label: string; name: string; options: string[][]; value?: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<select className="h-10 rounded-md border bg-background px-2 text-sm" defaultValue={value} name={name} required>{options.map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select></label>; }
 function PeriodInput({ options, selectedPeriodId, value }: { options: PeriodRow[]; selectedPeriodId: string | null; value?: string }) {
@@ -326,13 +330,15 @@ function PeriodInput({ options, selectedPeriodId, value }: { options: PeriodRow[
   if (resolvedValue) return <input name="reserve_period_id" type="hidden" value={resolvedValue} />;
   return <Select label="תקופת מילואים" name="reserve_period_id" options={options.map((period) => [period.id, period.name])} />;
 }
-function Tab({ active, children, href }: { active: boolean; children: React.ReactNode; href: string }) { return <Link aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors hover:bg-card/70 hover:text-foreground active:bg-card active:text-foreground", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground")} href={href}>{children}</Link>; }
 function range(start: string, end: string) { return `${short(start)}–${short(end)}`; }
 function short(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function statusLabel(value: string) { return Object.fromEntries(statusOptions)[value] ?? value; }
 function statusFormValue(value: string) { return value === "partially_approved" ? "approved" : value; }
 function isApprovedStatus(value: string) { return value === "approved" || value === "partially_approved"; }
+function statusVariant(value: string): React.ComponentProps<typeof Badge>["variant"] {
+  return isApprovedStatus(value) ? "success" : value === "rejected" || value === "cancelled" ? "danger" : "secondary";
+}
 function byLeaveDate(a: LeaveRow, b: LeaveRow) { return a.starts_on.localeCompare(b.starts_on) || a.ends_on.localeCompare(b.ends_on); }
 
 type LeaveRow = {
