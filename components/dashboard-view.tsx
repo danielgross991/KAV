@@ -322,18 +322,30 @@ function HomeLeaderboard({ data }: { data: DashboardData }) {
           {podium.map((item) => {
             const rank = data.homeLeaderboard.findIndex((candidate) => candidate.personId === item.personId) + 1;
             return (
-              <div
+              <details
                 key={item.personId}
                 className={cn(
-                  "grid min-h-36 place-items-center rounded-lg border bg-muted/30 p-2 text-center",
+                  "group relative min-h-36 rounded-lg border bg-muted/30 p-2 text-center",
                   rank === 1 && "min-h-44 border-primary/30 bg-accent",
                 )}
               >
-                <span className="text-xl" aria-hidden>{MEDALS[rank - 1]}</span>
-                <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} featured={rank === 1} />
-                <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
-                <span className="kav-num mt-1 text-xs text-muted-foreground">{Math.round(item.homePercentage * 100)}%</span>
-              </div>
+                <summary className="grid min-h-32 cursor-pointer list-none place-items-center rounded-md outline-none transition-colors hover:bg-background/50 active:bg-background/70 group-open:bg-background/60 [&::-webkit-details-marker]:hidden">
+                  <span className="text-xl" aria-hidden>{MEDALS[rank - 1]}</span>
+                  <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} featured={rank === 1} />
+                  <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
+                  <span className="kav-num mt-1 text-xs text-muted-foreground">{Math.round(item.homePercentage * 100)}%</span>
+                </summary>
+                <div className="absolute inset-x-1 top-full z-20 mt-1 rounded-lg border bg-popover p-2 text-right text-xs shadow-lg">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">בבסיס</span>
+                    <b className="kav-num">{item.baseDays}</b>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <span className="text-muted-foreground">בבית</span>
+                    <b className="kav-num">{item.homeDays}</b>
+                  </div>
+                </div>
+              </details>
             );
           })}
         </div>
