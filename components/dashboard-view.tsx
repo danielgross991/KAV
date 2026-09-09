@@ -332,9 +332,7 @@ function HomeLeaderboard({ data }: { data: DashboardData }) {
                 <span className="text-xl" aria-hidden>{MEDALS[rank - 1]}</span>
                 <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} featured={rank === 1} />
                 <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
-                <span className="kav-num mt-1 text-xs text-muted-foreground">
-                  {item.homeDays} ימים · {Math.round(item.homePercentage * 100)}%
-                </span>
+                <span className="kav-num mt-1 text-xs text-muted-foreground">{Math.round(item.homePercentage * 100)}%</span>
               </div>
             );
           })}
