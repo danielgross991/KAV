@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { KavLoading } from "@/components/kav-loading";
 import { addCalendarDays, calendarDayDifference, eachCalendarDate, getDateInTimeZone, shiftMonth } from "@/lib/kav/dates";
+import { buildLeaveRiskDateSet, getLeaveRiskDates, isCountedLeaveRequestStatus, riskyLeaveRequestThreshold, type LeaveRiskInput } from "@/lib/kav/leave-risk";
 import { generateRotationBlocks } from "@/lib/kav/schedule-domain";
 import { getDaySchedule, type ScheduleData } from "@/lib/kav/schedule";
 import { cn } from "@/lib/utils";
@@ -173,6 +174,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
   const teamLeaveCount = data.canManage
     ? day.approvedLeave.length + day.leaveRequests.length
     : day.leaveMarkers.length + day.leaveRequests.length;
+  const riskyLeaveDate = isRiskyLeaveDate(day.leaveRequests);
   const isPast = date < data.today;
   const attendanceIssue = data.canManage && isPast && ((day.attendance?.absent.length ?? 0) > 0 || (day.attendance?.unreported.length ?? 0) > 0);
   const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null;
@@ -186,10 +188,11 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
     attendanceIssue ? { className: "bg-destructive", label: "פער נוכחות" } : null,
   ].filter(Boolean) as { className: string; label: string }[];
 
-  return <Link aria-haspopup="dialog" className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", commanderDay && "border-pink-500 bg-pink-200/95 text-pink-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
+  return <Link aria-haspopup="dialog" className={cn("group relative min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", commanderDay && "border-pink-500 bg-pink-200/95 text-pink-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35", riskyLeaveDate && "ring-2 ring-inset ring-red-500/75")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
     event.preventDefault();
     onPreview();
   }}>
+    {riskyLeaveDate ? <AlertTriangle aria-label={`יום אדום - יותר מ־${riskyLeaveRequestThreshold} בקשות יציאה`} className="absolute -top-2 left-1/2 z-10 size-5 -translate-x-1/2 fill-red-100 text-red-700 drop-shadow-sm" /> : null}
     <div className="mb-1 flex items-start justify-between gap-1">
       <span className="flex items-center gap-1">
         <span className={cn("grid size-6 place-items-center rounded-full text-xs font-semibold transition-colors sm:size-7 sm:text-sm", date === data.today ? "bg-primary !text-white" : "bg-card text-foreground group-hover:bg-accent group-hover:text-primary")}>{Number(date.slice(-2))}</span>
@@ -208,6 +211,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
 function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; onClose: () => void }) {
   const peopleById = new Map(data.people.map((person) => [person.id, person.full_name]));
   const leaveItems = Array.from(new Map([...day.leaveMarkers, ...day.leaveRequests].map((item) => [`${item.id}-${item.status}`, item])).values());
+  const riskyLeaveDate = isRiskyLeaveDate(day.leaveRequests);
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
   const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null;
   const detailHref = `/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`;
@@ -229,7 +233,8 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
           {[...day.events, ...day.tasks].length ? <div className="mt-2 space-y-1.5">{day.events.map((event) => <PreviewLine key={event.id} meta={event.is_all_day ? "כל היום" : time(event.starts_at, data.team.timezone)} text={event.title} />)}{day.tasks.map((task) => <PreviewLine key={task.id} meta={time(task.starts_at, data.team.timezone)} text={task.title} />)}</div> : <p className="mt-2 text-muted-foreground">אין אירועים או משימות.</p>}
         </PreviewSection>
         <PreviewSection title="בקשות יציאה">
-          {leaveItems.length ? <div className="space-y-1.5">{leaveItems.map((item) => <PreviewLine key={`${item.id}-${item.status}`} meta={leaveStatusLabel(item.status)} text={peopleById.get(item.personId) ?? "איש צוות"} />)}</div> : <p className="text-muted-foreground">אין בקשות יציאה ביום הזה.</p>}
+          {riskyLeaveDate ? <p className="mb-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-semibold text-red-700">יום אדום: יש הרבה בקשות יציאה ביום הזה.</p> : null}
+          {leaveItems.length ? <div className="space-y-1.5">{leaveItems.map((item) => <PreviewLine className={riskyLeaveDate && isCountedLeaveRequestStatus(item.status) ? "border border-red-200 bg-red-50 text-red-900" : undefined} key={`${item.id}-${item.status}`} meta={riskyLeaveDate && isCountedLeaveRequestStatus(item.status) ? "יום אדום" : leaveStatusLabel(item.status)} text={peopleById.get(item.personId) ?? "איש צוות"} />)}</div> : <p className="text-muted-foreground">אין בקשות יציאה ביום הזה.</p>}
         </PreviewSection>
       </div>
       <Link className="mt-4 flex h-10 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold !text-white" href={detailHref}>פתיחת פירוט מלא</Link>
@@ -239,6 +244,13 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
 
 function ScheduleLeaveRequests({ data }: { data: ScheduleData }) {
   const requests = data.managerLeaveRequests;
+  const riskDateSet = useMemo(() => buildLeaveRiskDateSet(data.leaveRequests.map((request) => ({
+    endsOn: request.endsOn,
+    id: request.id,
+    personId: request.personId,
+    startsOn: request.startsOn,
+    status: request.status,
+  }))), [data.leaveRequests]);
 
   return <section className="rounded-lg border bg-card shadow-[0_10px_28px_-24px_rgba(20,22,26,0.5)]">
     <div className="flex items-start justify-between gap-3 border-b bg-muted/20 px-4 py-3">
@@ -249,22 +261,29 @@ function ScheduleLeaveRequests({ data }: { data: ScheduleData }) {
       <Badge variant="outline">{requests.length}</Badge>
     </div>
     <div className="grid gap-2 p-3">
-      {requests.length ? requests.map((request) => (
+      {requests.length ? requests.map((request) => {
+        const riskDates = getLeaveRiskDates(toLeaveRiskInput(request), riskDateSet);
+        return (
         <Link
-          className="grid gap-1 rounded-md border bg-background px-3 py-2.5 text-sm transition-colors hover:border-primary/30 hover:bg-accent/50 active:bg-accent"
+          className={cn("grid gap-1 rounded-md border bg-background px-3 py-2.5 text-sm transition-colors hover:border-primary/30 hover:bg-accent/50 active:bg-accent", riskDates.length && "border-red-300 bg-red-50 text-red-950")}
           href={`/${data.team.slug}/leave?view=all`}
           key={request.id}
         >
           <span className="flex items-center justify-between gap-2">
             <b>{request.personName}</b>
-            <Badge variant={isApprovedStatus(request.status) ? "success" : request.status === "rejected" ? "danger" : "secondary"}>
-              {leaveStatusLabel(request.status)}
-            </Badge>
+            <span className="flex shrink-0 items-center gap-1.5">
+              {riskDates.length ? <Badge variant="danger">יום אדום</Badge> : null}
+              <Badge variant={isApprovedStatus(request.status) ? "success" : request.status === "rejected" ? "danger" : "secondary"}>
+                {leaveStatusLabel(request.status)}
+              </Badge>
+            </span>
           </span>
           <span className="text-muted-foreground">{shortDate(request.startsOn)}–{shortDate(request.endsOn)}</span>
           <span className="line-clamp-2 text-foreground">{request.reason ?? "ללא סיבה"}</span>
+          {riskDates.length ? <span className="text-xs font-semibold text-red-700">נופלת על יום עם הרבה בקשות יציאה: {riskDates.map(shortDate).join(", ")}</span> : null}
         </Link>
-      )) : (
+        );
+      }) : (
         <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">אין בקשות יציאה בקו הנבחר.</p>
       )}
     </div>
@@ -275,8 +294,8 @@ function PreviewSection({ children, title }: { children: React.ReactNode; title:
   return <section className="rounded-lg border bg-background/70 p-3"><h4 className="mb-2 text-xs font-semibold text-muted-foreground">{title}</h4>{children}</section>;
 }
 
-function PreviewLine({ meta, text }: { meta: string; text: string }) {
-  return <div className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-2"><span className="truncate font-medium">{text}</span><span className="shrink-0 text-xs text-muted-foreground">{meta}</span></div>;
+function PreviewLine({ className, meta, text }: { className?: string; meta: string; text: string }) {
+  return <div className={cn("flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-2", className)}><span className="truncate font-medium">{text}</span><span className="shrink-0 text-xs text-muted-foreground">{meta}</span></div>;
 }
 
 function LegendDot({ className, label }: { className: string; label: string }) {
@@ -363,6 +382,20 @@ function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { date
 function time(iso: string, zone: string) { return new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: zone }).format(new Date(iso)); }
 function timeValue(iso: string, zone: string) { return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", minute: "2-digit", timeZone: zone }).format(new Date(iso)); }
 function names(message: string, data: ScheduleData) { for (const person of data.people) message = message.replace(person.id, person.full_name); for (const group of data.groups) message = message.replace(group.id, group.name); return message; }
+
+function isRiskyLeaveDate(requests: { status: string }[]) {
+  return requests.filter((request) => isCountedLeaveRequestStatus(request.status)).length > riskyLeaveRequestThreshold;
+}
+
+function toLeaveRiskInput(request: { endsOn: string; id: string; personName?: string; startsOn: string; status: string }): LeaveRiskInput {
+  return {
+    endsOn: request.endsOn,
+    id: request.id,
+    personName: request.personName,
+    startsOn: request.startsOn,
+    status: request.status,
+  };
+}
 
 const holidayTitles = new Set([
   "ערב ראש השנה",

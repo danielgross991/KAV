@@ -7,9 +7,12 @@ import { Input } from "@/components/ui/input";
 import { ViewerLeaveRequestForm } from "@/components/viewer-leave-request-form";
 import { deleteLeaveAction, saveLeaveAction } from "@/app/[teamSlug]/leave/actions";
 import { requireAuth } from "@/lib/kav/auth";
-import { eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
+import { getDateInTimeZone } from "@/lib/kav/dates";
+import { buildLeaveRiskDateSet, buildLeaveRiskDays, getLeaveRiskDates, type LeaveRiskInput } from "@/lib/kav/leave-risk";
 import { getSelectedLinePeriodId } from "@/lib/kav/line-selection.server";
+import { getLeaveRequestMarkers } from "@/lib/kav/operations";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
+import { cn } from "@/lib/utils";
 
 export default async function LeavePage({ params, searchParams }: {
   params: Promise<{ teamSlug: string }>;
@@ -35,11 +38,25 @@ export default async function LeavePage({ params, searchParams }: {
   const { data: currentPerson, error: currentPersonError } = await currentPersonPromise;
   if (peopleError || periodsError || leavesError) throw new Error("לא הצלחנו לטעון את היציאות");
   if (currentPersonError) throw new Error(`לא הצלחנו לטעון את איש הצוות שלך: ${currentPersonError.message}`);
+  const selectedRiskPeriod = selectedLinePeriodId
+    ? (periods ?? []).find((period) => period.id === selectedLinePeriodId) ?? null
+    : null;
+  const riskMarkers = selectedRiskPeriod
+    ? await getLeaveRequestMarkers(supabase, membership.team.id, selectedRiskPeriod.id, selectedRiskPeriod.starts_on, selectedRiskPeriod.ends_on)
+    : [];
+  const riskDateSet = buildLeaveRiskDateSet(riskMarkers.map((marker) => ({
+    endsOn: marker.endsOn,
+    id: marker.id,
+    personId: marker.personId,
+    startsOn: marker.startsOn,
+    status: marker.status,
+  })));
   if (!isManager) return <ViewerLeavePage
     currentPerson={currentPerson}
     leaves={leaves ?? []}
     periods={periods ?? []}
     query={query}
+    riskDateSet={riskDateSet}
     selectedPeriodId={selectedLinePeriodId}
     teamName={membership.team.name}
     teamSlug={teamSlug}
@@ -58,6 +75,7 @@ export default async function LeavePage({ params, searchParams }: {
       ? leave.starts_on <= today && leave.ends_on >= today
       : view === "upcoming" ? leave.starts_on > today : leave.ends_on < today);
   const riskDays = buildRiskDays(periodFiltered, peopleById);
+  const managerRiskDateSet = selectedRiskPeriod ? riskDateSet : new Set(riskDays.map((day) => day.date));
   const filtered = periodFiltered
     .filter((leave) => selectedPersonId === "all" ? true : leave.person_id === selectedPersonId)
     .sort(byLeaveDate);
@@ -83,17 +101,21 @@ export default async function LeavePage({ params, searchParams }: {
       currentPerson={currentPerson}
       leaves={(leaves ?? []).filter((leave) => leave.person_id === currentPerson?.id)}
       periods={periods ?? []}
+      riskDateSet={managerRiskDateSet}
       selectedPeriodId={selectedLinePeriodId}
       teamSlug={teamSlug}
     />
     <section className="divide-y overflow-hidden rounded-lg border bg-card">
-      {managementLeaves.map((leave) => <details key={leave.id}>
-        <summary className="grid min-h-16 cursor-pointer gap-3 p-3.5 transition-colors hover:bg-muted/40 active:bg-muted sm:grid-cols-[8rem_1fr_auto] sm:items-center">
+      {managementLeaves.map((leave) => {
+        const riskDates = getLeaveRiskDates(toLeaveRiskInput(leave, peopleById), managerRiskDateSet);
+        return <details key={leave.id}>
+        <summary className={cn("grid min-h-16 cursor-pointer gap-3 p-3.5 transition-colors hover:bg-muted/40 active:bg-muted sm:grid-cols-[8rem_1fr_auto] sm:items-center", riskDates.length && "bg-red-50 text-red-950")}>
           <div className="kav-num rounded-md bg-muted px-2.5 py-2 text-center text-sm font-bold">{range(leave.starts_on, leave.ends_on)}</div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <b>{peopleById.get(leave.person_id)}</b>
               <span className="text-xs text-muted-foreground">{periodsById.get(leave.reserve_period_id)?.name}</span>
+              {riskDates.length ? <RiskyLeaveBadge dates={riskDates} /> : null}
             </div>
             <p className="mt-1 truncate text-sm text-muted-foreground">{leave.reason || "ללא סיבה"}</p>
           </div>
@@ -110,7 +132,8 @@ export default async function LeavePage({ params, searchParams }: {
           <Button className="self-end">שמירת שינויים</Button>
         </form>
         <form action={deleteLeaveAction.bind(null, teamSlug)} className="bg-muted/30 px-3.5 pb-3.5"><input type="hidden" name="id" value={leave.id} /><Button variant="ghost" size="sm"><Trash2 className="size-4" />מחיקה</Button></form>
-      </details>)}
+      </details>;
+      })}
       {!managementLeaves.length ? <div className="grid min-h-52 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין בקשות יציאה להצגה</p></div></div> : null}
     </section>
     <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave"><h2 className="text-base font-semibold">יציאה חדשה</h2>
@@ -130,12 +153,14 @@ function MyLeaveRequests({
   currentPerson,
   leaves,
   periods,
+  riskDateSet,
   selectedPeriodId,
   teamSlug,
 }: {
   currentPerson: { full_name: string; id: string } | null;
   leaves: LeaveRow[];
   periods: PeriodRow[];
+  riskDateSet: Set<string>;
   selectedPeriodId: string | null;
   teamSlug: string;
 }) {
@@ -157,19 +182,25 @@ function MyLeaveRequests({
       </div>
       {visibleLeaves.length ? (
         <div className="mb-3 grid gap-2 md:grid-cols-2">
-          {visibleLeaves.slice(0, 4).map((leave) => (
-            <div className="rounded-md border p-3" key={leave.id}>
+          {visibleLeaves.slice(0, 4).map((leave) => {
+            const riskDates = getLeaveRiskDates(toLeaveRiskInput(leave), riskDateSet);
+            return (
+            <div className={cn("rounded-md border p-3", riskDates.length && "border-red-300 bg-red-50 text-red-950")} key={leave.id}>
               <div className="flex items-center justify-between gap-2">
                 <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
-                <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
-                  {statusLabel(leave.status)}
-                </Badge>
+                <div className="flex items-center gap-1.5">
+                  {riskDates.length ? <RiskyLeaveBadge dates={riskDates} /> : null}
+                  <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
+                    {statusLabel(leave.status)}
+                  </Badge>
+                </div>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
                 {periods.find((period) => period.id === leave.reserve_period_id)?.name ?? "סבב מילואים"}
               </p>
             </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <p className="mb-3 rounded-md border border-dashed p-3 text-sm text-muted-foreground">אין לך בקשות יציאה בתקופה הנבחרת.</p>
@@ -184,6 +215,7 @@ function ViewerLeavePage({
   leaves,
   periods,
   query,
+  riskDateSet,
   selectedPeriodId,
   teamName,
   teamSlug,
@@ -192,6 +224,7 @@ function ViewerLeavePage({
   leaves: LeaveRow[];
   periods: PeriodRow[];
   query: { saved?: string; view?: string };
+  riskDateSet: Set<string>;
   selectedPeriodId: string | null;
   teamName: string;
   teamSlug: string;
@@ -215,10 +248,15 @@ function ViewerLeavePage({
       ) : (
         <>
           <section className="divide-y overflow-hidden rounded-lg border bg-card">
-            {visibleLeaves.map((leave) => (
-              <div className="grid gap-2 p-3.5 sm:grid-cols-[1fr_auto] sm:items-center" key={leave.id}>
+            {visibleLeaves.map((leave) => {
+              const riskDates = getLeaveRiskDates(toLeaveRiskInput(leave), riskDateSet);
+              return (
+              <div className={cn("grid gap-2 p-3.5 sm:grid-cols-[1fr_auto] sm:items-center", riskDates.length && "bg-red-50 text-red-950")} key={leave.id}>
                 <div>
-                  <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
+                    {riskDates.length ? <RiskyLeaveBadge dates={riskDates} /> : null}
+                  </div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {periods.find((period) => period.id === leave.reserve_period_id)?.name ?? "סבב מילואים"}
                   </p>
@@ -228,7 +266,8 @@ function ViewerLeavePage({
                   {statusLabel(leave.status)}
                 </Badge>
               </div>
-            ))}
+              );
+            })}
             {!visibleLeaves.length ? <div className="grid min-h-40 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין לך בקשות יציאה עדיין</p></div></div> : null}
           </section>
           <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave">
@@ -307,20 +346,22 @@ function RiskDays({ days }: { days: RiskDay[] }) {
 }
 
 function buildRiskDays(leaves: LeaveRow[], peopleById: Map<string, string>): RiskDay[] {
-  const days = new Map<string, Set<string>>();
-  for (const leave of leaves) {
-    if (leave.status === "cancelled" || leave.status === "rejected") continue;
-    for (const date of eachCalendarDate(leave.starts_on, leave.ends_on)) {
-      const people = days.get(date) ?? new Set<string>();
-      people.add(peopleById.get(leave.person_id) ?? "איש צוות");
-      days.set(date, people);
-    }
-  }
+  return buildLeaveRiskDays(leaves.map((leave) => toLeaveRiskInput(leave, peopleById)));
+}
 
-  return [...days.entries()]
-    .map(([date, people]) => ({ count: people.size, date, people: [...people].sort((a, b) => a.localeCompare(b, "he")) }))
-    .filter((day) => day.count > 3)
-    .sort((a, b) => a.date.localeCompare(b.date));
+function RiskyLeaveBadge({ dates }: { dates: string[] }) {
+  return <Badge variant="danger">יום אדום · {dates.map(short).join(", ")}</Badge>;
+}
+
+function toLeaveRiskInput(leave: LeaveRow, peopleById?: Map<string, string>): LeaveRiskInput {
+  return {
+    endsOn: leave.ends_on,
+    id: leave.id,
+    personId: leave.person_id,
+    personName: peopleById?.get(leave.person_id),
+    startsOn: leave.starts_on,
+    status: leave.status,
+  };
 }
 
 function Field({ label, ...props }: React.ComponentProps<"input"> & { label: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<Input {...props} /></label>; }
@@ -354,8 +395,10 @@ type LeaveRow = {
 };
 
 type PeriodRow = {
+  ends_on: string;
   id: string;
   name: string;
+  starts_on: string;
   status: string;
 };
 
