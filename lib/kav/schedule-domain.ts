@@ -15,7 +15,7 @@ export type RotationOverrideInput = DateRange & {
   personId: string;
   toGroupId: string;
 };
-export type LeaveStatus = "pending" | "approved" | "partially_approved" | "rejected";
+export type LeaveStatus = "pending" | "approved" | "partially_approved" | "rejected" | "cancelled";
 export type AttendanceState = "present" | "absent" | "unreported";
 export type LeaveInput = DateRange & {
   id: string;

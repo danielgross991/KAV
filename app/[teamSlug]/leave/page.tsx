@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarOff, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CalendarOff, Filter, Plus, Trash2 } from "lucide-react";
 
 import { AppPage, EmptyState, PageHeader, SuccessNotice } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
@@ -8,14 +8,14 @@ import { Input } from "@/components/ui/input";
 import { ViewerLeaveRequestForm } from "@/components/viewer-leave-request-form";
 import { deleteLeaveAction, saveLeaveAction } from "@/app/[teamSlug]/leave/actions";
 import { requireAuth } from "@/lib/kav/auth";
-import { getDateInTimeZone } from "@/lib/kav/dates";
+import { eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
 import { getSelectedLinePeriodId } from "@/lib/kav/line-selection.server";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 import { cn } from "@/lib/utils";
 
 export default async function LeavePage({ params, searchParams }: {
   params: Promise<{ teamSlug: string }>;
-  searchParams: Promise<{ period?: string; view?: string; saved?: string; deleted?: string }>;
+  searchParams: Promise<{ period?: string; person?: string; view?: string; saved?: string; deleted?: string }>;
 }) {
   const [{ teamSlug }, query] = await Promise.all([params, searchParams]);
   const { supabase, userId } = await requireAuth();
@@ -32,7 +32,7 @@ export default async function LeavePage({ params, searchParams }: {
   const [{ data: people, error: peopleError }, { data: periods, error: periodsError }, { data: leaves, error: leavesError }] = await Promise.all([
     supabase.from("people").select("id, full_name, is_active").eq("team_id", membership.team.id).order("display_order").order("full_name"),
     supabase.from("reserve_periods").select("id, name, starts_on, ends_on, status").eq("team_id", membership.team.id).order("starts_on", { ascending: false }),
-    supabase.from("leave_requests").select("*").eq("team_id", membership.team.id).order("starts_on", { ascending: false }),
+    supabase.from("leave_requests").select("*").eq("team_id", membership.team.id).order("starts_on", { ascending: true }).order("created_at", { ascending: true }),
   ]);
   const { data: currentPerson, error: currentPersonError } = await currentPersonPromise;
   if (peopleError || periodsError || leavesError) throw new Error("לא הצלחנו לטעון את היציאות");
@@ -49,14 +49,20 @@ export default async function LeavePage({ params, searchParams }: {
 
   const peopleById = new Map((people ?? []).map((person) => [person.id, person.full_name]));
   const periodsById = new Map((periods ?? []).map((period) => [period.id, period]));
+  const selectablePeople = (people ?? []).filter((person) => person.is_active);
+  const selectedPersonId = query.person && peopleById.has(query.person) ? query.person : "all";
   const view = ["all", "active", "upcoming", "history"].includes(query.view ?? "") ? query.view! : "all";
-  const filtered = (leaves ?? [])
+  const periodFiltered = (leaves ?? [])
     .filter((leave) => selectedLinePeriodId ? leave.reserve_period_id === selectedLinePeriodId : true)
     .filter((leave) => view === "all"
       ? true
       : view === "active"
       ? leave.starts_on <= today && leave.ends_on >= today
       : view === "upcoming" ? leave.starts_on > today : leave.ends_on < today);
+  const riskDays = buildRiskDays(periodFiltered, peopleById);
+  const filtered = periodFiltered
+    .filter((leave) => selectedPersonId === "all" ? true : leave.person_id === selectedPersonId)
+    .sort(byLeaveDate);
   const managementLeaves = currentPerson
     ? filtered.filter((leave) => leave.person_id !== currentPerson.id)
     : filtered;
@@ -66,9 +72,17 @@ export default async function LeavePage({ params, searchParams }: {
 
   return <AppPage className="max-w-6xl">
     <PageHeader eyebrow={membership.team.name} title="יציאות" subtitle="ניהול בקשות וטווחים מאושרים" action={<a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="יציאה חדשה"><Plus className="size-4" /></a>}>
-      <nav className="grid grid-cols-4 gap-1 rounded-md border bg-muted p-1"><Tab active={view === "all"} href={`/${teamSlug}/leave?view=all`}>הכל</Tab><Tab active={view === "active"} href={`/${teamSlug}/leave?view=active`}>פעילות</Tab><Tab active={view === "upcoming"} href={`/${teamSlug}/leave?view=upcoming`}>קרובות</Tab><Tab active={view === "history"} href={`/${teamSlug}/leave?view=history`}>היסטוריה</Tab></nav>
+      <nav className="grid grid-cols-4 gap-1 rounded-md border bg-muted p-1"><Tab active={view === "all"} href={leaveHref(teamSlug, query, { view: "all", person: selectedPersonId })}>הכל</Tab><Tab active={view === "active"} href={leaveHref(teamSlug, query, { view: "active", person: selectedPersonId })}>פעילות</Tab><Tab active={view === "upcoming"} href={leaveHref(teamSlug, query, { view: "upcoming", person: selectedPersonId })}>קרובות</Tab><Tab active={view === "history"} href={leaveHref(teamSlug, query, { view: "history", person: selectedPersonId })}>היסטוריה</Tab></nav>
     </PageHeader>
     {query.saved ? <SuccessNotice>היציאה נשמרה</SuccessNotice> : null}{query.deleted ? <SuccessNotice>היציאה נמחקה</SuccessNotice> : null}
+    <LeaveFilters
+      period={query.period}
+      people={selectablePeople}
+      selectedPersonId={selectedPersonId}
+      teamSlug={teamSlug}
+      view={view}
+    />
+    <RiskDays days={riskDays} />
     <MyLeaveRequests
       currentPerson={currentPerson}
       leaves={(leaves ?? []).filter((leave) => leave.person_id === currentPerson?.id)}
@@ -224,7 +238,87 @@ function ViewerLeavePage({
   );
 }
 
-const statusOptions = [["pending", "טרם הוחלט"], ["approved", "כן"], ["rejected", "לא"]];
+const statusOptions = [["pending", "טרם הוחלט"], ["approved", "כן"], ["rejected", "לא"], ["cancelled", "בוטל"]];
+function LeaveFilters({
+  people,
+  period,
+  selectedPersonId,
+  teamSlug,
+  view,
+}: {
+  people: { full_name: string; id: string }[];
+  period?: string;
+  selectedPersonId: string;
+  teamSlug: string;
+  view: string;
+}) {
+  return (
+    <form action={`/${teamSlug}/leave`} className="mb-4 flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
+      <input name="view" type="hidden" value={view} />
+      {period ? <input name="period" type="hidden" value={period} /> : null}
+      <label className="grid min-w-52 flex-1 gap-1.5 text-xs font-medium text-muted-foreground">
+        סינון לפי איש צוות
+        <select className="h-10 rounded-md border bg-background px-2 text-sm" defaultValue={selectedPersonId} name="person">
+          <option value="all">כל האנשים</option>
+          {people.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
+        </select>
+      </label>
+      <div className="rounded-md bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">ברירת מחדל: ממויין לפי תאריכים</div>
+      <Button className="self-end" size="sm"><Filter className="size-4" />סינון</Button>
+    </form>
+  );
+}
+
+function RiskDays({ days }: { days: RiskDay[] }) {
+  if (!days.length) return null;
+  return (
+    <section className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-950">
+      <div className="flex items-center gap-2">
+        <AlertTriangle className="size-5" />
+        <div>
+          <h2 className="text-base font-semibold">ימים מסוכנים</h2>
+          <p className="text-sm">יותר מ־3 בקשות יציאה באותו יום.</p>
+        </div>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {days.map((day) => (
+          <div className="rounded-md border border-amber-200 bg-white/70 p-3" key={day.date}>
+            <div className="flex items-center justify-between gap-3">
+              <b>{fullDate(day.date)}</b>
+              <Badge variant="danger">{day.count} בקשות</Badge>
+            </div>
+            <p className="mt-2 text-sm">{day.people.join(", ")}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function buildRiskDays(leaves: LeaveRow[], peopleById: Map<string, string>): RiskDay[] {
+  const days = new Map<string, Set<string>>();
+  for (const leave of leaves) {
+    if (leave.status === "cancelled" || leave.status === "rejected") continue;
+    for (const date of eachCalendarDate(leave.starts_on, leave.ends_on)) {
+      const people = days.get(date) ?? new Set<string>();
+      people.add(peopleById.get(leave.person_id) ?? "איש צוות");
+      days.set(date, people);
+    }
+  }
+
+  return [...days.entries()]
+    .map(([date, people]) => ({ count: people.size, date, people: [...people].sort((a, b) => a.localeCompare(b, "he")) }))
+    .filter((day) => day.count > 3)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function leaveHref(teamSlug: string, query: { period?: string }, next: { person: string; view: string }) {
+  const params = new URLSearchParams({ view: next.view });
+  if (next.person !== "all") params.set("person", next.person);
+  if (query.period) params.set("period", query.period);
+  return `/${teamSlug}/leave?${params.toString()}`;
+}
+
 function Field({ label, ...props }: React.ComponentProps<"input"> & { label: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<Input {...props} /></label>; }
 function Select({ label, name, options, value }: { label: string; name: string; options: string[][]; value?: string }) { return <label className="grid gap-1.5 text-xs font-medium text-muted-foreground">{label}<select className="h-10 rounded-md border bg-background px-2 text-sm" defaultValue={value} name={name} required>{options.map(([id, text]) => <option key={id} value={id}>{text}</option>)}</select></label>; }
 function PeriodInput({ options, selectedPeriodId, value }: { options: PeriodRow[]; selectedPeriodId: string | null; value?: string }) {
@@ -235,9 +329,11 @@ function PeriodInput({ options, selectedPeriodId, value }: { options: PeriodRow[
 function Tab({ active, children, href }: { active: boolean; children: React.ReactNode; href: string }) { return <Link aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-colors hover:bg-card/70 hover:text-foreground active:bg-card active:text-foreground", active ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground")} href={href}>{children}</Link>; }
 function range(start: string, end: string) { return `${short(start)}–${short(end)}`; }
 function short(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
+function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function statusLabel(value: string) { return Object.fromEntries(statusOptions)[value] ?? value; }
 function statusFormValue(value: string) { return value === "partially_approved" ? "approved" : value; }
 function isApprovedStatus(value: string) { return value === "approved" || value === "partially_approved"; }
+function byLeaveDate(a: LeaveRow, b: LeaveRow) { return a.starts_on.localeCompare(b.starts_on) || a.ends_on.localeCompare(b.ends_on); }
 
 type LeaveRow = {
   approved_ends_on: string | null;
@@ -255,4 +351,10 @@ type PeriodRow = {
   id: string;
   name: string;
   status: string;
+};
+
+type RiskDay = {
+  count: number;
+  date: string;
+  people: string[];
 };

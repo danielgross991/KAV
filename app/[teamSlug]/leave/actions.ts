@@ -10,7 +10,7 @@ import { getOperationalRange } from "@/lib/kav/operations";
 import { overlaps, validateLeaveRange } from "@/lib/kav/schedule-domain";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
-const STATUSES = ["pending", "approved", "rejected"];
+const STATUSES = ["pending", "approved", "rejected", "cancelled"];
 export type ViewerLeaveRequestState = { error?: string };
 
 export async function saveLeaveAction(teamSlug: string, formData: FormData) {
