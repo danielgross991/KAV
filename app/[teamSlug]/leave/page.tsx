@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { CalendarOff, Plus, Trash2 } from "lucide-react";
 
-import { createViewerLeaveRequestAction, deleteLeaveAction, saveLeaveAction } from "@/app/[teamSlug]/leave/actions";
 import { AppPage, EmptyState, PageHeader, SuccessNotice } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ViewerLeaveRequestForm } from "@/components/viewer-leave-request-form";
+import { deleteLeaveAction, saveLeaveAction } from "@/app/[teamSlug]/leave/actions";
 import { requireAuth } from "@/lib/kav/auth";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { getSelectedLinePeriodId } from "@/lib/kav/line-selection.server";
@@ -156,13 +157,7 @@ function MyLeaveRequests({
       ) : (
         <p className="mb-3 rounded-md border border-dashed p-3 text-sm text-muted-foreground">אין לך בקשות יציאה בתקופה הנבחרת.</p>
       )}
-      <form action={createViewerLeaveRequestAction.bind(null, teamSlug)} className="grid gap-3 md:grid-cols-4">
-        <PeriodInput options={periodOptions} selectedPeriodId={selectedPeriodId} />
-        <Field label="מתאריך" name="starts_on" type="date" required />
-        <Field label="עד תאריך" name="ends_on" type="date" required />
-        <Field label="סיבה" name="reason" />
-        <Button className="self-end"><Plus className="size-4" />שליחת בקשה שלי</Button>
-      </form>
+      <ViewerLeaveRequestForm className="grid gap-3 md:grid-cols-4" periodOptions={periodOptions} selectedPeriodId={selectedPeriodId} teamSlug={teamSlug} />
     </section>
   );
 }
@@ -221,13 +216,7 @@ function ViewerLeavePage({
           </section>
           <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave">
             <h2 className="text-base font-semibold">בקשה חדשה</h2>
-            <form action={createViewerLeaveRequestAction.bind(null, teamSlug)} className="mt-4 grid gap-3 md:grid-cols-4">
-              <PeriodInput options={visiblePeriodOptions} selectedPeriodId={selectedPeriodId} />
-              <Field label="מתאריך" name="starts_on" type="date" required />
-              <Field label="עד תאריך" name="ends_on" type="date" required />
-              <Field label="סיבה" name="reason" />
-              <Button className="self-end"><Plus className="size-4" />שליחת בקשה</Button>
-            </form>
+            <ViewerLeaveRequestForm className="mt-4 grid gap-3 md:grid-cols-4" periodOptions={visiblePeriodOptions} selectedPeriodId={selectedPeriodId} teamSlug={teamSlug} />
           </section>
         </>
       )}

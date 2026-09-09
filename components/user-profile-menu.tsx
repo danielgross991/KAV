@@ -60,10 +60,16 @@ export function UserProfileMenu({
   teamSlug: string;
   variant?: "desktop" | "mobile";
 }) {
+  const [open, setOpen] = useState(false);
+
   if (!profile) return null;
 
   return (
-    <details className={cn("group relative", variant === "desktop" && "mt-3")}>
+    <details
+      className={cn("group relative", variant === "desktop" && "mt-3")}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      open={open}
+    >
       <summary
         className={cn(
           "flex cursor-pointer list-none items-center gap-2 rounded-md border bg-background text-start transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-details-marker]:hidden",
@@ -89,13 +95,13 @@ export function UserProfileMenu({
           variant === "desktop" ? "bottom-full right-0 mb-2" : "left-0 top-12",
         )}
       >
-        <ProfileMenuLink href={`/${teamSlug}/team/${profile.id}`} icon={<UserRound className="size-4" />}>
+        <ProfileMenuLink href={`/${teamSlug}/team/${profile.id}`} icon={<UserRound className="size-4" />} onSelect={() => setOpen(false)}>
           האזור האישי
         </ProfileMenuLink>
-        <ProfileMenuLink href={`/${teamSlug}/leave`} icon={<ClipboardList className="size-4" />}>
+        <ProfileMenuLink href={`/${teamSlug}/leave`} icon={<ClipboardList className="size-4" />} onSelect={() => setOpen(false)}>
           הבקשות שלי
         </ProfileMenuLink>
-        <ProfileMenuLink href={`/${teamSlug}/equipment`} icon={<PackageCheck className="size-4" />}>
+        <ProfileMenuLink href={`/${teamSlug}/equipment`} icon={<PackageCheck className="size-4" />} onSelect={() => setOpen(false)}>
           הציוד שלי
         </ProfileMenuLink>
       </div>
@@ -107,15 +113,18 @@ function ProfileMenuLink({
   children,
   href,
   icon,
+  onSelect,
 }: {
   children: React.ReactNode;
   href: string;
   icon: React.ReactNode;
+  onSelect: () => void;
 }) {
   return (
     <Link
       className="flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
       href={href}
+      onClick={onSelect}
     >
       {icon}
       {children}

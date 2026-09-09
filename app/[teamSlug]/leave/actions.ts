@@ -11,6 +11,7 @@ import { overlaps, validateLeaveRange } from "@/lib/kav/schedule-domain";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
 const STATUSES = ["pending", "approved", "rejected"];
+export type ViewerLeaveRequestState = { error?: string };
 
 export async function saveLeaveAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
@@ -96,6 +97,25 @@ export async function deleteLeaveAction(teamSlug: string, formData: FormData) {
 }
 
 export async function createViewerLeaveRequestAction(teamSlug: string, formData: FormData) {
+  await createViewerLeaveRequest(teamSlug, formData);
+  redirect(`/${teamSlug}/leave?saved=1`);
+}
+
+export async function createViewerLeaveRequestStateAction(
+  teamSlug: string,
+  _state: ViewerLeaveRequestState,
+  formData: FormData,
+): Promise<ViewerLeaveRequestState> {
+  try {
+    await createViewerLeaveRequest(teamSlug, formData);
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : "משהו השתבש. נסה שוב." };
+  }
+
+  redirect(`/${teamSlug}/leave?saved=1`);
+}
+
+async function createViewerLeaveRequest(teamSlug: string, formData: FormData) {
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);
   const periodId = required(formData, "reserve_period_id");
@@ -159,7 +179,6 @@ export async function createViewerLeaveRequestAction(teamSlug: string, formData:
     title: "בקשת יציאה חדשה",
   });
   refresh(teamSlug);
-  redirect(`/${teamSlug}/leave?saved=1`);
 }
 
 async function managerContext(teamSlug: string) {

@@ -165,7 +165,6 @@ function MonthNavButton({ active, ariaLabel, children, onClick }: { active: bool
 function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; inMonth: boolean; onPreview: () => void }) {
   const holiday = day.events.find(isHolidayEvent);
   const otherEvents = day.events.filter((event) => !isHolidayEvent(event));
-  const viewer = data.viewerPersonId ? day.people.find((person) => person.id === data.viewerPersonId) : null;
   const personalLeaves = data.viewerPersonId
     ? [...day.leaveMarkers, ...day.leaveRequests].filter((item) => item.personId === data.viewerPersonId)
     : [];
@@ -174,47 +173,32 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
     : day.leaveMarkers.length + day.leaveRequests.length;
   const isPast = date < data.today;
   const attendanceIssue = data.canManage && isPast && ((day.attendance?.absent.length ?? 0) > 0 || (day.attendance?.unreported.length ?? 0) > 0);
-  const baseGroups = day.groups.filter((group) => group.block?.state === "base");
   const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null;
   const isChangeover = isChangeoverDate(data, date, dominantState);
   const operationalLabel = isChangeover ? `חילוף ל${stateLabel(dominantState)}` : stateLabel(dominantState);
+  const enrichmentMarkers = [
+    holiday ? { className: "bg-violet-500", label: holiday.title } : null,
+    otherEvents.length ? { className: "bg-amber-500", label: `${otherEvents.length} אירועים` } : null,
+    day.tasks.length ? { className: "bg-primary", label: `${day.tasks.length} משימות` } : null,
+    attendanceIssue ? { className: "bg-destructive", label: "פער נוכחות" } : null,
+  ].filter(Boolean) as { className: string; label: string }[];
 
   return <Link aria-haspopup="dialog" className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
     event.preventDefault();
     onPreview();
   }}>
-    <div className="mb-1.5 flex items-start justify-between gap-1">
-      <span className={cn("grid size-6 place-items-center rounded-full text-xs font-semibold transition-colors sm:size-7 sm:text-sm", date === data.today ? "bg-primary !text-white" : "bg-card text-foreground group-hover:bg-accent group-hover:text-primary")}>{Number(date.slice(-2))}</span>
-      <span className="mt-1 flex flex-wrap justify-end gap-1">
-        {holiday ? <span aria-label={holiday.title} className="size-2 rounded-full bg-violet-500" title={holiday.title} /> : null}
-        {otherEvents.length ? <span className="size-2 rounded-full bg-amber-500" /> : null}
-        {day.tasks.length ? <span className="size-2 rounded-full bg-primary" /> : null}
-        {teamLeaveCount ? <span className="kav-num min-w-5 rounded-full bg-fuchsia-700 px-1 text-center text-[0.62rem] font-bold leading-5 text-white">{teamLeaveCount}</span> : null}
-        {attendanceIssue ? <span className="size-2 rounded-full bg-destructive" /> : null}
+    <div className="mb-1 flex items-start justify-between gap-1">
+      <span className="flex items-center gap-1">
+        <span className={cn("grid size-6 place-items-center rounded-full text-xs font-semibold transition-colors sm:size-7 sm:text-sm", date === data.today ? "bg-primary !text-white" : "bg-card text-foreground group-hover:bg-accent group-hover:text-primary")}>{Number(date.slice(-2))}</span>
+        {teamLeaveCount ? <span aria-label={`${teamLeaveCount} בקשות יציאה`} className="kav-num grid size-5 place-items-center rounded-full bg-fuchsia-700 text-[0.62rem] font-bold leading-none text-white">{teamLeaveCount}</span> : null}
       </span>
+    </div>
+    <div className="mb-1 flex h-4 items-center justify-center gap-1">
+      {enrichmentMarkers.map((marker) => <span aria-label={marker.label} className={cn("size-2 rounded-full", marker.className)} key={marker.label} title={marker.label} />)}
     </div>
     <div className={cn("mb-1 rounded-md px-1.5 py-1 text-center text-[0.72rem] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] sm:text-xs", dominantState === "base" ? "bg-emerald-600 text-white" : dominantState === "home" ? "bg-sky-700 text-white" : "bg-card text-muted-foreground", isChangeover && "bg-primary text-white")}>
       {operationalLabel}
     </div>
-    {holiday ? <div className="truncate rounded bg-special-soft px-1.5 py-0.5 text-[0.68rem] font-medium text-special sm:text-xs">{holiday.title}</div> : null}
-    {data.canManage ? (
-      <>
-        {baseGroups.length ? <div className="mt-1 truncate text-[0.68rem] font-semibold text-emerald-950 sm:text-xs">{day.expectedBase.length} בבסיס</div> : <div className="mt-1 truncate text-[0.68rem] font-semibold text-sky-950 sm:text-xs">{day.expectedHome.length} בבית</div>}
-        {teamLeaveCount ? <div className="mt-1 truncate text-[0.68rem] font-bold text-fuchsia-900 sm:text-xs">{teamLeaveCount} בקשות יציאה</div> : null}
-        {day.tasks.length ? <div className="mt-1 truncate text-[0.68rem] text-primary sm:text-xs">{day.tasks.length} משימות</div> : null}
-      </>
-    ) : viewer ? (
-      <div className="mt-1 flex flex-wrap items-center gap-1">
-        {viewer.resolution.state ? (
-          <Badge variant={viewer.resolution.state === "base" ? "success" : "info"}>
-            {stateLabel(viewer.resolution.state)}
-          </Badge>
-        ) : null}
-        {viewer.resolution.leave ? <Badge variant="secondary">יציאה</Badge> : null}
-        {personalLeaves.length ? <Badge variant="outline">בקשה שלך</Badge> : null}
-        {teamLeaveCount && !personalLeaves.length ? <span className="text-[0.68rem] text-sky-700 sm:text-xs">{teamLeaveCount} יציאות</span> : null}
-      </div>
-    ) : null}
   </Link>;
 }
 
