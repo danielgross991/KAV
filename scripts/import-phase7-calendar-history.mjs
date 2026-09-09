@@ -47,7 +47,7 @@ const report = {
   equipmentTypesCreated: [], equipmentTypesSkipped: [],
   equipmentImported: [],
   currentPhasesRemoved: [], currentRotationGroupsCreated: [], currentRotationGroupsUpdated: [], currentRotationGroupsRemoved: [],
-  currentRotationMembershipCreated: [], currentRotationBlocksSynced: [],
+  currentRotationMembershipCreated: [], currentRotationMembershipUpdated: [], currentRotationMembershipRemoved: [], currentRotationBlocksSynced: [], currentAttendanceImported: [],
   historicalAttendanceDates: [], historicalPresenceRowsCreated: [], historicalPresenceRowsUpdated: [],
   historicalRotationBlocksCreated: [], historicalRotationBlocksSkipped: [], historicalRotationMembership: [],
   skippedRows: [], ambiguousNames: [], missingDates: [],
@@ -91,7 +91,7 @@ async function main() {
   const period2026 = await getOrCreatePeriod(team.id, reservePeriod2026.period);
   await removeOutdatedCurrentPhases(team.id, period2026.id, reservePeriod2026.phases ?? []);
   await createPhases(team.id, period2026.id, reservePeriod2026.phases ?? []);
-  const currentGroupIds = await syncCurrentRotationGroups(team.id, period2026.id, reservePeriod2026.rotationGroups ?? [], people);
+  const currentGroupIds = await syncCurrentRotationGroups(team.id, period2026.id, reservePeriod2026.rotationGroups ?? [], people, nameToId);
   await syncCurrentRotationBlocks(team.id, period2026.id, reservePeriod2026.rotationBlocks ?? [], currentGroupIds);
   await removeOutdatedCurrentEvents(team.id, period2026.id, [
     ...(reservePeriod2026.events ?? []),
@@ -101,6 +101,7 @@ async function main() {
   // The current schedule schema intentionally has no separate holiday event type;
   // holidays are displayed as all-day calendar events with the valid generic type.
   await createEvents(team, period2026.id, (reservePeriod2026.holidays ?? []).map((h) => ({ ...h, event_type: "other", is_all_day: true })), "holiday");
+  await importCurrentAttendance(team.id, period2026.id, reservePeriod2026.attendanceDays ?? [], nameToId);
   await importPendingLeave(team.id, period2026.id, reservePeriod2026.pendingLeaveRequests ?? [], nameToId);
   for (const skipped of reservePeriod2026.skippedLeaveRequests ?? []) {
     report.pendingLeaveSkipped.push(skipped);
@@ -302,7 +303,7 @@ async function removeOutdatedCurrentEvents(teamId, reservePeriodId, events) {
   if (error) throw new Error(`Unable to remove outdated current events: ${error.message}`);
 }
 
-async function syncCurrentRotationGroups(teamId, reservePeriodId, groups, people) {
+async function syncCurrentRotationGroups(teamId, reservePeriodId, groups, people, nameToId) {
   const expectedNames = new Set(groups.map((group) => group.name));
   const { data: existingGroups, error } = await supabase.from("rotation_groups").select("*")
     .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId);
@@ -357,18 +358,30 @@ async function syncCurrentRotationGroups(teamId, reservePeriodId, groups, people
 
     if (group.members === "all_active") {
       const groupId = groupIds.get(group.name);
-      await ensureAllActiveMembers(teamId, groupId, people, group.excluded_members ?? []);
+      await syncCurrentGroupMembers(teamId, groupId, eligibleAllActiveMembers(people, group.excluded_members ?? []), group);
+    } else if (Array.isArray(group.members)) {
+      const groupId = groupIds.get(group.name);
+      const namedPeople = [];
+      for (const memberName of group.members) {
+        const personId = resolvePersonId(nameToId, memberName, `current rotation group '${group.name}'`);
+        if (personId) namedPeople.push({ id: personId, full_name: memberName });
+      }
+      await syncCurrentGroupMembers(teamId, groupId, namedPeople, group);
     }
   }
   return groupIds;
 }
 
-async function ensureAllActiveMembers(teamId, rotationGroupId, people, excludedNames) {
+function eligibleAllActiveMembers(people, excludedNames) {
+  const excluded = new Set(excludedNames);
+  return people.filter((person) => !excluded.has(person.full_name));
+}
+
+async function syncCurrentGroupMembers(teamId, rotationGroupId, people, group) {
   const { data: existing, error } = await supabase.from("rotation_members").select("person_id")
     .eq("team_id", teamId).eq("rotation_group_id", rotationGroupId);
   if (error) throw new Error(`Unable to load current rotation membership: ${error.message}`);
-  const excluded = new Set(excludedNames);
-  const eligiblePeople = people.filter((person) => !excluded.has(person.full_name));
+  const eligiblePeople = dedupePeople(people);
   const eligibleIds = new Set(eligiblePeople.map((person) => person.id));
   const existingIds = new Set((existing ?? []).map((item) => item.person_id));
   const staleIds = [...existingIds].filter((personId) => !eligibleIds.has(personId));
@@ -378,14 +391,30 @@ async function ensureAllActiveMembers(teamId, rotationGroupId, people, excludedN
       .eq("rotation_group_id", rotationGroupId)
       .in("person_id", staleIds);
     if (deleteError) throw new Error(`Unable to remove excluded current rotation members: ${deleteError.message}`);
+    report.currentRotationMembershipRemoved.push(...staleIds.map((personId) => ({ group: group.name, person_id: personId })));
+  }
+  const membershipDates = { starts_on: group.starts_on ?? null, ends_on: group.ends_on ?? null };
+  const updateIds = [...existingIds].filter((personId) => eligibleIds.has(personId));
+  if (updateIds.length) {
+    const { error: updateError } = await supabase.from("rotation_members")
+      .update(membershipDates)
+      .eq("team_id", teamId)
+      .eq("rotation_group_id", rotationGroupId)
+      .in("person_id", updateIds);
+    if (updateError) throw new Error(`Unable to update current rotation member dates: ${updateError.message}`);
+    report.currentRotationMembershipUpdated.push(...updateIds.map((personId) => ({ group: group.name, person_id: personId, ...membershipDates })));
   }
   const rows = eligiblePeople
     .filter((person) => !existingIds.has(person.id))
-    .map((person) => ({ team_id: teamId, rotation_group_id: rotationGroupId, person_id: person.id, starts_on: null, ends_on: null }));
+    .map((person) => ({ team_id: teamId, rotation_group_id: rotationGroupId, person_id: person.id, ...membershipDates }));
   if (!rows.length) return;
   const { error: insertError } = await supabase.from("rotation_members").insert(rows);
   if (insertError) throw new Error(`Unable to create all-team current rotation membership: ${insertError.message}`);
-  report.currentRotationMembershipCreated.push(...rows.map((row) => ({ person_id: row.person_id })));
+  report.currentRotationMembershipCreated.push(...rows.map((row) => ({ group: group.name, person_id: row.person_id, starts_on: row.starts_on, ends_on: row.ends_on })));
+}
+
+function dedupePeople(people) {
+  return [...new Map(people.map((person) => [person.id, person])).values()];
 }
 
 async function syncCurrentRotationBlocks(teamId, reservePeriodId, blocks, groupIdByName) {
@@ -480,6 +509,72 @@ async function importPendingLeave(teamId, reservePeriodId, requests, nameToId) {
     });
     if (insertError) throw new Error(`Unable to create leave request for ${request.person_name}: ${insertError.message}`);
     report.pendingLeaveImported.push({ person_name: request.person_name, starts_on: request.starts_on, ends_on: request.ends_on });
+  }
+}
+
+async function importCurrentAttendance(teamId, reservePeriodId, attendanceDays, nameToId) {
+  if (!attendanceDays.length) return;
+
+  for (const record of attendanceDays) {
+    const presentPersonIds = [];
+    for (const personName of record.present ?? []) {
+      const personId = resolvePersonId(nameToId, personName, `current attendance ${record.date}`);
+      if (personId) presentPersonIds.push(personId);
+    }
+
+    let { data: day, error: dayError } = await supabase.from("attendance_days").select("id, status")
+      .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId).eq("attendance_date", record.date).maybeSingle();
+    if (dayError) throw new Error(`Unable to load current attendance day ${record.date}: ${dayError.message}`);
+    if (!day) {
+      const { data: created, error: insertError } = await supabase.from("attendance_days").insert({
+        team_id: teamId,
+        reserve_period_id: reservePeriodId,
+        attendance_date: record.date,
+        status: record.status ?? "submitted",
+        submitted_at: new Date().toISOString(),
+      }).select("id, status").single();
+      if (insertError) throw new Error(`Unable to create current attendance day ${record.date}: ${insertError.message}`);
+      day = created;
+    } else if (day.status !== (record.status ?? "submitted")) {
+      const { error: updateError } = await supabase.from("attendance_days").update({
+        status: record.status ?? "submitted",
+        submitted_at: new Date().toISOString(),
+      }).eq("id", day.id);
+      if (updateError) throw new Error(`Unable to update current attendance day ${record.date}: ${updateError.message}`);
+    }
+
+    const { data: existingEntries, error: entriesError } = await supabase.from("attendance_entries")
+      .select("id, person_id").eq("team_id", teamId).eq("attendance_day_id", day.id);
+    if (entriesError) throw new Error(`Unable to load current attendance entries ${record.date}: ${entriesError.message}`);
+
+    const presentIdSet = new Set(presentPersonIds);
+    const staleEntryIds = (existingEntries ?? [])
+      .filter((entry) => !presentIdSet.has(entry.person_id))
+      .map((entry) => entry.id);
+    if (staleEntryIds.length) {
+      const { error: deleteError } = await supabase.from("attendance_entries").delete().in("id", staleEntryIds);
+      if (deleteError) throw new Error(`Unable to remove stale current attendance entries ${record.date}: ${deleteError.message}`);
+    }
+
+    const rows = presentPersonIds.map((personId) => ({
+      team_id: teamId,
+      attendance_day_id: day.id,
+      person_id: personId,
+      is_present: true,
+      source: "manual",
+    }));
+    if (rows.length) {
+      const { error: upsertError } = await supabase.from("attendance_entries").upsert(rows, {
+        onConflict: "attendance_day_id,person_id",
+      });
+      if (upsertError) throw new Error(`Unable to upsert current attendance entries ${record.date}: ${upsertError.message}`);
+    }
+
+    report.currentAttendanceImported.push({
+      date: record.date,
+      presentCount: presentPersonIds.length,
+      staleRemoved: staleEntryIds.length,
+    });
   }
 }
 

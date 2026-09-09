@@ -2,28 +2,40 @@
   "period": {
     "name": "קו עותניאל",
     "location": "קו עותניאל",
-    "starts_on": "2026-09-09",
+    "starts_on": "2026-09-08",
     "ends_on": "2026-12-02",
     "status": "published"
   },
   "phases": [
-    { "name": "חתימה על נשקים ואל״ת", "phase_type": "preparation", "starts_on": "2026-09-09", "ends_on": "2026-09-09", "sort_order": 0 },
-    { "name": "ראש השנה בבית", "phase_type": "other", "starts_on": "2026-09-10", "ends_on": "2026-09-13", "sort_order": 1 },
-    { "name": "אימון לפני הפעלה", "phase_type": "preparation", "starts_on": "2026-09-14", "ends_on": "2026-09-16", "sort_order": 2 },
-    { "name": "פעילות מבצעית / קו", "phase_type": "line", "starts_on": "2026-09-17", "ends_on": "2026-12-01", "sort_order": 3 },
-    { "name": "ירידה מהמשימה", "phase_type": "stand_down", "starts_on": "2026-12-02", "ends_on": "2026-12-02", "sort_order": 4 }
+    { "name": "יום מפקדים", "phase_type": "preparation", "starts_on": "2026-09-08", "ends_on": "2026-09-08", "sort_order": 0 },
+    { "name": "חתימה על נשקים ואל״ת", "phase_type": "preparation", "starts_on": "2026-09-09", "ends_on": "2026-09-09", "sort_order": 1 },
+    { "name": "ראש השנה בבית", "phase_type": "other", "starts_on": "2026-09-10", "ends_on": "2026-09-13", "sort_order": 2 },
+    { "name": "אימון לפני הפעלה", "phase_type": "preparation", "starts_on": "2026-09-14", "ends_on": "2026-09-16", "sort_order": 3 },
+    { "name": "פעילות מבצעית / קו", "phase_type": "line", "starts_on": "2026-09-17", "ends_on": "2026-12-01", "sort_order": 4 },
+    { "name": "ירידה מהמשימה", "phase_type": "stand_down", "starts_on": "2026-12-02", "ends_on": "2026-12-02", "sort_order": 5 }
   ],
   "rotationGroups": [
+    {
+      "name": "מפקדים",
+      "initial_state": "base",
+      "color_token": "pink",
+      "sort_order": 0,
+      "starts_on": "2026-09-08",
+      "ends_on": "2026-09-08",
+      "members": ["דניאל גרוס", "לידור דורון", "אורי בנבג'י", "ניתאי ידעי"]
+    },
     {
       "name": "כל הצוות",
       "initial_state": "base",
       "color_token": "gray",
-      "sort_order": 0,
+      "sort_order": 1,
+      "starts_on": "2026-09-09",
       "members": "all_active",
       "excluded_members": ["עמנואל אלמו", "אריאל דויב", "אריאל דוייב"]
     }
   ],
   "rotationBlocks": [
+    { "group_name": "מפקדים", "state": "base", "starts_on": "2026-09-08", "ends_on": "2026-09-08", "notes": "יום מפקדים בלבד: דניאל גרוס, לידור דורון, אורי בנבג'י וניתאי ידעי" },
     { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-09-09", "ends_on": "2026-09-09", "notes": "חתימה על נשקים ותחילת אל״ת בבא״פ לכיש" },
     { "group_name": "כל הצוות", "state": "home", "starts_on": "2026-09-10", "ends_on": "2026-09-13", "notes": "כולם בבית לראש השנה" },
     { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-09-14", "ends_on": "2026-09-17", "notes": "חזרה לאל״ת בבא״פ לכיש, עלייה לגזרת עותניאל ב-17/09" },
@@ -41,6 +53,13 @@
     { "group_name": "כל הצוות", "state": "base", "starts_on": "2026-11-29", "ends_on": "2026-12-02", "notes": "שבוע בסיס אחרון עד סיום המשימה" }
   ],
   "events": [
+    {
+      "title": "יום מפקדים",
+      "event_type": "briefing",
+      "starts_on": "2026-09-08",
+      "is_all_day": true,
+      "notes": "דניאל גרוס, לידור דורון, אורי בנבג'י וניתאי ידעי בלבד"
+    },
     {
       "title": "חתימה על נשקים ותחילת אל״ת",
       "event_type": "training",
@@ -137,6 +156,13 @@
     { "title": "חול המועד סוכות", "starts_on": "2026-09-27", "ends_on": "2026-10-02" },
     { "title": "הושענא רבה", "starts_on": "2026-10-02" },
     { "title": "שמיני עצרת / שמחת תורה", "starts_on": "2026-10-03" }
+  ],
+  "attendanceDays": [
+    {
+      "date": "2026-09-08",
+      "status": "submitted",
+      "present": ["דניאל גרוס", "לידור דורון", "אורי בנבג'י", "ניתאי ידעי"]
+    }
   ],
   "pendingLeaveRequests": [
     { "person_name": "אביאל אלקאיל", "starts_on": "2026-09-24", "ends_on": "2026-09-25", "reason": "אירוע" },

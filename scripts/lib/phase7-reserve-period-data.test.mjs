@@ -18,9 +18,21 @@ const legacyLeaveSeed = JSON.parse(
 test("2026 reserve period seed is the upcoming Otniel line with exact requested dates", () => {
   assert.equal(periodSeed.period.name, "קו עותניאל");
   assert.equal(periodSeed.period.location, "קו עותניאל");
-  assert.equal(periodSeed.period.starts_on, "2026-09-09");
+  assert.equal(periodSeed.period.starts_on, "2026-09-08");
   assert.equal(periodSeed.period.ends_on, "2026-12-02");
   assert.equal(periodSeed.period.status, "published");
+});
+
+test("2026 Otniel seed includes a reported commanders day for the four requested people", () => {
+  const commandersDay = periodSeed.events.find((event) => event.title === "יום מפקדים");
+  assert.ok(commandersDay);
+  assert.equal(commandersDay.starts_on, "2026-09-08");
+  assert.equal(commandersDay.event_type, "briefing");
+
+  const attendanceDay = periodSeed.attendanceDays.find((day) => day.date === "2026-09-08");
+  assert.ok(attendanceDay);
+  assert.equal(attendanceDay.status, "submitted");
+  assert.deepEqual(attendanceDay.present, ["דניאל גרוס", "לידור דורון", "אורי בנבג'י", "ניתאי ידעי"]);
 });
 
 test("Rosh Hashanah home instruction is modeled as an event, not fake leave requests", () => {
@@ -33,12 +45,20 @@ test("Rosh Hashanah home instruction is modeled as an event, not fake leave requ
 });
 
 test("2026 Otniel rotations are whole-team week-on week-off", () => {
-  assert.deepEqual(periodSeed.rotationGroups.map((group) => group.name), ["כל הצוות"]);
-  assert.equal(periodSeed.rotationGroups[0].members, "all_active");
-  assert.deepEqual(periodSeed.rotationGroups[0].excluded_members, ["עמנואל אלמו", "אריאל דויב", "אריאל דוייב"]);
+  assert.deepEqual(periodSeed.rotationGroups.map((group) => group.name), ["מפקדים", "כל הצוות"]);
+  assert.deepEqual(periodSeed.rotationGroups[0].members, ["דניאל גרוס", "לידור דורון", "אורי בנבג'י", "ניתאי ידעי"]);
+  assert.equal(periodSeed.rotationGroups[0].starts_on, "2026-09-08");
+  assert.equal(periodSeed.rotationGroups[0].ends_on, "2026-09-08");
+  assert.equal(periodSeed.rotationGroups[1].members, "all_active");
+  assert.equal(periodSeed.rotationGroups[1].starts_on, "2026-09-09");
+  assert.deepEqual(periodSeed.rotationGroups[1].excluded_members, ["עמנואל אלמו", "אריאל דויב", "אריאל דוייב"]);
 
   const blocks = periodSeed.rotationBlocks ?? [];
-  assert.equal(blocks[0].starts_on, "2026-09-09");
+  assert.equal(blocks[0].starts_on, "2026-09-08");
+  assert.equal(blocks[0].state, "base");
+  assert.equal(blocks[0].group_name, "מפקדים");
+  assert.equal(blocks[1].starts_on, "2026-09-09");
+  assert.equal(blocks[1].state, "base");
   assert.equal(blocks.at(-1).ends_on, "2026-12-02");
   assert.ok(blocks.some((block) =>
     block.state === "home" &&
@@ -64,11 +84,11 @@ test("2026 Otniel rotations are whole-team week-on week-off", () => {
     block.state === "home" &&
     block.starts_on === "2026-10-11" &&
     block.ends_on === "2026-10-17"));
-  assert.ok(blocks.slice(7).every((block) => new Date(`${block.starts_on}T12:00:00Z`).getUTCDay() === 0));
+  assert.ok(blocks.slice(8).every((block) => new Date(`${block.starts_on}T12:00:00Z`).getUTCDay() === 0));
   for (let index = 1; index < blocks.length; index += 1) {
     assert.equal(blocks[index].group_name, "כל הצוות");
     assert.ok(blocks[index].starts_on > blocks[index - 1].ends_on);
-    assert.notEqual(blocks[index].state, blocks[index - 1].state);
+    if (index > 1) assert.notEqual(blocks[index].state, blocks[index - 1].state);
   }
 });
 
