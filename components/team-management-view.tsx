@@ -8,6 +8,7 @@ import {
   assignEquipmentAction,
   createPersonAction,
   createTeamEquipmentAction,
+  deleteTeamEquipmentAction,
   quickUpdateEquipmentAction,
   transferTeamEquipmentAction,
   updateTeamEquipmentAction,
@@ -326,6 +327,7 @@ function SharedTeamEquipmentItem({
 }) {
   const transfer = transferTeamEquipmentAction.bind(null, data.team.slug, item.id);
   const update = updateTeamEquipmentAction.bind(null, data.team.slug, item.id);
+  const remove = deleteTeamEquipmentAction.bind(null, data.team.slug, item.id);
 
   return (
     <details className="rounded-lg border p-3">
@@ -363,6 +365,11 @@ function SharedTeamEquipmentItem({
           <Button type="submit">שמירה</Button>
         </form>
       </div>
+      <form action={remove} className="mt-3 rounded-lg border border-destructive/20 bg-destructive/5 p-3">
+        <p className="text-sm font-semibold text-destructive">מחיקת ציוד צוותי</p>
+        <p className="mt-1 text-xs text-muted-foreground">המחיקה מסירה את הפריט מהצוות ואת היסטוריית ההעברות שלו.</p>
+        <Button className="mt-3 w-full" type="submit" variant="destructive">מחיקת פריט</Button>
+      </form>
     </details>
   );
 }

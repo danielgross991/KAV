@@ -601,6 +601,34 @@ export async function transferTeamEquipmentAction(teamSlug: string, itemId: stri
   redirect(`/${teamSlug}/team?saved=team-equipment-transferred`);
 }
 
+export async function deleteTeamEquipmentAction(teamSlug: string, itemId: string) {
+  const { membership, supabase, userId } = await requireManager(teamSlug);
+  const item = await assertTeamEquipmentBelongsToTeam(supabase, membership.team.id, itemId);
+
+  const { error } = await supabase
+    .from("team_equipment_items")
+    .delete()
+    .eq("team_id", membership.team.id)
+    .eq("id", itemId);
+
+  if (error) {
+    throw new Error(`לא ניתן למחוק ציוד צוותי: ${error.message}`);
+  }
+
+  await logActivityEvent(supabase, {
+    actorUserId: userId,
+    details: "פריט ציוד צוותי נמחק",
+    entityId: itemId,
+    entityType: "team_equipment_item",
+    eventType: "team_equipment.updated",
+    metadata: { deleted: true },
+    teamId: membership.team.id,
+    title: "ציוד צוותי נמחק",
+  });
+  revalidateTeamEquipment(teamSlug, [item.current_holder_person_id]);
+  redirect(`/${teamSlug}/team?saved=team-equipment-deleted`);
+}
+
 async function upsertPrivateDetails(
   teamSlug: string,
   personId: string,

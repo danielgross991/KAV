@@ -104,6 +104,32 @@ export async function saveDailyQuoteAction(teamSlug: string, formData: FormData)
   redirect(`/${teamSlug}/settings?saved=daily-quote`);
 }
 
+export async function decideDailyQuoteAction(teamSlug: string, quoteId: string, status: "approved" | "rejected", formData: FormData) {
+  const { membership, supabase, userId } = await requireManager(teamSlug);
+  const sortOrder = numberOrDefault(formData, "sort_order", 0);
+  const approved = status === "approved";
+
+  const { error } = await supabase
+    .from("daily_quotes")
+    .update({
+      approved_at: approved ? new Date().toISOString() : null,
+      approved_by: approved ? userId : null,
+      is_active: approved,
+      sort_order: sortOrder,
+      status,
+    })
+    .eq("team_id", membership.team.id)
+    .eq("id", quoteId);
+
+  if (error) {
+    throw new Error(`לא ניתן לעדכן הצעת משפט: ${error.message}`);
+  }
+
+  revalidatePath(`/${teamSlug}`);
+  revalidatePath(`/${teamSlug}/settings`);
+  redirect(`/${teamSlug}/settings?saved=daily-quote-decision`);
+}
+
 async function requireManager(teamSlug: string) {
   const { supabase, userId } = await requireAuth();
   const membership = await requireTeamAccess(supabase, userId, teamSlug);

@@ -1,4 +1,4 @@
-import { saveDailyQuoteAction } from "@/app/[teamSlug]/quotes/actions";
+import { decideDailyQuoteAction, saveDailyQuoteAction } from "@/app/[teamSlug]/quotes/actions";
 import {
   createEquipmentTypeAction,
   updateEquipmentTypeAction,
@@ -37,6 +37,12 @@ export function SettingsManagementView({
   const createPakal = upsertPakalTypeAction.bind(null, data.team.slug);
   const updateRequirement = updateRequirementAction.bind(null, data.team.slug);
   const createEquipmentType = createEquipmentTypeAction.bind(null, data.team.slug);
+  const peopleById = new Map(data.people.map((person) => [person.id, person.full_name]));
+  const pendingQuotes = dailyQuotes.filter((quote) => quote.status === "pending");
+  const managedQuotes = [
+    ...pendingQuotes,
+    ...dailyQuotes.filter((quote) => quote.status !== "pending"),
+  ];
 
   return (
     <AppPage>
@@ -180,15 +186,18 @@ export function SettingsManagementView({
       <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_24rem]">
         <Card>
           <CardHeader>
-            <CardTitle>משפטים יומיים</CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle>משפטים יומיים</CardTitle>
+              {pendingQuotes.length ? <Badge variant="warning">{pendingQuotes.length} ממתינים לאישור</Badge> : null}
+            </div>
           </CardHeader>
           <CardContent>
             {dailyQuotes.length === 0 ? (
               <EmptyState title="אין משפטים" description="אפשר להוסיף משפט ראשון מהטופס בצד." />
             ) : (
               <div className="grid gap-3">
-                {dailyQuotes.map((quote) => (
-                  <DailyQuoteForm key={quote.id} quote={quote} teamSlug={data.team.slug} />
+                {managedQuotes.map((quote) => (
+                  <DailyQuoteForm key={quote.id} peopleById={peopleById} quote={quote} teamSlug={data.team.slug} />
                 ))}
               </div>
             )}
@@ -208,11 +217,35 @@ export function SettingsManagementView({
   );
 }
 
-function DailyQuoteForm({ quote, teamSlug }: { quote?: DailyQuote; teamSlug: string }) {
+function DailyQuoteForm({ peopleById, quote, teamSlug }: { peopleById?: Map<string, string>; quote?: DailyQuote; teamSlug: string }) {
   const save = saveDailyQuoteAction.bind(null, teamSlug);
+  const submitterName = quote?.submitted_person_id ? peopleById?.get(quote.submitted_person_id) ?? "איש צוות" : null;
 
   return (
-    <form action={save} className="grid gap-3 rounded-lg border p-3">
+    <div className="grid gap-3 rounded-lg border p-3">
+      {quote?.status === "pending" ? (
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-950">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-semibold">הצעה שממתינה לאישור</p>
+              <p className="mt-1 text-sm font-bold leading-6">{quote.text}</p>
+              {submitterName ? <p className="mt-1 text-xs">הוצע על ידי {submitterName}</p> : null}
+            </div>
+            <Badge variant="warning">חדש</Badge>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <form action={decideDailyQuoteAction.bind(null, teamSlug, quote.id, "approved")} className="grid gap-2">
+              <input name="sort_order" type="hidden" value={quote.sort_order} />
+              <Button className="w-full" type="submit">אישור משפט</Button>
+            </form>
+            <form action={decideDailyQuoteAction.bind(null, teamSlug, quote.id, "rejected")} className="grid gap-2">
+              <input name="sort_order" type="hidden" value={quote.sort_order} />
+              <Button className="w-full" type="submit" variant="outline">דחייה</Button>
+            </form>
+          </div>
+        </div>
+      ) : null}
+      <form action={save} className="grid gap-3">
       {quote ? <input name="id" type="hidden" value={quote.id} /> : null}
       <TextArea
         defaultValue={quote?.text ?? ""}
@@ -240,13 +273,14 @@ function DailyQuoteForm({ quote, teamSlug }: { quote?: DailyQuote; teamSlug: str
       </div>
       {quote?.source === "viewer" ? (
         <Badge className="justify-self-start" variant={quote.status === "pending" ? "warning" : "outline"}>
-          הצעה ממשתמש
+          {submitterName ? `הצעה מאת ${submitterName}` : "הצעה ממשתמש"}
         </Badge>
       ) : null}
       <Button type="submit" variant={quote ? "outline" : "default"}>
         {quote ? "שמירת משפט" : "הוספת משפט"}
       </Button>
     </form>
+    </div>
   );
 }
 
@@ -417,6 +451,7 @@ function savedLabel(saved: string) {
     "equipment-type": "סוג הציוד נוסף",
     "equipment-type-updated": "סוג הציוד נשמר",
     "daily-quote": "המשפט נשמר",
+    "daily-quote-decision": "הצעת המשפט עודכנה",
     "pakal-type": "הפקל נשמר",
     requirement: "דרישת הכשירות נשמרה",
   };
