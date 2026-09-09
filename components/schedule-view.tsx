@@ -405,9 +405,7 @@ function isChangeoverDate(data: ScheduleData, date: string, state: string | null
   if (!state) return false;
 
   const previousDate = addCalendarDays(date, -1);
-  const nextDate = addCalendarDays(date, 1);
   const previousState = data.blocks.find((block) => block.starts_on <= previousDate && block.ends_on >= previousDate)?.state ?? null;
-  const nextState = data.blocks.find((block) => block.starts_on <= nextDate && block.ends_on >= nextDate)?.state ?? null;
 
-  return (previousState !== null && previousState !== state) || (nextState !== null && nextState !== state);
+  return previousState !== null && previousState !== state;
 }
