@@ -150,9 +150,6 @@ function Month({ data, month, onMonthChange, pendingMonth }: { data: ScheduleDat
     <div className="kav-month-enter grid grid-cols-7 gap-1 bg-card p-1 sm:gap-1.5 sm:p-2">{dates.map((date) => { const day = getDaySchedule(data, date); return <MonthCell data={data} date={date} day={day} inMonth={date.slice(0, 7) === month} key={date} onPreview={() => setSelectedDay({ date, day })} />; })}</div>
     {selectedDay ? <DayPreview data={data} date={selectedDay.date} day={selectedDay.day} onClose={() => setSelectedDay(null)} /> : null}
     <div className="flex flex-wrap gap-x-3 gap-y-1 border-t bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
-      <LegendDot className="bg-emerald-500" label="בבסיס" />
-      <LegendDot className="bg-sky-500" label="בבית" />
-      <LegendDot className="bg-gradient-to-l from-emerald-500 to-sky-500" label="חילוף" />
       <LegendDot className="bg-violet-500" label="חג" />
       <LegendDot className="bg-primary" label="משימות" />
       <LegendDot className="bg-fuchsia-600" label="בקשות/יציאות" />
@@ -180,6 +177,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
   const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null;
   const isChangeover = isChangeoverDate(data, date, dominantState);
+  const operationalLabel = isChangeover ? `חילוף ל${stateLabel(dominantState)}` : stateLabel(dominantState);
 
   return <Link aria-haspopup="dialog" className={cn("group min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
     event.preventDefault();
@@ -195,11 +193,13 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
         {attendanceIssue ? <span className="size-2 rounded-full bg-destructive" /> : null}
       </span>
     </div>
+    <div className={cn("mb-1 rounded-md px-1.5 py-1 text-center text-[0.72rem] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] sm:text-xs", dominantState === "base" ? "bg-emerald-600 text-white" : dominantState === "home" ? "bg-sky-700 text-white" : "bg-card text-muted-foreground", isChangeover && "bg-primary text-white")}>
+      {operationalLabel}
+    </div>
     {holiday ? <div className="truncate rounded bg-special-soft px-1.5 py-0.5 text-[0.68rem] font-medium text-special sm:text-xs">{holiday.title}</div> : null}
     {data.canManage ? (
       <>
-        {baseGroups.slice(0, 2).map((group) => <div className={cn("mt-1 truncate rounded-md px-1.5 py-0.5 text-[0.68rem] font-medium sm:text-xs", groupColorClass(group.color_token))} key={group.id}>{group.name} · {stateLabel(group.block?.state)}</div>)}
-        {baseGroups.length > 2 ? <div className="mt-1 truncate text-[0.68rem] text-muted-foreground sm:text-xs">+{baseGroups.length - 2} סבבים בבסיס</div> : null}
+        {baseGroups.length ? <div className="mt-1 truncate text-[0.68rem] font-semibold text-emerald-950 sm:text-xs">{day.expectedBase.length} בבסיס</div> : <div className="mt-1 truncate text-[0.68rem] font-semibold text-sky-950 sm:text-xs">{day.expectedHome.length} בבית</div>}
         {teamLeaveCount ? <div className="mt-1 truncate text-[0.68rem] font-bold text-fuchsia-900 sm:text-xs">{teamLeaveCount} בקשות יציאה</div> : null}
         {day.tasks.length ? <div className="mt-1 truncate text-[0.68rem] text-primary sm:text-xs">{day.tasks.length} משימות</div> : null}
       </>
@@ -222,6 +222,7 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
   const peopleById = new Map(data.people.map((person) => [person.id, person.full_name]));
   const leaveItems = Array.from(new Map([...day.leaveMarkers, ...day.leaveRequests].map((item) => [`${item.id}-${item.status}`, item])).values());
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
+  const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null;
   const detailHref = `/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`;
 
   return <>
@@ -236,7 +237,8 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
       </div>
       <div className="mt-4 grid gap-3 text-sm">
         <PreviewSection title="מה יש ביום הזה">
-          {baseGroups.length ? <div className="flex flex-wrap gap-1.5">{baseGroups.map((group) => <Badge key={group.id} variant="success">{group.name}</Badge>)}</div> : <p className="text-muted-foreground">אין סבב בבסיס.</p>}
+          <Badge variant={dominantState === "base" ? "success" : "info"}>{stateLabel(dominantState)}</Badge>
+          {baseGroups.length ? <div className="mt-2 flex flex-wrap gap-1.5">{baseGroups.map((group) => <Badge key={group.id} variant="outline">{group.name}</Badge>)}</div> : null}
           {[...day.events, ...day.tasks].length ? <div className="mt-2 space-y-1.5">{day.events.map((event) => <PreviewLine key={event.id} meta={event.is_all_day ? "כל היום" : time(event.starts_at, data.team.timezone)} text={event.title} />)}{day.tasks.map((task) => <PreviewLine key={task.id} meta={time(task.starts_at, data.team.timezone)} text={task.title} />)}</div> : <p className="mt-2 text-muted-foreground">אין אירועים או משימות.</p>}
         </PreviewSection>
         <PreviewSection title="בקשות יציאה">
@@ -301,7 +303,7 @@ function periodSubtitle(period: NonNullable<ScheduleData["selectedPeriod"]>) {
 
 function Agenda({ data }: { data: ScheduleData }) {
   const period = data.selectedPeriod!;
-  return <div className="space-y-3">{eachCalendarDate(period.starts_on, period.ends_on).map((date) => { const day = getDaySchedule(data, date); const isToday = date === data.today; return <section key={date} aria-label={fullDate(date)}><div className="sticky top-[132px] z-10 -mx-4 flex items-center gap-2 bg-background/95 px-4 py-1.5 backdrop-blur lg:static lg:mx-0 lg:px-0"><h2 className="text-sm font-semibold">{isToday ? "היום · " : ""}{shortWeekDate(date)}</h2><span className="h-px flex-1 bg-border" /><Badge variant={day.groups.some((group) => group.block?.state === "base") ? "success" : "muted"}>{day.expectedBase.length} בבסיס</Badge></div><Link className="mt-1.5 block overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-colors hover:border-primary/30" href={`/${data.team.slug}/schedule/${date}?period=${period.id}`}><div className="grid gap-3 p-3.5 md:grid-cols-[10rem_1fr_15rem]"><div><b className="text-sm">{day.phase?.name ?? "יום מבצעי"}</b><p className="mt-1 text-xs text-muted-foreground">{day.groups.filter((group) => group.block?.state === "base").map((group) => group.name).join(", ") || "אין סבב בבסיס"}</p></div><div className="grid grid-cols-2 gap-3"><Summary label="בבסיס" count={day.expectedBase.length} groups={[]} /><Summary label="בבית" count={day.expectedHome.length} groups={[]} /></div><div className="space-y-1 text-sm text-muted-foreground">{day.tasks.slice(0, 2).map((task) => <div className="truncate font-medium text-primary" key={task.id}>{time(task.starts_at, data.team.timezone)} · {task.title}</div>)}{day.events.slice(0, 2).map((event) => <div className="truncate" key={event.id}>{event.is_all_day ? "כל היום" : time(event.starts_at, data.team.timezone)} · {event.title}</div>)}{!day.tasks.length && !day.events.length ? <span className="text-xs">אין אירועים או משימות</span> : null}</div></div><div className="flex min-h-9 items-center justify-between border-t bg-muted/35 px-3.5 text-sm font-medium text-primary"><span>פירוט היום</span><span aria-hidden>←</span></div></Link></section>; })}</div>;
+  return <div className="space-y-3">{eachCalendarDate(period.starts_on, period.ends_on).map((date) => { const day = getDaySchedule(data, date); const isToday = date === data.today; const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null; return <section key={date} aria-label={fullDate(date)}><div className="sticky top-[132px] z-10 -mx-4 flex items-center gap-2 bg-background/95 px-4 py-1.5 backdrop-blur lg:static lg:mx-0 lg:px-0"><h2 className="text-sm font-semibold">{isToday ? "היום · " : ""}{shortWeekDate(date)}</h2><span className="h-px flex-1 bg-border" /><Badge variant={dominantState === "base" ? "success" : "muted"}>{stateLabel(dominantState)}</Badge></div><Link className="mt-1.5 block overflow-hidden rounded-lg border bg-card shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-colors hover:border-primary/30" href={`/${data.team.slug}/schedule/${date}?period=${period.id}`}><div className="grid gap-3 p-3.5 md:grid-cols-[10rem_1fr_15rem]"><div><b className="text-sm">{day.phase?.name ?? "יום מבצעי"}</b><p className="mt-1 text-xs text-muted-foreground">{stateLabel(dominantState)}</p></div><div className="grid grid-cols-2 gap-3"><Summary label="בבסיס" count={day.expectedBase.length} groups={[]} /><Summary label="בבית" count={day.expectedHome.length} groups={[]} /></div><div className="space-y-1 text-sm text-muted-foreground">{day.tasks.slice(0, 2).map((task) => <div className="truncate font-medium text-primary" key={task.id}>{time(task.starts_at, data.team.timezone)} · {task.title}</div>)}{day.events.slice(0, 2).map((event) => <div className="truncate" key={event.id}>{event.is_all_day ? "כל היום" : time(event.starts_at, data.team.timezone)} · {event.title}</div>)}{!day.tasks.length && !day.events.length ? <span className="text-xs">אין אירועים או משימות</span> : null}</div></div><div className="flex min-h-9 items-center justify-between border-t bg-muted/35 px-3.5 text-sm font-medium text-primary"><span>פירוט היום</span><span aria-hidden>←</span></div></Link></section>; })}</div>;
 }
 function Summary({ count, groups, label }: { count: number; groups: string[]; label: string }) { return <div><div className="text-xs text-muted-foreground">{label}</div><div className="kav-num mt-1 text-sm font-semibold">{count}{groups.length ? <span className="mr-1 font-normal text-muted-foreground">· {groups.join(", ")}</span> : null}</div></div>; }
 
@@ -392,13 +394,6 @@ const holidayTitles = new Set([
 
 function isHolidayEvent(event: ScheduleData["events"][number]) {
   return event.event_type === "holiday" || holidayTitles.has(event.title);
-}
-
-function groupColorClass(color: string | null) {
-  if (color === "green") return "bg-emerald-300 text-emerald-950";
-  if (color === "amber") return "bg-amber-300 text-amber-950";
-  if (color === "gray") return "bg-slate-300 text-slate-950";
-  return "bg-sky-300 text-sky-950";
 }
 
 function isChangeoverDate(data: ScheduleData, date: string, state: string | null) {
