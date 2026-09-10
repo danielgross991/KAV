@@ -33,9 +33,8 @@ export type PersonAttendanceStats = {
  * schedule-domain resolver) into attendance/home statistics. Only elapsed dates should be
  * passed in — the caller decides what "elapsed" means (typically: strictly before today).
  * Unreported attendance is never counted as absence, and a legitimate home rotation or
- * approved leave never reduces the attendance percentage, because expectedAtBase already
- * accounts for both. For "אלופי הבית", count where the person actually ended up away from
- * base: planned home, approved leave, or a reported absence on a day they were expected.
+ * approved leave never reduces the attendance percentage. For "אלופי הבית", count what
+ * actually exists in operational records: a reported absence or an approved leave day.
  */
 export function computeAttendanceStats(
   people: PersonStatsInput[],
@@ -45,9 +44,7 @@ export function computeAttendanceStats(
     const days = resolutionsByPerson.get(person.id) ?? [];
     const baseDays = days.filter((day) => day.state === "base").length;
     const leaveDays = days.filter((day) => day.leave).length;
-    const homeDays = days.filter((day) =>
-      day.state === "home" || day.leave || (day.expectedAtBase && day.attendance === "absent"),
-    ).length;
+    const homeDays = days.filter((day) => day.attendance === "absent" || day.leave).length;
     const expectedDays = days.filter((day) => day.expectedAtBase);
     const finalizedExpectedDays = expectedDays.filter((day) => day.attendance !== "unreported");
     const presentOnExpectedDays = finalizedExpectedDays.filter((day) => day.attendance === "present").length;
