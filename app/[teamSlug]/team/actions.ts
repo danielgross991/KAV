@@ -98,6 +98,42 @@ export async function upsertPrivateDetailsAction(
   redirect(`/${teamSlug}/team/${personId}?tab=general&saved=private-updated`);
 }
 
+export async function updateLineParticipationAction(
+  teamSlug: string,
+  personId: string,
+  formData: FormData,
+) {
+  const { membership, supabase, userId } = await requireManager(teamSlug);
+  const reservePeriodId = requiredText(formData, "reserve_period_id", "תקופת מילואים");
+  const isLineActive = formData.get("is_line_active") === "on";
+  const notes = optionalText(formData, "line_participation_notes");
+
+  await assertPersonBelongsToTeam(supabase, membership.team.id, personId);
+  await assertReservePeriodBelongsToTeam(supabase, membership.team.id, reservePeriodId);
+
+  const { error } = await supabase.from("reserve_period_person_statuses").upsert(
+    {
+      is_line_active: isLineActive,
+      notes,
+      person_id: personId,
+      reserve_period_id: reservePeriodId,
+      team_id: membership.team.id,
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    },
+    { onConflict: "reserve_period_id,person_id" },
+  );
+
+  if (error) {
+    throw new Error(`לא ניתן לעדכן פעילות בקו: ${error.message}`);
+  }
+
+  revalidateTeam(teamSlug, personId);
+  revalidatePath(`/${teamSlug}/attendance`);
+  revalidatePath(`/${teamSlug}/schedule`);
+  redirect(`/${teamSlug}/team/${personId}?tab=general&saved=line-participation-updated`);
+}
+
 export async function assignPakalAction(
   teamSlug: string,
   personId: string,
@@ -734,6 +770,23 @@ async function assertTeamEquipmentBelongsToTeam(
   }
 
   return data;
+}
+
+async function assertReservePeriodBelongsToTeam(
+  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  teamId: string,
+  reservePeriodId: string,
+) {
+  const { data, error } = await supabase
+    .from("reserve_periods")
+    .select("id")
+    .eq("team_id", teamId)
+    .eq("id", reservePeriodId)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("תקופת המילואים לא נמצאה בצוות הנוכחי");
+  }
 }
 
 function revalidateTeam(teamSlug: string, personId: string) {

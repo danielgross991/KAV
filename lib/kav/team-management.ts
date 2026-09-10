@@ -58,6 +58,11 @@ export type PersonProfileData = {
   canManageTeam: boolean;
   equipment: PersonEquipmentItem[];
   equipmentTypes: EquipmentType[];
+  lineParticipation: {
+    isLineActive: boolean;
+    notes: string | null;
+    period: Pick<TableRow<"reserve_periods">, "ends_on" | "id" | "name" | "starts_on" | "status">;
+  } | null;
   pakalTypes: PakalType[];
   person: TableRow<"people">;
   privateDetails: TableRow<"person_private_details"> | null;
@@ -235,7 +240,7 @@ export const getPersonProfileData = cache(async function getPersonProfileData(
     notFound();
   }
 
-  const [pakalTypes, personPakals, requirements, equipmentTypes, equipment, reservePeriods, teamEquipment] =
+  const [pakalTypes, personPakals, requirements, equipmentTypes, equipment, reservePeriods, teamEquipment, currentRotationContext] =
     await Promise.all([
       selectOrThrow(
         supabase
@@ -297,6 +302,7 @@ export const getPersonProfileData = cache(async function getPersonProfileData(
           .order("name", { ascending: true }),
         "לא ניתן לטעון ציוד צוותי",
       ),
+      getCurrentRotationContext(supabase, membership.team.id, membership.team.timezone),
     ]);
 
   const privateDetails = canManageTeam
@@ -309,7 +315,7 @@ export const getPersonProfileData = cache(async function getPersonProfileData(
   // reserve period (self-or-manager authorized inside the function), never raw daily rows.
   // attendance_days/attendance_entries are manager-only-SELECT in production; a direct
   // table read here would silently return nothing for a viewer looking at their own profile.
-  const [rotationGroups, rotationMembers, attendanceSummaryResult] = await Promise.all([
+  const [rotationGroups, rotationMembers, attendanceSummaryResult, lineParticipationResult] = await Promise.all([
     selectOrThrow(
       supabase.from("rotation_groups").select("id, reserve_period_id, name").eq("team_id", membership.team.id),
       "לא ניתן לטעון קבוצות רוטציה",
@@ -326,10 +332,22 @@ export const getPersonProfileData = cache(async function getPersonProfileData(
       target_team_id: membership.team.id,
       target_person_id: person.id,
     }),
+    currentRotationContext.reservePeriod
+      ? supabase
+          .from("reserve_period_person_statuses")
+          .select("is_line_active, notes")
+          .eq("team_id", membership.team.id)
+          .eq("reserve_period_id", currentRotationContext.reservePeriod.id)
+          .eq("person_id", person.id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   if (attendanceSummaryResult.error) {
     throw new Error(`לא ניתן לטעון סיכום נוכחות: ${attendanceSummaryResult.error.message}`);
+  }
+  if (lineParticipationResult.error) {
+    throw new Error(`לא ניתן לטעון סטטוס פעילות בקו: ${lineParticipationResult.error.message}`);
   }
 
   const pakalById = new Map(pakalTypes.map((pakal) => [pakal.id, pakal]));
@@ -363,6 +381,13 @@ export const getPersonProfileData = cache(async function getPersonProfileData(
         }))
       : [],
     equipmentTypes,
+    lineParticipation: currentRotationContext.reservePeriod
+      ? {
+          isLineActive: lineParticipationResult.data?.is_line_active ?? true,
+          notes: lineParticipationResult.data?.notes ?? null,
+          period: currentRotationContext.reservePeriod,
+        }
+      : null,
     pakalTypes: pakalTypes.map((pakal) => ({
       ...pakal,
       assignedCount: assignedCounts.get(pakal.id) ?? 0,

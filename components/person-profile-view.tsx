@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Phone,
   ShieldAlert,
+  UserCheck,
   UserRound,
 } from "lucide-react";
 
@@ -13,6 +14,7 @@ import {
   removePakalAction,
   returnEquipmentAction,
   updateEquipmentAction,
+  updateLineParticipationAction,
   updatePersonAction,
 } from "@/app/[teamSlug]/team/actions";
 import { AppPage, PageHeader } from "@/components/ui/app-page";
@@ -120,59 +122,119 @@ function GeneralTab({ data }: { data: PersonProfileData }) {
   }
 
   return (
-    <form action={updatePerson} className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
-      <Card>
-        <CardHeader>
-          <CardTitle>פרטים כלליים</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field defaultValue={person.full_name} label="שם מלא" name="full_name" required />
-            <Field defaultValue={person.phone ?? ""} label="טלפון" name="phone" type="tel" />
-            <Field defaultValue={person.email ?? ""} label="אימייל" name="email" type="email" />
-            <Field defaultValue={person.photo_url ?? ""} label="קישור לתמונה" name="photo_url" type="url" />
-            <label className="flex items-center gap-2 pt-7 text-sm">
-              <input name="is_active" type="checkbox" defaultChecked={person.is_active} />
-              פעיל
-            </label>
-          </div>
-          <TextArea defaultValue={person.notes ?? ""} label="הערות רגילות" name="notes" />
-        </CardContent>
-      </Card>
+    <>
+      <form action={updatePerson} className="grid gap-4 lg:grid-cols-[1fr_0.9fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>פרטים כלליים</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field defaultValue={person.full_name} label="שם מלא" name="full_name" required />
+              <Field defaultValue={person.phone ?? ""} label="טלפון" name="phone" type="tel" />
+              <Field defaultValue={person.email ?? ""} label="אימייל" name="email" type="email" />
+              <Field defaultValue={person.photo_url ?? ""} label="קישור לתמונה" name="photo_url" type="url" />
+              <label className="flex items-center gap-2 pt-7 text-sm">
+                <input name="is_active" type="checkbox" defaultChecked={person.is_active} />
+                פעיל
+              </label>
+            </div>
+            <TextArea defaultValue={person.notes ?? ""} label="הערות רגילות" name="notes" />
+          </CardContent>
+        </Card>
 
-      <Card>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle>פרטים רגישים</CardTitle>
+              <ShieldAlert className="size-5 text-amber-600" />
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <input name="private_enabled" type="hidden" value="on" />
+            <Field
+              defaultValue={privateDetails?.personal_number ?? ""}
+              label="מספר אישי"
+              name="personal_number"
+            />
+            <Field
+              defaultValue={privateDetails?.national_id ?? ""}
+              label="תעודת זהות"
+              name="national_id"
+            />
+            <TextArea
+              defaultValue={privateDetails?.private_notes ?? ""}
+              label="הערות פרטיות"
+              name="private_notes"
+            />
+            {!privateDetails ? (
+              <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                אין עדיין רשומת פרטים רגישים לאיש הצוות.
+              </p>
+            ) : null}
+            <Button type="submit">שמירת פרופיל</Button>
+          </CardContent>
+        </Card>
+      </form>
+      <LineParticipationCard data={data} />
+    </>
+  );
+}
+
+function LineParticipationCard({ data }: { data: PersonProfileData }) {
+  if (!data.canManageTeam) return null;
+
+  const status = data.lineParticipation;
+  if (!status) {
+    return (
+      <Card className="mt-4">
         <CardHeader>
-          <div className="flex items-center justify-between gap-3">
-            <CardTitle>פרטים רגישים</CardTitle>
-            <ShieldAlert className="size-5 text-amber-600" />
-          </div>
+          <CardTitle>פעילות בקו הנוכחי</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-4">
-          <input name="private_enabled" type="hidden" value="on" />
-          <Field
-            defaultValue={privateDetails?.personal_number ?? ""}
-            label="מספר אישי"
-            name="personal_number"
-          />
-          <Field
-            defaultValue={privateDetails?.national_id ?? ""}
-            label="תעודת זהות"
-            name="national_id"
-          />
-          <TextArea
-            defaultValue={privateDetails?.private_notes ?? ""}
-            label="הערות פרטיות"
-            name="private_notes"
-          />
-          {!privateDetails ? (
-            <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-              אין עדיין רשומת פרטים רגישים לאיש הצוות.
-            </p>
-          ) : null}
-          <Button type="submit">שמירת פרופיל</Button>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            אין כרגע תקופת מילואים פעילה או מפורסמת לתאריך היום.
+          </p>
         </CardContent>
       </Card>
-    </form>
+    );
+  }
+
+  const updateLineParticipation = updateLineParticipationAction.bind(null, data.team.slug, data.person.id);
+
+  return (
+    <Card className="mt-4">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <CardTitle>פעילות בקו הנוכחי</CardTitle>
+          <UserCheck className="size-5 text-primary" />
+        </div>
+      </CardHeader>
+      <CardContent>
+        <form action={updateLineParticipation} className="grid gap-4">
+          <input name="reserve_period_id" type="hidden" value={status.period.id} />
+          <div className="rounded-md border bg-muted/35 p-3 text-sm">
+            <div className="font-semibold">{status.period.name}</div>
+            <p className="mt-1 text-muted-foreground">
+              {formatDate(status.period.starts_on)} - {formatDate(status.period.ends_on)}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+            <input name="is_line_active" type="checkbox" defaultChecked={status.isLineActive} />
+            פעיל בקו הזה
+          </label>
+          <p className="text-sm leading-6 text-muted-foreground">
+            מי שלא פעיל בקו לא יופיע בדיווח נוכחות של הקו ולא ייכנס לחישוב אלופי הבית.
+          </p>
+          <TextArea
+            defaultValue={status.notes ?? ""}
+            label="הערת קו"
+            name="line_participation_notes"
+          />
+          <Button type="submit">שמירת פעילות בקו</Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -650,6 +712,7 @@ function savedLabel(saved: string) {
     "person-created": "איש הצוות נוצר",
     "person-updated": "הפרופיל נשמר",
     "private-updated": "הפרטים הרגישים נשמרו",
+    "line-participation-updated": "פעילות בקו נשמרה",
   };
 
   return labels[saved] ?? "נשמר";

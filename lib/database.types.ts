@@ -130,6 +130,17 @@ export type Database = {
         team_id: string;
         updated_at: string;
       }>;
+      reserve_period_person_statuses: Row<{
+        created_at: string;
+        id: string;
+        is_line_active: boolean;
+        notes: string | null;
+        person_id: string;
+        reserve_period_id: string;
+        team_id: string;
+        updated_at: string;
+        updated_by: string | null;
+      }>;
       reserve_periods: Row<{
         created_at: string;
         created_by: string | null;

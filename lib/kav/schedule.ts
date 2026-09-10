@@ -3,6 +3,7 @@ import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone, overlapsCalendarDayInTimeZone } from "@/lib/kav/dates";
+import { filterLineActivePeople, getLineInactivePersonIds } from "@/lib/kav/line-participation";
 import { getManagerLeaveRequests, type ManagerLeaveRequestSummary } from "@/lib/kav/manager-leave";
 import { getApprovedLeaveWindows, getAttendanceEntriesByDate, getLeaveRequestMarkers } from "@/lib/kav/operations";
 import {
@@ -31,6 +32,7 @@ export type ScheduleData = {
   groups: Row<"rotation_groups">[];
   leaveRequests: LeaveInput[];
   leaves: LeaveInput[];
+  lineInactivePersonIds: string[];
   managerLeaveRequests: ManagerLeaveRequestSummary[];
   memberships: Row<"rotation_members">[];
   overrides: Row<"rotation_overrides">[];
@@ -75,7 +77,7 @@ export const getScheduleData = cache(async function getScheduleData(
   if (!selectedPeriod) {
     return {
       attendanceByDate: new Map(), blocks: [], canManage: manager, config: null, events: [], groups: [], leaves: [],
-      canManageReservePeriods: reservePeriodManager, leaveRequests: [], memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
+      canManageReservePeriods: reservePeriodManager, leaveRequests: [], lineInactivePersonIds: [], memberships: [], overrides: [], people: people ?? [], periods: allPeriods, phases: [],
       managerLeaveRequests: [], selectedPeriod: null, team, tasks: [], today, validationIssues: [], viewerPersonId,
     };
   }
@@ -113,8 +115,10 @@ export const getScheduleData = cache(async function getScheduleData(
   const phases = phasesResult.data ?? [];
   const blocks = blocksResult.data ?? [];
   const overrides = overridesResult.data ?? [];
-  const memberships = membershipsResult.data ?? [];
-  const activePeopleIds = (people ?? []).filter((person) => person.is_active).map((person) => person.id);
+  const lineInactivePersonIds = await getLineInactivePersonIds(supabase, team.id, selectedPeriod.id);
+  const memberships = (membershipsResult.data ?? []).filter((item) => !lineInactivePersonIds.has(item.person_id));
+  const linePeople = filterLineActivePeople(people ?? [], lineInactivePersonIds);
+  const activePeopleIds = linePeople.filter((person) => person.is_active).map((person) => person.id);
   const validationIssues = validateScheduleForPublication({
     period: { startsOn: selectedPeriod.starts_on, endsOn: selectedPeriod.ends_on },
     activePeopleIds,
@@ -137,7 +141,7 @@ export const getScheduleData = cache(async function getScheduleData(
   return {
     attendanceByDate,
     blocks, canManage: manager, canManageReservePeriods: reservePeriodManager, config: configResult.data, events: eventsResult.data ?? [],
-    groups, leaveRequests, leaves, managerLeaveRequests, memberships, overrides, people: people ?? [], periods: allPeriods, phases,
+    groups, leaveRequests, leaves, lineInactivePersonIds: Array.from(lineInactivePersonIds), managerLeaveRequests, memberships, overrides, people: linePeople, periods: allPeriods, phases,
     selectedPeriod, team, tasks: tasksResult.data ?? [], today, validationIssues, viewerPersonId,
   };
 });
@@ -157,7 +161,8 @@ export function getDaySchedule(data: ScheduleData, date: string) {
     toGroupId: item.to_rotation_group_id, startsOn: item.starts_on, endsOn: item.ends_on,
   }] : []);
   const attendanceEntries = data.attendanceByDate.get(date) ?? [];
-  const people = data.people.map((person) => ({
+  const inactivePersonIds = new Set(data.lineInactivePersonIds);
+  const people = filterLineActivePeople(data.people, inactivePersonIds).map((person) => ({
     ...person,
     resolution: resolveOperationalPerson({
       personId: person.id, date, memberships: membershipInputs, blocks: blockInputs,
@@ -233,7 +238,9 @@ export const getOperationalScheduleSummary = cache(async function getOperational
     personId: item.person_id, fromGroupId: item.from_rotation_group_id,
     toGroupId: item.to_rotation_group_id, startsOn: item.starts_on, endsOn: item.ends_on,
   }] : []);
-  const expectedOnBase = (peopleResult.data ?? []).filter((person) =>
+  const inactivePersonIds = await getLineInactivePersonIds(supabase, team.id, period.id);
+  const linePeople = filterLineActivePeople(peopleResult.data ?? [], inactivePersonIds);
+  const expectedOnBase = linePeople.filter((person) =>
     resolvePersonSchedule({ personId: person.id, date: today, memberships: membershipInputs, blocks: blockInputs, overrides: overrideInputs }).state === "base",
   ).length;
   return {

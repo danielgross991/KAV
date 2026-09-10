@@ -4,6 +4,7 @@ import { cache } from "react";
 import type { Database } from "@/lib/database.types";
 import { getCurrentDailyQuote, type CurrentDailyQuote } from "@/lib/kav/daily-quotes";
 import { getDateInTimeZone } from "@/lib/kav/dates";
+import { getLineInactivePersonIds } from "@/lib/kav/line-participation";
 import { getLeaveRequestDayCounts, getOperationalDay } from "@/lib/kav/operations";
 import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
 import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
@@ -193,6 +194,9 @@ export const getDashboardData = cache(async function getDashboardData(
   ]);
   assertOk(upcomingEventResult.error, "upcoming event");
   const currentPeriod = selectedPeriod ?? operationalDay.period;
+  const inactiveLinePersonIds = currentPeriod
+    ? await getLineInactivePersonIds(supabase, team.id, currentPeriod.id)
+    : new Set<string>();
   const attendance = {
     absent: operationalDay.summary.absent,
     present: operationalDay.summary.expectedPresent,
@@ -260,7 +264,9 @@ export const getDashboardData = cache(async function getDashboardData(
   const equipmentTypeById = new Map((equipmentTypesResult.data ?? []).map((type) => [type.id, type]));
 
   return {
-    activePeople: people.filter((person) => person.is_active).length,
+    activePeople: currentPeriod
+      ? people.filter((person) => person.is_active && !inactiveLinePersonIds.has(person.id)).length
+      : people.filter((person) => person.is_active).length,
     canManage: manager,
     approvedLeaveToday: operationalDay.summary.leave,
     attendance,
@@ -278,6 +284,7 @@ export const getDashboardData = cache(async function getDashboardData(
     homeLeaderboard: teamStats.leaderboard,
     leaveRequestLeaderboard: leaveRequestDayCounts
       .map((item) => {
+        if (inactiveLinePersonIds.has(item.personId)) return null;
         const person = peopleById.get(item.personId);
         return person ? {
           fullName: person.full_name,

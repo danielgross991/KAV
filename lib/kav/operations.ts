@@ -3,6 +3,7 @@ import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getDateInTimeZone } from "@/lib/kav/dates";
+import { filterLineActivePeople, getLineInactivePersonIds } from "@/lib/kav/line-participation";
 import {
   resolveOperationalPerson,
   selectOperationalReservePeriod,
@@ -200,7 +201,11 @@ export const getOperationalRange = cache(async function getOperationalRange(
     : { data: [], error: null };
   assertOk(membershipsResult.error, "operational range memberships");
 
-  const memberships = (membershipsResult.data ?? []).map((item) => ({
+  const inactivePersonIds = await getLineInactivePersonIds(supabase, team.id, period.id);
+  const linePeople = filterLineActivePeople(peopleResult.data ?? [], inactivePersonIds);
+  const memberships = (membershipsResult.data ?? [])
+    .filter((item) => !inactivePersonIds.has(item.person_id))
+    .map((item) => ({
     personId: item.person_id,
     groupId: item.rotation_group_id,
     startsOn: item.starts_on ?? period.starts_on,
@@ -221,7 +226,7 @@ export const getOperationalRange = cache(async function getOperationalRange(
   }] : []);
 
   return {
-    people: peopleResult.data ?? [],
+    people: linePeople,
     resolve(personId, date) {
       return resolveOperationalPerson({
         personId,
@@ -280,7 +285,11 @@ export const getOperationalDay = cache(async function getOperationalDay(
     : { data: [], error: null };
   assertOk(membersResult.error, "rotation memberships");
 
-  const memberships = (membersResult.data ?? []).map((item) => ({
+  const inactivePersonIds = await getLineInactivePersonIds(supabase, team.id, period.id);
+  const linePeople = filterLineActivePeople(people ?? [], inactivePersonIds);
+  const memberships = (membersResult.data ?? [])
+    .filter((item) => !inactivePersonIds.has(item.person_id))
+    .map((item) => ({
     personId: item.person_id, groupId: item.rotation_group_id,
     startsOn: item.starts_on ?? period.starts_on, endsOn: item.ends_on ?? period.ends_on,
   }));
@@ -295,7 +304,7 @@ export const getOperationalDay = cache(async function getOperationalDay(
   const attendanceEntries = attendanceByDate.get(date) ?? [];
   const contactDetailsByPersonId = new Map((contactDetailsResult.data ?? []).map((item) => [item.id, item]));
   const privateDetailsByPersonId = new Map((privateDetailsResult.data ?? []).map((item) => [item.person_id, item]));
-  const resolvedPeople = (people ?? []).map((person) => ({
+  const resolvedPeople = linePeople.map((person) => ({
     ...person,
     phone: contactDetailsByPersonId.get(person.id)?.phone ?? null,
     personal_number: privateDetailsByPersonId.get(person.id)?.personal_number ?? null,
