@@ -22,7 +22,12 @@ export default async function AttendancePage({ params, searchParams }: {
   if (!canManage(membership.role)) redirect(`/${teamSlug}`);
   const today = getDateInTimeZone(membership.team.timezone);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(query.date ?? "") ? query.date! : today;
-  const day = await getOperationalDay(supabase, membership.team, date, undefined, true);
+  const [rawDay, previousDay] = await Promise.all([
+    getOperationalDay(supabase, membership.team, date, undefined, true),
+    getOperationalDay(supabase, membership.team, addCalendarDays(date, -1)),
+  ]);
+  const day = applyYesterdayAttendanceDefaults(rawDay, previousDay);
+  const summary = attendanceSummary(day.people);
   const reportText = attendanceReportText(day.people, date);
   const reportContacts = day.people.filter((person) => person.phone);
 
@@ -46,13 +51,13 @@ export default async function AttendancePage({ params, searchParams }: {
         <>
           <section className="overflow-hidden rounded-lg bg-primary !text-white">
             <div className="grid grid-cols-4 divide-x divide-x-reverse divide-white/15">
-              <Metric label="צפויים" value={day.summary.expected} />
-              <Metric label="נוכחים" value={day.summary.present} />
-              <Metric label="לא נוכחים" value={day.summary.absent} />
-              <Metric label="טרם דווחו" value={day.summary.unreported} />
+              <Metric label="צוות" value={summary.total} />
+              <Metric label="נוכחים" value={summary.present} />
+              <Metric label="לא נוכחים" value={summary.absent} />
+              <Metric label="טרם דווחו" value={summary.unreported} />
             </div>
             <div className="flex flex-col gap-2 border-t border-white/15 p-3 sm:flex-row">
-              <form action={markExpectedPresentAction.bind(null, teamSlug)} className="flex-1"><input type="hidden" name="date" value={date} /><Button className="w-full border-white/20 bg-white/10 text-white hover:bg-white/15"><Check className="size-4" />סמן את כל הצפויים כנוכחים</Button></form>
+              <form action={markExpectedPresentAction.bind(null, teamSlug)} className="flex-1"><input type="hidden" name="date" value={date} /><Button className="w-full border-white/20 bg-white/10 text-white hover:bg-white/15"><Check className="size-4" />סמן את כל הצוות כנוכח</Button></form>
               <form action={submitAttendanceAction.bind(null, teamSlug)} className="flex-1"><input type="hidden" name="date" value={date} /><Button className="w-full border-white/30 bg-white text-primary hover:bg-white/90" variant="outline"><Send className="size-4" />{day.attendanceDayStatus === "submitted" ? "דווח" : "סיום ודיווח"}</Button></form>
             </div>
           </section>
@@ -72,7 +77,7 @@ function Roster({ title, empty, ...props }: { title: string; empty: string; peop
 }
 
 function RosterContent({ people, teamSlug, date }: { people: OperationalPerson[]; teamSlug: string; date: string }) {
-  return <div className="divide-y">{people.map((person) => <div className="grid gap-3 p-3 sm:grid-cols-[1fr_auto] sm:items-center" key={person.id}><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="block truncate text-sm">{person.full_name}</b>{person.personal_number ? <span className="kav-num text-xs text-muted-foreground">{person.personal_number}</span> : null}<ReportStatusBadge person={person} /></div><div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><span>{stateLabel(person.resolution.state)}</span>{person.resolution.override ? <Badge variant="info">חריג סבב</Badge> : null}{person.resolution.leave ? <Badge variant="warning">ביציאה מאושרת</Badge> : null}{person.resolution.discrepancy === "unexpected-presence" ? <Badge variant="special">נוכחות חריגה</Badge> : null}</div></div><div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1"><AttendanceButton person={person} state="present" icon={<Check className="size-4" />} label="נוכח" teamSlug={teamSlug} date={date} /><AttendanceButton person={person} state="absent" icon={<CircleMinus className="size-4" />} label="לא נוכח" teamSlug={teamSlug} date={date} /><AttendanceButton person={person} state="unreported" icon={<RotateCcw className="size-4" />} label="איפוס" teamSlug={teamSlug} date={date} /></div></div>)}</div>;
+  return <div className="divide-y">{people.map((person) => <div className="grid gap-3 p-3 sm:grid-cols-[1fr_auto] sm:items-center" key={person.id}><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><b className="block truncate text-sm">{person.full_name}</b>{person.personal_number ? <span className="kav-num text-xs text-muted-foreground">{person.personal_number}</span> : null}<ReportStatusBadge person={person} /></div><div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">{person.resolution.leave ? <Badge variant="warning">בקשת יציאה מאושרת</Badge> : null}{person.resolution.attendanceSource === "yesterday" ? <Badge variant="info">לפי אתמול</Badge> : null}</div></div><div className="grid grid-cols-3 gap-1 rounded-md bg-muted p-1"><AttendanceButton person={person} state="present" icon={<Check className="size-4" />} label="נוכח" teamSlug={teamSlug} date={date} /><AttendanceButton person={person} state="absent" icon={<CircleMinus className="size-4" />} label="לא נוכח" teamSlug={teamSlug} date={date} /><AttendanceButton person={person} state="unreported" icon={<RotateCcw className="size-4" />} label="איפוס" teamSlug={teamSlug} date={date} /></div></div>)}</div>;
 }
 
 function AttendanceButton({ person, state, icon, label, teamSlug, date }: { person: OperationalPerson; state: string; icon: React.ReactNode; label: string; teamSlug: string; date: string }) {
@@ -109,13 +114,12 @@ function WhatsAppReport({ contacts, reportText }: { contacts: OperationalPerson[
 
 function ReportStatusBadge({ person }: { person: OperationalPerson }) {
   const status = attendanceReportStatus(person);
-  const variant = status === "נוכח" ? "success" : status === "לא נוכח" ? "danger" : status === "בבית" ? "info" : "muted";
+  const variant = status === "נוכח" ? "success" : status === "לא נוכח" ? "danger" : "muted";
   return <Badge variant={variant}>{status}</Badge>;
 }
 
 function Metric({ label, value }: { label: string; value: number }) { return <div className="min-w-0 p-3 text-center"><div className="kav-num text-2xl font-bold">{value}</div><div className="mt-0.5 truncate text-[11px] text-white/65">{label}</div></div>; }
 function href(slug: string, date: string) { return `/${slug}/attendance?date=${date}`; }
-function stateLabel(state: string | null) { return state === "base" ? "בסיס" : state === "home" ? "בית" : "ללא תכנון"; }
 function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function shortReportDate(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 
@@ -136,8 +140,39 @@ function attendanceReportText(people: OperationalPerson[], date: string) {
 function attendanceReportStatus(person: OperationalPerson) {
   if (person.resolution.attendance === "present") return "נוכח";
   if (person.resolution.attendance === "absent") return "לא נוכח";
-  if (person.resolution.leave || person.resolution.state === "home") return "בבית";
   return "טרם דווח";
+}
+
+function attendanceSummary(people: OperationalPerson[]) {
+  return {
+    absent: people.filter((person) => person.resolution.attendance === "absent").length,
+    present: people.filter((person) => person.resolution.attendance === "present").length,
+    total: people.length,
+    unreported: people.filter((person) => person.resolution.attendance === "unreported").length,
+  };
+}
+
+function applyYesterdayAttendanceDefaults(day: Awaited<ReturnType<typeof getOperationalDay>>, previousDay: Awaited<ReturnType<typeof getOperationalDay>>) {
+  const previousByPersonId = new Map(previousDay.people.map((person) => [person.id, person.resolution.attendance]));
+  return {
+    ...day,
+    people: day.people.map((person) => {
+      const previousAttendance = previousByPersonId.get(person.id);
+      if (person.resolution.attendance !== "unreported" || previousAttendance === undefined || previousAttendance === "unreported") {
+        return person;
+      }
+
+      return {
+        ...person,
+        resolution: {
+          ...person.resolution,
+          attendance: previousAttendance,
+          attendanceSource: "yesterday" as const,
+          discrepancy: null,
+        },
+      };
+    }),
+  };
 }
 
 function whatsAppHref(text: string, phone?: string | null) {

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { requireAuth } from "@/lib/kav/auth";
+import { addCalendarDays } from "@/lib/kav/dates";
 import { getOperationalDay } from "@/lib/kav/operations";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
@@ -32,10 +33,9 @@ export async function markExpectedPresentAction(teamSlug: string, formData: Form
   const date = required(formData, "date");
   const day = await getOperationalDay(context.supabase, context.team, date);
   if (!day.period) throw new Error("אין תקופת מילואים פעילה ביום זה");
-  const expected = day.people.filter((person) => person.resolution.expectedAtBase);
-  if (!expected.length) return;
+  if (!day.people.length) return;
   const attendanceDayId = await ensureDay(context, day.period.id, date);
-  const { error } = await context.supabase.from("attendance_entries").upsert(expected.map((person) => ({
+  const { error } = await context.supabase.from("attendance_entries").upsert(day.people.map((person) => ({
     team_id: context.team.id, attendance_day_id: attendanceDayId, person_id: person.id,
     is_present: true, source: "schedule_default", updated_by: context.userId,
   })), { onConflict: "attendance_day_id,person_id" });
@@ -49,11 +49,44 @@ export async function submitAttendanceAction(teamSlug: string, formData: FormDat
   const day = await getOperationalDay(context.supabase, context.team, date);
   if (!day.period) throw new Error("אין תקופת מילואים פעילה ביום זה");
   const attendanceDayId = await ensureDay(context, day.period.id, date);
+  await seedMissingAttendanceFromYesterday(context, day, attendanceDayId, date);
   const { error } = await context.supabase.from("attendance_days").update({
     status: "submitted", submitted_by: context.userId, submitted_at: new Date().toISOString(),
   }).eq("id", attendanceDayId).eq("team_id", context.team.id);
   assertOk(error);
   refresh(teamSlug, date);
+}
+
+async function seedMissingAttendanceFromYesterday(
+  context: Awaited<ReturnType<typeof managerContext>>,
+  day: Awaited<ReturnType<typeof getOperationalDay>>,
+  attendanceDayId: string,
+  date: string,
+) {
+  const missingPeople = day.people.filter((person) => person.resolution.attendance === "unreported");
+  if (!missingPeople.length) return;
+
+  const previousDay = await getOperationalDay(context.supabase, context.team, addCalendarDays(date, -1));
+  const previousByPersonId = new Map(previousDay.people.map((person) => [person.id, person.resolution.attendance]));
+  const defaults = missingPeople.flatMap((person) => {
+    const previousAttendance = previousByPersonId.get(person.id);
+    if (previousAttendance !== "present" && previousAttendance !== "absent") return [];
+
+    return {
+      attendance_day_id: attendanceDayId,
+      is_present: previousAttendance === "present",
+      person_id: person.id,
+      source: "previous_day_default",
+      team_id: context.team.id,
+      updated_by: context.userId,
+    };
+  });
+  if (!defaults.length) return;
+
+  const { error } = await context.supabase
+    .from("attendance_entries")
+    .upsert(defaults, { onConflict: "attendance_day_id,person_id" });
+  assertOk(error);
 }
 
 async function ensureDay(context: Awaited<ReturnType<typeof managerContext>>, periodId: string, date: string) {

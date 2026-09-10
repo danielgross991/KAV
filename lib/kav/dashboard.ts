@@ -221,11 +221,11 @@ export const getDashboardData = cache(async function getDashboardData(
     }
   }
   const attendance = {
-    absent: operationalDay.summary.absent,
-    present: operationalDay.summary.expectedPresent,
+    absent: operationalDay.people.filter((person) => person.resolution.attendance === "absent").length,
+    present: operationalDay.summary.present,
     submitted: operationalDay.attendanceDayStatus === "submitted",
-    total: operationalDay.summary.expected,
-    unexpectedPresent: operationalDay.summary.unexpectedPresent,
+    total: operationalDay.people.length,
+    unexpectedPresent: 0,
   };
   const rotationStatus = operationalDay.rotationStatus;
   const expectedOnBase = operationalDay.summary.expected;
@@ -248,9 +248,10 @@ export const getDashboardData = cache(async function getDashboardData(
   if (currentPeriod && rotationStatus.length === 0) {
     issues.push("אין סבבי רוטציה פעילים להיום");
   }
-  if (operationalDay.summary.absent) issues.push(`${operationalDay.summary.absent} פערי נוכחות`);
-  if (operationalDay.summary.unreported) issues.push(`${operationalDay.summary.unreported} טרם דווחו בנוכחות`);
-  if (operationalDay.summary.unexpectedPresent) issues.push(`${operationalDay.summary.unexpectedPresent} נוכחות חריגה`);
+  if (attendance.absent) issues.push(`${attendance.absent} לא נוכחים`);
+  if (operationalDay.people.some((person) => person.resolution.attendance === "unreported")) {
+    issues.push(`${operationalDay.people.filter((person) => person.resolution.attendance === "unreported").length} טרם דווחו בנוכחות`);
+  }
 
   const currentPerson = currentPersonResult.data;
   const personalResolution = currentPerson

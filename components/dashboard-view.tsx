@@ -48,8 +48,6 @@ function ManagerDashboard({
   lineOptions: Awaited<ReturnType<typeof getLineSelectionOptions>>;
   selectedLinePeriodId: string | null;
 }) {
-  const home = Math.max(0, data.activePeople - data.expectedOnBase - data.approvedLeaveToday);
-
   return (
     <AppPage>
       <PageHeader
@@ -80,8 +78,8 @@ function ManagerDashboard({
           ) : null}
         </div>
         <div className="grid grid-cols-3 gap-4 px-4 pb-4 pt-2">
-          <HeroMetric dominant label="צפויים בבסיס" value={data.expectedOnBase} />
-          <HeroMetric label="בבית" value={home} muted />
+          <HeroMetric dominant label="סגל בקו" value={data.activePeople} />
+          <HeroMetric label="נוכחים" value={data.attendance.present} muted />
           <HeroMetric label="ביציאה" value={data.approvedLeaveToday} info />
         </div>
         <Link

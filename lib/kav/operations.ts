@@ -18,7 +18,9 @@ type Row<Name extends keyof Database["public"]["Tables"]> = Database["public"]["
 
 export type OperationalPerson = Pick<Row<"people">, "full_name" | "id" | "is_active" | "phone"> & {
   personal_number: string | null;
-  resolution: ReturnType<typeof resolveOperationalPerson>;
+  resolution: ReturnType<typeof resolveOperationalPerson> & {
+    attendanceSource?: "yesterday";
+  };
 };
 
 export type OperationalDay = {
