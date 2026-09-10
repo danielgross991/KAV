@@ -48,6 +48,23 @@ export function SettingsManagementView({
     <AppPage>
       <PageHeader eyebrow={data.team.name} title="הגדרות צוות" subtitle="ניהול פקלים, דרישות כשירות וסוגי ציוד לצוות." action={saved ? <Badge variant="success">{savedLabel(saved)}</Badge> : null} />
 
+      {pendingQuotes.length ? (
+        <section className="mb-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-amber-950 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold">משפטים שממתינים לאישור</h2>
+              <p className="mt-0.5 text-sm">אישור מהיר להצעות שהצוות שלח.</p>
+            </div>
+            <Badge variant="warning">{pendingQuotes.length}</Badge>
+          </div>
+          <div className="mt-3 grid gap-2 md:grid-cols-2">
+            {pendingQuotes.map((quote) => (
+              <PendingDailyQuoteApproval key={quote.id} peopleById={peopleById} quote={quote} teamSlug={data.team.slug} />
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-4 xl:grid-cols-[1fr_24rem]">
         <Card>
           <CardHeader>
@@ -280,6 +297,29 @@ function DailyQuoteForm({ peopleById, quote, teamSlug }: { peopleById?: Map<stri
         {quote ? "שמירת משפט" : "הוספת משפט"}
       </Button>
     </form>
+    </div>
+  );
+}
+
+function PendingDailyQuoteApproval({ peopleById, quote, teamSlug }: { peopleById: Map<string, string>; quote: DailyQuote; teamSlug: string }) {
+  const submitterName = quote.submitted_person_id ? peopleById.get(quote.submitted_person_id) ?? "איש צוות" : "איש צוות";
+
+  return (
+    <div className="grid gap-3 rounded-lg border border-amber-200 bg-white/80 p-3">
+      <div>
+        <p className="text-xs font-semibold text-amber-700">הוצע על ידי {submitterName}</p>
+        <p className="mt-1 text-base font-bold leading-7">{quote.text}</p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <form action={decideDailyQuoteAction.bind(null, teamSlug, quote.id, "approved")}>
+          <input name="sort_order" type="hidden" value={quote.sort_order} />
+          <Button className="w-full" type="submit">אישור משפט</Button>
+        </form>
+        <form action={decideDailyQuoteAction.bind(null, teamSlug, quote.id, "rejected")}>
+          <input name="sort_order" type="hidden" value={quote.sort_order} />
+          <Button className="w-full" type="submit" variant="outline">דחייה</Button>
+        </form>
+      </div>
     </div>
   );
 }

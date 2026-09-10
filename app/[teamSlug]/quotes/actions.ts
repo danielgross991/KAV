@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { logActivityEvent } from "@/lib/kav/activity";
 import { requireAuth } from "@/lib/kav/auth";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
@@ -45,7 +46,7 @@ export async function submitDailyQuoteSuggestionAction(
     return { message: "רק איש צוות משויך יכול להציע משפט.", ok: false };
   }
 
-  const { error } = await supabase.from("daily_quotes").insert({
+  const { data: quote, error } = await supabase.from("daily_quotes").insert({
     is_active: true,
     source: "viewer",
     status: "pending",
@@ -53,14 +54,27 @@ export async function submitDailyQuoteSuggestionAction(
     submitted_person_id: person.id,
     team_id: membership.team.id,
     text,
-  });
+  }).select("id").single();
 
   if (error) {
     return { message: "משהו השתבש בהגשה. נסה שוב עוד רגע.", ok: false };
   }
 
+  await logActivityEvent(supabase, {
+    actorPersonId: person.id,
+    actorUserId: userId,
+    details: text,
+    entityId: quote.id,
+    entityType: "daily_quote",
+    eventType: "leave.request_created",
+    metadata: { textLength: text.length },
+    teamId: membership.team.id,
+    title: "משפט יומי חדש הוצע",
+  });
+
   revalidatePath(`/${teamSlug}`);
   revalidatePath(`/${teamSlug}/settings`);
+  revalidatePath(`/${teamSlug}/notifications`);
   return { message: "המשפט הועבר לאישור מנהל.", ok: true };
 }
 

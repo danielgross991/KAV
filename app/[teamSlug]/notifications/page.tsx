@@ -1,4 +1,4 @@
-import { Bell, LogIn, PackageCheck, PlaneTakeoff } from "lucide-react";
+import { Bell, LogIn, MessageSquareQuote, PackageCheck, PlaneTakeoff } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AppPage, EmptyState, PageHeader } from "@/components/ui/app-page";
@@ -44,7 +44,7 @@ export default async function NotificationsPage({ params }: NotificationsPagePro
       <PageHeader
         eyebrow={membership.team.name}
         title="עדכונים ולוגים"
-        subtitle="כניסות, בקשות יציאה ושינויי ציוד בזמן אמת למנהלים."
+        subtitle="כניסות, בקשות יציאה, משפטים חדשים ושינויי ציוד בזמן אמת למנהלים."
       />
 
       {events?.length ? (
@@ -52,12 +52,12 @@ export default async function NotificationsPage({ params }: NotificationsPagePro
           {events.map((event) => (
             <Card className="grid gap-3 p-3.5 sm:grid-cols-[auto_1fr_auto] sm:items-center" key={event.id}>
               <span className="grid size-10 place-items-center rounded-md bg-accent text-primary">
-                <ActivityIcon type={event.event_type} />
+                <ActivityIcon entityType={event.entity_type} type={event.event_type} />
               </span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="truncate text-sm font-semibold">{event.title}</h2>
-                  <Badge variant="outline">{label(event.event_type)}</Badge>
+                  <Badge variant="outline">{label(event.event_type, event.entity_type)}</Badge>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {event.details ?? "עודכן במערכת"}
@@ -77,14 +77,16 @@ export default async function NotificationsPage({ params }: NotificationsPagePro
   );
 }
 
-function ActivityIcon({ type }: { type: string }) {
+function ActivityIcon({ entityType, type }: { entityType: string; type: string }) {
+  if (entityType === "daily_quote") return <MessageSquareQuote className="size-4" />;
   if (type.startsWith("auth.")) return <LogIn className="size-4" />;
   if (type.startsWith("leave.")) return <PlaneTakeoff className="size-4" />;
   if (type.includes("equipment")) return <PackageCheck className="size-4" />;
   return <Bell className="size-4" />;
 }
 
-function label(type: string) {
+function label(type: string, entityType: string) {
+  if (entityType === "daily_quote") return "משפט חדש";
   if (type === "auth.sign_in") return "כניסה";
   if (type === "leave.request_created") return "בקשה חדשה";
   if (type === "leave.request_updated") return "עדכון יציאה";
