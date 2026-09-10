@@ -5,7 +5,7 @@ import type { Database } from "@/lib/database.types";
 import { getCurrentDailyQuote, type CurrentDailyQuote } from "@/lib/kav/daily-quotes";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { getLineInactivePersonIds } from "@/lib/kav/line-participation";
-import { getLeaveRequestDayCounts, getOperationalDay } from "@/lib/kav/operations";
+import { getAttendanceEntriesByDate, getLeaveRequestDayCounts, getOperationalDay } from "@/lib/kav/operations";
 import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
 import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
 import { getNextPersonalTask } from "@/lib/kav/tasks";
@@ -36,6 +36,12 @@ export type DashboardData = {
   dailyQuote: CurrentDailyQuote;
   expectedOnBase: number;
   homeLeaderboard: PersonAttendanceStats[];
+  specialPeople: Array<{
+    fullName: string;
+    personId: string;
+    photoUrl: string | null;
+    presentDays: number;
+  }>;
   leaveRequestLeaderboard: Array<{
     fullName: string;
     personId: string;
@@ -197,6 +203,23 @@ export const getDashboardData = cache(async function getDashboardData(
   const inactiveLinePersonIds = currentPeriod
     ? await getLineInactivePersonIds(supabase, team.id, currentPeriod.id)
     : new Set<string>();
+  const specialAttendanceByDate = currentPeriod && inactiveLinePersonIds.size > 0 && today >= currentPeriod.starts_on
+    ? await getAttendanceEntriesByDate(
+        supabase,
+        team.id,
+        currentPeriod.id,
+        currentPeriod.starts_on,
+        today < currentPeriod.ends_on ? today : currentPeriod.ends_on,
+      )
+    : new Map<string, { isPresent: boolean; personId: string }[]>();
+  const specialPresentDays = new Map<string, number>();
+  for (const entries of specialAttendanceByDate.values()) {
+    for (const entry of entries) {
+      if (entry.isPresent && inactiveLinePersonIds.has(entry.personId)) {
+        specialPresentDays.set(entry.personId, (specialPresentDays.get(entry.personId) ?? 0) + 1);
+      }
+    }
+  }
   const attendance = {
     absent: operationalDay.summary.absent,
     present: operationalDay.summary.expectedPresent,
@@ -282,6 +305,17 @@ export const getDashboardData = cache(async function getDashboardData(
     dailyQuote,
     expectedOnBase,
     homeLeaderboard: teamStats.leaderboard,
+    specialPeople: currentPeriod
+      ? people
+          .filter((person) => person.is_active && inactiveLinePersonIds.has(person.id))
+          .map((person) => ({
+            fullName: person.full_name,
+            personId: person.id,
+            photoUrl: person.photo_url,
+            presentDays: specialPresentDays.get(person.id) ?? 0,
+          }))
+          .sort((a, b) => b.presentDays - a.presentDays || a.fullName.localeCompare(b.fullName, "he"))
+      : [],
     leaveRequestLeaderboard: leaveRequestDayCounts
       .map((item) => {
         if (inactiveLinePersonIds.has(item.personId)) return null;

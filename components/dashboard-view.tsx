@@ -308,7 +308,7 @@ function MiniMetric({ label, value }: { label: string; value: number | string })
 }
 
 function HomeLeaderboard({ data }: { data: DashboardData }) {
-  if (!data.homeLeaderboard.length) return null;
+  if (!data.homeLeaderboard.length && !data.specialPeople.length) return null;
   const podium = [data.homeLeaderboard[1], data.homeLeaderboard[0], data.homeLeaderboard[2]].filter(Boolean);
   const isPreview = data.attendanceStats.length === 0 && Boolean(data.currentPeriod);
   return (
@@ -318,39 +318,73 @@ function HomeLeaderboard({ data }: { data: DashboardData }) {
         {isPreview ? <p className="mt-1 text-xs text-muted-foreground">כרגע מוצגים אלופי הקו הקודם עד שהקו הנוכחי יתחיל.</p> : null}
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 items-end gap-2">
-          {podium.map((item) => {
-            const rank = data.homeLeaderboard.findIndex((candidate) => candidate.personId === item.personId) + 1;
-            return (
-              <details
-                key={item.personId}
-                className={cn(
-                  "group relative min-h-36 rounded-lg border bg-muted/30 p-2 text-center",
-                  rank === 1 && "min-h-44 border-primary/30 bg-accent",
-                )}
-              >
-                <summary className="grid min-h-32 cursor-pointer list-none place-items-center rounded-md outline-none transition-colors hover:bg-background/50 active:bg-background/70 group-open:bg-background/60 [&::-webkit-details-marker]:hidden">
-                  <span className="text-xl" aria-hidden>{MEDALS[rank - 1]}</span>
-                  <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} featured={rank === 1} />
-                  <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
-                  <span className="kav-num mt-1 text-xs text-muted-foreground">{Math.round(item.homePercentage * 100)}%</span>
-                </summary>
-                <div className="absolute inset-x-1 top-full z-20 mt-1 rounded-lg border bg-popover p-2 text-right text-xs shadow-lg">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground">בבסיס</span>
-                    <b className="kav-num">{item.baseDays}</b>
+        {podium.length ? (
+          <div className="grid grid-cols-3 items-end gap-2">
+            {podium.map((item) => {
+              const rank = data.homeLeaderboard.findIndex((candidate) => candidate.personId === item.personId) + 1;
+              return (
+                <details
+                  key={item.personId}
+                  className={cn(
+                    "group relative min-h-36 rounded-lg border bg-muted/30 p-2 text-center",
+                    rank === 1 && "min-h-44 border-primary/30 bg-accent",
+                  )}
+                >
+                  <summary className="grid min-h-32 cursor-pointer list-none place-items-center rounded-md outline-none transition-colors hover:bg-background/50 active:bg-background/70 group-open:bg-background/60 [&::-webkit-details-marker]:hidden">
+                    <span className="text-xl" aria-hidden>{MEDALS[rank - 1]}</span>
+                    <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} featured={rank === 1} />
+                    <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
+                    <span className="kav-num mt-1 text-xs text-muted-foreground">{Math.round(item.homePercentage * 100)}%</span>
+                  </summary>
+                  <div className="absolute inset-x-1 top-full z-20 mt-1 rounded-lg border bg-popover p-2 text-right text-xs shadow-lg">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">בבסיס</span>
+                      <b className="kav-num">{item.baseDays}</b>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between gap-2">
+                      <span className="text-muted-foreground">בבית</span>
+                      <b className="kav-num">{item.homeDays}</b>
+                    </div>
                   </div>
-                  <div className="mt-1 flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground">בבית</span>
-                    <b className="kav-num">{item.homeDays}</b>
-                  </div>
-                </div>
-              </details>
-            );
-          })}
-        </div>
+                </details>
+              );
+            })}
+          </div>
+        ) : null}
+        {data.specialPeople.length ? <SpecialPeople people={data.specialPeople} /> : null}
       </CardContent>
     </Card>
+  );
+}
+
+function SpecialPeople({ people }: { people: DashboardData["specialPeople"] }) {
+  return (
+    <section className="mt-4 border-t pt-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold">המיוחדים</h3>
+        <Badge variant="outline">{people.length} מחוץ לקו</Badge>
+      </div>
+      <div className="grid gap-2">
+        {people.map((person) => (
+          <details key={person.personId} className="group rounded-lg border bg-muted/25 p-2">
+            <summary className="flex cursor-pointer list-none items-center gap-3 rounded-md p-1 outline-none transition-colors hover:bg-background/60 active:bg-background/80 group-open:bg-background/70 [&::-webkit-details-marker]:hidden">
+              <PersonAvatar name={person.fullName} photoUrl={person.photoUrl} />
+              <span className="min-w-0 flex-1">
+                <b className="block truncate text-sm">{person.fullName}</b>
+                <span className="text-xs text-muted-foreground">לא פעיל בקו הנוכחי</span>
+              </span>
+              <Badge variant="muted">מיוחד</Badge>
+            </summary>
+            <div className="mt-2 rounded-md bg-background p-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">ימים שכן היה בקו</span>
+                <b className="kav-num">{person.presentDays}</b>
+              </div>
+            </div>
+          </details>
+        ))}
+      </div>
+    </section>
   );
 }
 
