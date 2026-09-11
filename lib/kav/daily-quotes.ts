@@ -9,6 +9,7 @@ export type DailyQuote = Database["public"]["Tables"]["daily_quotes"]["Row"];
 
 export type CurrentDailyQuote = {
   id: string;
+  submitterName: string | null;
   text: string;
 } | null;
 
@@ -19,7 +20,7 @@ export async function getCurrentDailyQuote(
 ): Promise<CurrentDailyQuote> {
   const { data, error } = await supabase
     .from("daily_quotes")
-    .select("id, text")
+    .select("id, text, submitted_person_id")
     .eq("team_id", team.id)
     .eq("status", "approved")
     .eq("is_active", true)
@@ -30,7 +31,28 @@ export async function getCurrentDailyQuote(
     throw new Error(`Unable to load daily quote: ${error.message}`);
   }
 
-  return selectDailyQuoteForDate(data ?? [], today);
+  const quote = selectDailyQuoteForDate(data ?? [], today);
+  if (!quote) return null;
+
+  let submitterName: string | null = null;
+  if (quote.submitted_person_id) {
+    const { data: person, error: personError } = await supabase
+      .from("people")
+      .select("full_name")
+      .eq("team_id", team.id)
+      .eq("id", quote.submitted_person_id)
+      .maybeSingle();
+    if (personError) {
+      throw new Error(`Unable to load daily quote submitter: ${personError.message}`);
+    }
+    submitterName = person?.full_name ?? null;
+  }
+
+  return {
+    id: quote.id,
+    submitterName,
+    text: quote.text,
+  };
 }
 
 export function selectDailyQuoteForDate<T>(quotes: T[], today: string): T | null {

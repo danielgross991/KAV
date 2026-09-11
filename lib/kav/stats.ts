@@ -74,7 +74,10 @@ export async function getTeamStats(
   };
 
   async function buildStatsForPeriod(targetPeriod: NonNullable<typeof period>, targetElapsedEnd: string) {
-    const range = await getOperationalRange(supabase, team, targetPeriod, targetPeriod.starts_on, targetElapsedEnd);
+    const [range, submittedAttendanceDates] = await Promise.all([
+      getOperationalRange(supabase, team, targetPeriod, targetPeriod.starts_on, targetElapsedEnd),
+      getSubmittedAttendanceDates(supabase, team.id, targetPeriod.id, targetPeriod.starts_on, targetElapsedEnd),
+    ]);
     const activePeople = range.people.filter((person) => person.is_active);
     const elapsedDates = eachCalendarDate(targetPeriod.starts_on, targetElapsedEnd);
 
@@ -84,11 +87,11 @@ export async function getTeamStats(
       const days: DailyResolution[] = elapsedDates.map((date) => {
         const resolution = range.resolve(person.id, date);
         const day = {
-          attendance: resolution.attendance,
+          attendance: submittedAttendanceDates.has(date) ? resolution.attendance : "unreported",
           expectedAtBase: resolution.expectedAtBase,
           leave: Boolean(resolution.leave),
           state: resolution.state,
-        };
+        } satisfies DailyResolution;
         return useActualHistoricalAttendance ? applyHistoricalAttendanceSemantics(day) : day;
       });
       resolutionsByPerson.set(person.id, days);
@@ -97,4 +100,23 @@ export async function getTeamStats(
     const statPeople = activePeople.map((person) => ({ fullName: person.full_name, id: person.id, photoUrl: person.photo_url }));
     return getLegacyLineStatsOverride(targetPeriod, statPeople) ?? computeAttendanceStats(statPeople, resolutionsByPerson);
   }
+}
+
+async function getSubmittedAttendanceDates(
+  supabase: Client,
+  teamId: string,
+  reservePeriodId: string,
+  startsOn: string,
+  endsOn: string,
+) {
+  const { data, error } = await supabase.rpc("get_team_attendance_day_status", {
+    target_team_id: teamId,
+    target_reserve_period_id: reservePeriodId,
+    range_starts_on: startsOn,
+    range_ends_on: endsOn,
+  });
+  if (error) throw new Error(`Unable to load submitted attendance days for stats: ${error.message}`);
+  return new Set((data ?? [])
+    .filter((item) => item.status === "submitted")
+    .map((item) => item.attendance_date));
 }

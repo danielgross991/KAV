@@ -497,11 +497,19 @@ async function importPendingLeave(teamId, reservePeriodId, requests, nameToId) {
       report.pendingLeaveSkipped.push({ ...request, why_skipped: "person not found in team roster" });
       continue;
     }
-    const { data: existing, error } = await supabase.from("leave_requests").select("id")
+    const { data: existing, error } = await supabase.from("leave_requests").select("id, starts_on, ends_on, status")
       .eq("team_id", teamId).eq("person_id", personId)
-      .eq("starts_on", request.starts_on).eq("ends_on", request.ends_on).maybeSingle();
+      .eq("reserve_period_id", reservePeriodId)
+      .lte("starts_on", request.ends_on)
+      .gte("ends_on", request.starts_on);
     if (error) throw new Error(`Unable to look up leave request for ${request.person_name}: ${error.message}`);
-    if (existing) { report.pendingLeaveSkipped.push({ ...request, why_skipped: "already exists" }); continue; }
+    if (existing?.length) {
+      report.pendingLeaveSkipped.push({
+        ...request,
+        why_skipped: "overlaps existing live request; skipping to preserve manager edits",
+      });
+      continue;
+    }
 
     const { error: insertError } = await supabase.from("leave_requests").insert({
       team_id: teamId, reserve_period_id: reservePeriodId, person_id: personId,

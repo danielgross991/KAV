@@ -16,7 +16,7 @@ export function DailyQuoteCard({
   quote,
   teamSlug,
 }: {
-  quote: { id: string; text: string } | null;
+  quote: { id: string; submitterName: string | null; text: string } | null;
   teamSlug: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -41,6 +41,9 @@ export function DailyQuoteCard({
         <blockquote className="rounded-lg bg-accent px-4 py-3 text-lg font-bold leading-8 text-primary">
           {quote?.text ?? "עוד לא הוגדר משפט יומי."}
         </blockquote>
+        {quote?.submitterName ? (
+          <p className="mt-2 text-xs font-medium text-muted-foreground">הוגש ע״י {quote.submitterName}</p>
+        ) : null}
         <div className="mt-3">
           <Button
             aria-expanded={open}
