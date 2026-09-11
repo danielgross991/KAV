@@ -5,6 +5,7 @@ import { useFormStatus } from "react-dom";
 
 import { KavLoading } from "@/components/kav-loading";
 
+const pendingOverlayDelayMs = 350;
 const maxPendingOverlayMs = 9000;
 
 export function FormPendingOverlay() {
@@ -15,11 +16,16 @@ export function FormPendingOverlay() {
 
 function AutoExpiringPendingOverlay() {
   const [expired, setExpired] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const timeout = window.setTimeout(() => setExpired(true), maxPendingOverlayMs);
-    return () => window.clearTimeout(timeout);
+    const showTimeout = window.setTimeout(() => setVisible(true), pendingOverlayDelayMs);
+    const expireTimeout = window.setTimeout(() => setExpired(true), maxPendingOverlayMs);
+    return () => {
+      window.clearTimeout(showTimeout);
+      window.clearTimeout(expireTimeout);
+    };
   }, []);
 
-  return expired ? null : <KavLoading label="מבצע פעולה" />;
+  return expired || !visible ? null : <KavLoading label="מבצע פעולה" />;
 }

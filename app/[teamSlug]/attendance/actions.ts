@@ -8,12 +8,81 @@ import { addCalendarDays } from "@/lib/kav/dates";
 import { getOperationalDay } from "@/lib/kav/operations";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
+type AttendanceState = "present" | "absent" | "unreported";
+
+export type AttendanceActionResult = {
+  message?: string;
+  ok: boolean;
+};
+
 export async function markAttendanceAction(teamSlug: string, formData: FormData) {
   const context = await managerContext(teamSlug);
   const date = required(formData, "date");
   const personId = required(formData, "person_id");
   const state = required(formData, "state");
-  if (state !== "present" && state !== "absent" && state !== "unreported") throw new Error("מצב הנוכחות אינו תקין");
+  await markAttendance(context, date, personId, attendanceState(state));
+  refresh(teamSlug, date);
+}
+
+export async function markAttendanceInlineAction(
+  teamSlug: string,
+  input: { date: string; personId: string; state: string },
+): Promise<AttendanceActionResult> {
+  try {
+    const context = await managerContext(teamSlug);
+    await markAttendance(context, input.date, input.personId, attendanceState(input.state));
+    return { ok: true };
+  } catch (error) {
+    return { message: errorMessage(error, "לא הצלחנו לעדכן את הנוכחות. נסה שוב."), ok: false };
+  }
+}
+
+export async function markExpectedPresentAction(teamSlug: string, formData: FormData) {
+  const context = await managerContext(teamSlug);
+  const date = required(formData, "date");
+  await markAllPresent(context, date);
+  refresh(teamSlug, date);
+}
+
+export async function markExpectedPresentInlineAction(
+  teamSlug: string,
+  input: { date: string },
+): Promise<AttendanceActionResult> {
+  try {
+    const context = await managerContext(teamSlug);
+    await markAllPresent(context, input.date);
+    return { ok: true };
+  } catch (error) {
+    return { message: errorMessage(error, "לא הצלחנו לסמן את הצוות כנוכח. נסה שוב."), ok: false };
+  }
+}
+
+export async function submitAttendanceAction(teamSlug: string, formData: FormData) {
+  const context = await managerContext(teamSlug);
+  const date = required(formData, "date");
+  await submitAttendance(context, date);
+  refresh(teamSlug, date);
+}
+
+export async function submitAttendanceInlineAction(
+  teamSlug: string,
+  input: { date: string },
+): Promise<AttendanceActionResult> {
+  try {
+    const context = await managerContext(teamSlug);
+    await submitAttendance(context, input.date);
+    return { ok: true };
+  } catch (error) {
+    return { message: errorMessage(error, "לא הצלחנו לסיים דיווח. נסה שוב."), ok: false };
+  }
+}
+
+async function markAttendance(
+  context: Awaited<ReturnType<typeof managerContext>>,
+  date: string,
+  personId: string,
+  state: AttendanceState,
+) {
   const day = await getOperationalDay(context.supabase, context.team, date);
   if (!day.period || !day.people.some((person) => person.id === personId)) throw new Error("איש הצוות או היום אינם תקינים");
   const attendanceDayId = await ensureDay(context, day.period.id, date);
@@ -25,12 +94,9 @@ export async function markAttendanceAction(teamSlug: string, formData: FormData)
         is_present: state === "present", source: "manual", updated_by: context.userId,
       }, { onConflict: "attendance_day_id,person_id" });
   assertOk(result.error);
-  refresh(teamSlug, date);
 }
 
-export async function markExpectedPresentAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
-  const date = required(formData, "date");
+async function markAllPresent(context: Awaited<ReturnType<typeof managerContext>>, date: string) {
   const day = await getOperationalDay(context.supabase, context.team, date);
   if (!day.period) throw new Error("אין תקופת מילואים פעילה ביום זה");
   if (!day.people.length) return;
@@ -40,12 +106,9 @@ export async function markExpectedPresentAction(teamSlug: string, formData: Form
     is_present: true, source: "schedule_default", updated_by: context.userId,
   })), { onConflict: "attendance_day_id,person_id" });
   assertOk(error);
-  refresh(teamSlug, date);
 }
 
-export async function submitAttendanceAction(teamSlug: string, formData: FormData) {
-  const context = await managerContext(teamSlug);
-  const date = required(formData, "date");
+async function submitAttendance(context: Awaited<ReturnType<typeof managerContext>>, date: string) {
   const day = await getOperationalDay(context.supabase, context.team, date);
   if (!day.period) throw new Error("אין תקופת מילואים פעילה ביום זה");
   const attendanceDayId = await ensureDay(context, day.period.id, date);
@@ -54,7 +117,6 @@ export async function submitAttendanceAction(teamSlug: string, formData: FormDat
     status: "submitted", submitted_by: context.userId, submitted_at: new Date().toISOString(),
   }).eq("id", attendanceDayId).eq("team_id", context.team.id);
   assertOk(error);
-  refresh(teamSlug, date);
 }
 
 async function seedMissingAttendanceFromYesterday(
@@ -110,3 +172,12 @@ async function managerContext(teamSlug: string) {
 function refresh(teamSlug: string, date: string) { revalidatePath(`/${teamSlug}`); revalidatePath(`/${teamSlug}/attendance`); revalidatePath(`/${teamSlug}/schedule/${date}`); }
 function required(data: FormData, key: string) { const value = data.get(key); if (typeof value !== "string" || !value.trim()) throw new Error("חסר שדה חובה"); return value.trim(); }
 function assertOk(error: { message: string } | null) { if (error) { console.error("Phase 4 attendance mutation failed", error.message); throw new Error("לא הצלחנו לעדכן את הנוכחות. נסה שוב."); } }
+
+function attendanceState(value: string): AttendanceState {
+  if (value === "present" || value === "absent" || value === "unreported") return value;
+  throw new Error("מצב הנוכחות אינו תקין");
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
