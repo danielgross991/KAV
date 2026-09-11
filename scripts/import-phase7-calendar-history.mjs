@@ -296,6 +296,7 @@ async function removeOutdatedCurrentEvents(teamId, reservePeriodId, events) {
     "גיוס גוף עיקרי",
     "ראש השנה בבית",
     "זיכויים ועלייה לקו",
+    "המשך אימון לפני הפעלה",
   ].filter((title) => !expectedTitles.has(title));
   if (!outdatedTitles.length) return;
   const { error } = await supabase.from("schedule_events").delete()

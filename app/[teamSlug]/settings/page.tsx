@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 
 import { SettingsManagementView } from "@/components/settings-management-view";
 import { requireAuth } from "@/lib/kav/auth";
+import { getDateInTimeZone } from "@/lib/kav/dates";
+import { getCurrentDailyQuote } from "@/lib/kav/daily-quotes";
+import { getScheduleData } from "@/lib/kav/schedule";
 import { getTeamManagementData } from "@/lib/kav/team-management";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
@@ -20,8 +23,11 @@ export default async function SettingsPage({ params, searchParams }: SettingsPag
     redirect(`/${teamSlug}`);
   }
 
-  const [data, equipmentTypesResult, dailyQuotesResult] = await Promise.all([
+  const today = getDateInTimeZone(membership.team.timezone);
+  const [data, scheduleData, currentDailyQuote, equipmentTypesResult, dailyQuotesResult] = await Promise.all([
     getTeamManagementData(supabase, membership),
+    getScheduleData(supabase, membership, undefined, userId),
+    getCurrentDailyQuote(supabase, membership.team, today),
     supabase
       .from("equipment_types")
       .select("id, team_id, name, category, serial_required, is_active, created_at")
@@ -46,9 +52,11 @@ export default async function SettingsPage({ params, searchParams }: SettingsPag
 
   return (
     <SettingsManagementView
+      currentDailyQuoteId={currentDailyQuote?.id ?? null}
       data={data}
       dailyQuotes={dailyQuotesResult.data ?? []}
       equipmentTypes={equipmentTypesResult.data ?? []}
+      scheduleData={scheduleData}
       saved={saved}
     />
   );

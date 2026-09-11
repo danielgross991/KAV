@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 
 import { logActivityEvent } from "@/lib/kav/activity";
 import { requireAuth } from "@/lib/kav/auth";
+import { getDateInTimeZone } from "@/lib/kav/dates";
+import { getDailyQuoteIndex } from "@/lib/kav/daily-quotes";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
 const STATUSES = ["approved", "pending", "rejected", "archived"] as const;
@@ -213,6 +215,54 @@ export async function decideDailyQuoteAction(teamSlug: string, quoteId: string, 
   revalidatePath(`/${teamSlug}`);
   revalidatePath(`/${teamSlug}/settings`);
   redirect(`/${teamSlug}/settings?saved=daily-quote-decision`);
+}
+
+export async function setCurrentDailyQuoteAction(teamSlug: string, quoteId: string) {
+  const { membership, supabase, userId } = await requireManager(teamSlug);
+  const { data: quote, error: quoteError } = await supabase
+    .from("daily_quotes")
+    .select("id, text")
+    .eq("team_id", membership.team.id)
+    .eq("id", quoteId)
+    .maybeSingle();
+  if (quoteError) throw new Error(`לא ניתן לטעון משפט: ${quoteError.message}`);
+  if (!quote) throw new Error("המשפט לא נמצא");
+
+  const { data: activeQuotes, error } = await supabase
+    .from("daily_quotes")
+    .select("id")
+    .eq("team_id", membership.team.id)
+    .eq("status", "approved")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`לא ניתן לסדר משפטים: ${error.message}`);
+
+  const ids = [...new Set([...(activeQuotes ?? []).map((item) => item.id), quote.id])];
+  const targetIndex = getDailyQuoteIndex(getDateInTimeZone(membership.team.timezone), ids.length);
+  const reordered = ids.filter((id) => id !== quote.id);
+  reordered.splice(targetIndex, 0, quote.id);
+
+  for (const [index, id] of reordered.entries()) {
+    const payload = {
+      is_active: true,
+      sort_order: index,
+      status: "approved" as const,
+      ...(id === quote.id
+        ? { approved_at: new Date().toISOString(), approved_by: userId }
+        : {}),
+    };
+    const { error: updateError } = await supabase
+      .from("daily_quotes")
+      .update(payload)
+      .eq("team_id", membership.team.id)
+      .eq("id", id);
+    if (updateError) throw new Error(`לא ניתן לקבוע משפט היום: ${updateError.message}`);
+  }
+
+  revalidatePath(`/${teamSlug}`);
+  revalidatePath(`/${teamSlug}/settings`);
+  redirect(`/${teamSlug}/settings?saved=daily-quote-current`);
 }
 
 async function requireManager(teamSlug: string) {

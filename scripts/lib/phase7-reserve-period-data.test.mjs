@@ -66,7 +66,7 @@ test("2026 Otniel rotations are whole-team week-on week-off", () => {
     block.ends_on === "2026-09-13"));
   assert.ok(blocks.some((block) =>
     block.state === "home" &&
-    block.starts_on === "2026-09-18" &&
+    block.starts_on === "2026-09-17" &&
     block.ends_on === "2026-09-21"));
   assert.ok(blocks.some((block) =>
     block.state === "base" &&
@@ -90,6 +90,25 @@ test("2026 Otniel rotations are whole-team week-on week-off", () => {
     assert.ok(blocks[index].starts_on > blocks[index - 1].ends_on);
     if (index > 1) assert.notEqual(blocks[index].state, blocks[index - 1].state);
   }
+});
+
+test("2026 Otniel seed includes the ELT PDF schedule for September 14-16", () => {
+  const titles = new Set(periodSeed.events.map((event) => event.title));
+  for (const title of [
+    "14/9 - יום סמבצים בגזרה",
+    "14/9 - קפ״ק 2 לגזרה",
+    "15/9 - לבנת מעצרים לשיטה חדשה",
+    "15/9 - תרגיל פלוגה א",
+    "16/9 - שעת מח״ט לכל הגדוד",
+    "16/9 - מטווח קליעה",
+    "16/9 - עליית מטא״ר 1 לגזרות",
+  ]) {
+    assert.ok(titles.has(title), `missing ELT schedule event: ${title}`);
+  }
+
+  const aliya = periodSeed.events.find((event) => event.title === "עלייה לגזרת עותניאל");
+  assert.ok(aliya);
+  assert.equal(aliya.starts_on, "2026-09-17");
 });
 
 test("historical Kishufim seed includes non-overlapping rotation blocks for both rounds", () => {

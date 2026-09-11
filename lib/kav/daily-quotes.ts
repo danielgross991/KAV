@@ -35,10 +35,15 @@ export async function getCurrentDailyQuote(
 
 export function selectDailyQuoteForDate<T>(quotes: T[], today: string): T | null {
   if (!quotes.length) return null;
-  return quotes[dayIndex(today) % quotes.length] ?? null;
+  return quotes[getDailyQuoteIndex(today, quotes.length)] ?? null;
 }
 
-function dayIndex(date: string) {
+export function getDailyQuoteIndex(date: string, quoteCount: number) {
+  if (quoteCount < 1) return 0;
+  return dayIndex(date) % quoteCount;
+}
+
+export function dayIndex(date: string) {
   const [year, month, day] = date.split("-").map(Number);
   if (![year, month, day].every(Number.isFinite)) {
     throw new Error(`Invalid quote date: ${date}`);

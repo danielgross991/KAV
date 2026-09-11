@@ -335,7 +335,7 @@ function assertDateRange(startsOn: string, endsOn: string) { if (endsOn < starts
 function assertInsidePeriod(startsOn: string, endsOn: string, period: { starts_on: string; ends_on: string }) { assertDateRange(startsOn, endsOn); if (startsOn < period.starts_on || endsOn > period.ends_on) throw new Error("טווח התאריכים חייב להיות בתוך תקופת המילואים"); }
 function assertDraft(period: { status: string }) { if (period.status !== "draft") throw new Error("שינויים מבניים מותרים רק בתקופה במצב טיוטה"); }
 function assertOk(error: { message: string } | null, label: string) { if (error) throw new Error(`${label} נכשלה: ${error.message}`); }
-function refresh(teamSlug: string) { revalidatePath(`/${teamSlug}/schedule`); revalidatePath(`/${teamSlug}`); revalidatePath(`/${teamSlug}/team`); }
+function refresh(teamSlug: string) { revalidatePath(`/${teamSlug}/schedule`); revalidatePath(`/${teamSlug}/settings`); revalidatePath(`/${teamSlug}`); revalidatePath(`/${teamSlug}/team`); }
 
 function subtractManualRanges(
   block: { groupId: string; state: RotationState; startsOn: string; endsOn: string },
