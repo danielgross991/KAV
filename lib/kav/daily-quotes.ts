@@ -10,6 +10,7 @@ export type DailyQuote = Database["public"]["Tables"]["daily_quotes"]["Row"];
 export type CurrentDailyQuote = {
   id: string;
   submitterName: string | null;
+  submitterPhotoUrl: string | null;
   text: string;
 } | null;
 
@@ -35,10 +36,11 @@ export async function getCurrentDailyQuote(
   if (!quote) return null;
 
   let submitterName: string | null = null;
+  let submitterPhotoUrl: string | null = null;
   if (quote.submitted_person_id) {
     const { data: person, error: personError } = await supabase
       .from("people")
-      .select("full_name")
+      .select("full_name, photo_url")
       .eq("team_id", team.id)
       .eq("id", quote.submitted_person_id)
       .maybeSingle();
@@ -46,11 +48,13 @@ export async function getCurrentDailyQuote(
       throw new Error(`Unable to load daily quote submitter: ${personError.message}`);
     }
     submitterName = person?.full_name ?? null;
+    submitterPhotoUrl = person?.photo_url ?? null;
   }
 
   return {
     id: quote.id,
     submitterName,
+    submitterPhotoUrl,
     text: quote.text,
   };
 }

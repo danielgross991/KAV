@@ -16,7 +16,7 @@ export function DailyQuoteCard({
   quote,
   teamSlug,
 }: {
-  quote: { id: string; submitterName: string | null; text: string } | null;
+  quote: { id: string; submitterName: string | null; submitterPhotoUrl: string | null; text: string } | null;
   teamSlug: string;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
@@ -42,7 +42,10 @@ export function DailyQuoteCard({
           {quote?.text ?? "עוד לא הוגדר משפט יומי."}
         </blockquote>
         {quote?.submitterName ? (
-          <p className="mt-2 text-xs font-medium text-muted-foreground">הוגש ע״י {quote.submitterName}</p>
+          <div className="mt-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <SubmitterAvatar name={quote.submitterName} photoUrl={quote.submitterPhotoUrl} />
+            <span>הוגש ע״י {quote.submitterName}</span>
+          </div>
         ) : null}
         <div className="mt-3">
           <Button
@@ -83,5 +86,23 @@ export function DailyQuoteCard({
         ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+function SubmitterAvatar({ name, photoUrl }: { name: string; photoUrl: string | null }) {
+  if (photoUrl) {
+    return (
+      <span
+        aria-hidden
+        className="size-6 shrink-0 rounded-full bg-cover bg-center ring-1 ring-border"
+        style={{ backgroundImage: `url(${photoUrl})` }}
+      />
+    );
+  }
+
+  return (
+    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-muted text-[0.65rem] font-bold text-muted-foreground ring-1 ring-border">
+      {name.trim().slice(0, 1)}
+    </span>
   );
 }
