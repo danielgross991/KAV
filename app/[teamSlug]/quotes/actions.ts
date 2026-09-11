@@ -57,25 +57,96 @@ export async function submitDailyQuoteSuggestionAction(
   }).select("id").single();
 
   if (error) {
-    return { message: "משהו השתבש בהגשה. נסה שוב עוד רגע.", ok: false };
+    const existing = await findExistingQuote(supabase, membership.team.id, text);
+    if (!existing) {
+      return { message: "משהו השתבש בהגשה. נסה שוב עוד רגע.", ok: false };
+    }
+
+    if (existing.status === "approved" && existing.is_active) {
+      return { message: "המשפט הזה כבר קיים ומאושר במערכת.", ok: true };
+    }
+
+    const { error: updateError } = await supabase
+      .from("daily_quotes")
+      .update({
+        is_active: true,
+        source: "viewer",
+        status: "pending",
+        submitted_by: userId,
+        submitted_person_id: person.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("team_id", membership.team.id)
+      .eq("id", existing.id);
+
+    if (updateError) {
+      return { message: "משהו השתבש בהגשה. נסה שוב עוד רגע.", ok: false };
+    }
+
+    await logQuoteSuggestion(supabase, {
+      personId: person.id,
+      quoteId: existing.id,
+      teamId: membership.team.id,
+      text,
+      userId,
+    });
+
+    revalidatePath(`/${teamSlug}`);
+    revalidatePath(`/${teamSlug}/settings`);
+    revalidatePath(`/${teamSlug}/notifications`);
+    return { message: "המשפט הועבר לאישור מנהל.", ok: true };
   }
 
-  await logActivityEvent(supabase, {
-    actorPersonId: person.id,
-    actorUserId: userId,
-    details: text,
-    entityId: quote.id,
-    entityType: "daily_quote",
-    eventType: "leave.request_created",
-    metadata: { textLength: text.length },
+  await logQuoteSuggestion(supabase, {
+    personId: person.id,
+    quoteId: quote.id,
     teamId: membership.team.id,
-    title: "משפט יומי חדש הוצע",
+    text,
+    userId,
   });
 
   revalidatePath(`/${teamSlug}`);
   revalidatePath(`/${teamSlug}/settings`);
   revalidatePath(`/${teamSlug}/notifications`);
   return { message: "המשפט הועבר לאישור מנהל.", ok: true };
+}
+
+async function findExistingQuote(
+  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  teamId: string,
+  text: string,
+) {
+  const { data } = await supabase
+    .from("daily_quotes")
+    .select("id, is_active, status")
+    .eq("team_id", teamId)
+    .eq("text", text)
+    .maybeSingle();
+
+  return data;
+}
+
+async function logQuoteSuggestion(
+  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  input: {
+    personId: string;
+    quoteId: string;
+    teamId: string;
+    text: string;
+    userId: string;
+  },
+) {
+  await logActivityEvent(supabase, {
+    actorPersonId: input.personId,
+    actorUserId: input.userId,
+    details: input.text,
+    entityId: input.quoteId,
+    entityType: "daily_quote",
+    eventType: "leave.request_created",
+    metadata: { textLength: input.text.length },
+    teamId: input.teamId,
+    title: "משפט יומי חדש הוצע",
+  });
 }
 
 export async function saveDailyQuoteAction(teamSlug: string, formData: FormData) {

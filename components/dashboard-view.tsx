@@ -349,6 +349,11 @@ function HomeLeaderboard({ data }: { data: DashboardData }) {
             })}
           </div>
         ) : null}
+        {podium.length ? (
+          <p className="mt-3 text-center text-xs leading-5 text-muted-foreground">
+            האחוז הוא אחוז ימי הבית מתוך הימים המדווחים של הלוחם בקו.
+          </p>
+        ) : null}
         {data.specialPeople.length ? <SpecialPeople people={data.specialPeople} /> : null}
       </CardContent>
     </Card>

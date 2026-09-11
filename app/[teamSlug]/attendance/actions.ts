@@ -76,7 +76,7 @@ async function seedMissingAttendanceFromYesterday(
       attendance_day_id: attendanceDayId,
       is_present: previousAttendance === "present",
       person_id: person.id,
-      source: "previous_day_default",
+      source: "schedule_default",
       team_id: context.team.id,
       updated_by: context.userId,
     };

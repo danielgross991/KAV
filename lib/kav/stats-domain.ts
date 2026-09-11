@@ -42,13 +42,13 @@ export function computeAttendanceStats(
 ): PersonAttendanceStats[] {
   return people.map((person) => {
     const days = resolutionsByPerson.get(person.id) ?? [];
-    const baseDays = days.filter((day) => day.state === "base").length;
+    const baseDays = days.filter((day) => day.attendance === "present").length;
     const leaveDays = days.filter((day) => day.leave).length;
     const homeDays = days.filter((day) => day.attendance === "absent" || day.leave).length;
     const expectedDays = days.filter((day) => day.expectedAtBase);
     const finalizedExpectedDays = expectedDays.filter((day) => day.attendance !== "unreported");
     const presentOnExpectedDays = finalizedExpectedDays.filter((day) => day.attendance === "present").length;
-    const totalElapsedDays = days.length;
+    const totalElapsedDays = days.filter((day) => day.attendance !== "unreported" || day.leave).length;
 
     return {
       attendancePercentage: finalizedExpectedDays.length > 0
