@@ -80,11 +80,13 @@ export async function getTeamStats(
     ]);
     const activePeople = range.people.filter((person) => person.is_active);
     const elapsedDates = eachCalendarDate(targetPeriod.starts_on, targetElapsedEnd);
+    const wholeLineDates = elapsedDates.filter((date) =>
+      activePeople.length > 0 && activePeople.every((person) => range.resolve(person.id, date).state !== null));
 
     const resolutionsByPerson = new Map<string, DailyResolution[]>();
     const useActualHistoricalAttendance = targetPeriod.status === "completed";
     for (const person of activePeople) {
-      const days: DailyResolution[] = elapsedDates.map((date) => {
+      const days: DailyResolution[] = wholeLineDates.map((date) => {
         const resolution = range.resolve(person.id, date);
         const day = {
           attendance: submittedAttendanceDates.has(date) ? resolution.attendance : "unreported",
