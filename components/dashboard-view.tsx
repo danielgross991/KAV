@@ -354,9 +354,58 @@ function HomeLeaderboard({ data }: { data: DashboardData }) {
             האחוז הוא אחוז ימי הבית מתוך הימים המדווחים של הלוחם בקו.
           </p>
         ) : null}
+        {data.canManage ? <HomeLeaderboardFullStats stats={data.attendanceStats} /> : null}
         {data.specialPeople.length ? <SpecialPeople people={data.specialPeople} /> : null}
       </CardContent>
     </Card>
+  );
+}
+
+function HomeLeaderboardFullStats({ stats }: { stats: DashboardData["attendanceStats"] }) {
+  const sorted = [...stats].sort((a, b) =>
+    b.homeDays - a.homeDays ||
+    b.homePercentage - a.homePercentage ||
+    a.fullName.localeCompare(b.fullName, "he") ||
+    a.personId.localeCompare(b.personId));
+
+  if (!sorted.length) return null;
+
+  return (
+    <section className="mt-4 border-t pt-4">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold">אחוזי כל הצוות</h3>
+        <Badge variant="outline">{sorted.length}</Badge>
+      </div>
+      <div className="overflow-hidden rounded-lg border">
+        <div className="max-h-72 overflow-auto">
+          <table className="w-full min-w-[28rem] text-sm">
+            <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 text-right font-medium">לוחם</th>
+                <th className="px-3 py-2 text-center font-medium">אחוז בית</th>
+                <th className="px-3 py-2 text-center font-medium">בבית</th>
+                <th className="px-3 py-2 text-center font-medium">בבסיס</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {sorted.map((item) => (
+                <tr key={item.personId} className="bg-card">
+                  <td className="px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} />
+                      <span className="min-w-0 truncate font-medium">{item.fullName}</span>
+                    </div>
+                  </td>
+                  <td className="kav-num px-3 py-2 text-center font-semibold">{Math.round(item.homePercentage * 100)}%</td>
+                  <td className="kav-num px-3 py-2 text-center">{item.homeDays}</td>
+                  <td className="kav-num px-3 py-2 text-center">{item.baseDays}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
   );
 }
 
