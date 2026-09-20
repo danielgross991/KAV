@@ -6,7 +6,9 @@ export function KavLoading({ compact = false, label = "טוען נתונים" }:
     <div
       className={cn(
         "grid w-full place-items-center px-6 text-center",
-        compact ? "min-h-48 bg-background/80 py-10 backdrop-blur-sm" : "fixed inset-0 z-50 min-h-screen bg-background/15 backdrop-blur-[1px]",
+        compact
+          ? "min-h-48 bg-background/80 py-10 backdrop-blur-sm"
+          : "kav-app-overlay fixed inset-0 z-50 min-h-[100dvh] bg-background/35 backdrop-blur-[1px]",
       )}
       role="status"
       aria-live="polite"

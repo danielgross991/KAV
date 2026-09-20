@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ClipboardList, PackageCheck, UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { KavMark } from "@/components/kav-mark";
 import { cn } from "@/lib/utils";
@@ -61,6 +61,30 @@ export function UserProfileMenu({
   variant?: "desktop" | "mobile";
 }) {
   const [open, setOpen] = useState(false);
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    function closeOnOutsidePress(event: PointerEvent) {
+      if (!detailsRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", closeOnOutsidePress);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnOutsidePress);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
 
   if (!profile) return null;
 
@@ -69,10 +93,11 @@ export function UserProfileMenu({
       className={cn("group relative", variant === "desktop" && "mt-3")}
       onToggle={(event) => setOpen(event.currentTarget.open)}
       open={open}
+      ref={detailsRef}
     >
       <summary
         className={cn(
-          "flex cursor-pointer list-none items-center gap-2 rounded-md border bg-background text-start transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-details-marker]:hidden",
+          "flex cursor-pointer list-none items-center gap-2 rounded-md border bg-background text-start transition-[background-color,transform] active:scale-[0.97] hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 [&::-webkit-details-marker]:hidden",
           variant === "desktop" ? "min-h-12 px-2.5 py-2" : "size-10 justify-center p-1",
         )}
         aria-label="פתיחת אזור אישי"
@@ -91,7 +116,7 @@ export function UserProfileMenu({
       </summary>
       <div
         className={cn(
-          "absolute z-50 w-56 overflow-hidden rounded-lg border bg-card p-1.5 shadow-xl shadow-black/10",
+          "kav-panel-enter absolute z-50 w-56 overflow-hidden rounded-lg border bg-card p-1.5 shadow-xl shadow-black/10",
           variant === "desktop" ? "bottom-full right-0 mb-2" : "left-0 top-12",
         )}
       >
@@ -122,7 +147,7 @@ function ProfileMenuLink({
 }) {
   return (
     <Link
-      className="flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-colors hover:bg-muted"
+      className="flex h-10 items-center gap-2 rounded-md px-2.5 text-sm font-medium text-foreground transition-[background-color,transform] active:scale-[0.98] hover:bg-muted"
       href={href}
       onClick={onSelect}
     >

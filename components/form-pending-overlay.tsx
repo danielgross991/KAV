@@ -5,8 +5,8 @@ import { useFormStatus } from "react-dom";
 
 import { KavLoading } from "@/components/kav-loading";
 
-const pendingOverlayDelayMs = 350;
-const maxPendingOverlayMs = 9000;
+const pendingOverlayDelayMs = 120;
+const maxPendingOverlayMs = 12000;
 
 export function FormPendingOverlay() {
   const { pending } = useFormStatus();

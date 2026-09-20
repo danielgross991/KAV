@@ -5,6 +5,7 @@ const eslintConfig = [
   {
     ignores: [
       ".codex-remote-attachments/**",
+      ".agents/**",
       ".next/**",
       "tmp/**",
     ],

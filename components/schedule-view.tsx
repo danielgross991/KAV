@@ -24,9 +24,9 @@ import { cn } from "@/lib/utils";
 
 const phaseLabels: Record<string, string> = { preparation: "הכנה", line: "קו", stand_down: "ירידה / התארגנות", processing: "זיכויים", other: "אחר" };
 const eventLabels: Record<string, string> = { briefing: "תדריך", training: "אימון", family: "משפחות", processing: "זיכויים", changeover: "החלפה", holiday: "חג / מועד", other: "אחר" };
-const scheduleLoadingHandoffMs = 48;
-const scheduleMinimumLoadingMs = 420;
-const schedulePressFeedbackMs = 520;
+const scheduleLoadingHandoffMs = 32;
+const scheduleMinimumLoadingMs = 220;
+const schedulePressFeedbackMs = 220;
 
 export function ScheduleView({ data, initialManage, month, view }: { data: ScheduleData; initialManage: boolean; month?: string; view: string }) {
   const router = useRouter();
@@ -125,7 +125,7 @@ export function ScheduleView({ data, initialManage, month, view }: { data: Sched
 }
 
 function Empty() { return <EmptyState icon={<CalendarDays className="size-4" />} title="אין עדיין תקופת מילואים" description="מנהל יכול ליצור תקופה חדשה ולהתחיל לבנות את הלו״ז." />; }
-function Tab({ active, children, className, onSelect, pressed = false }: { active: boolean; children: React.ReactNode; className?: string; onSelect: () => void; pressed?: boolean }) { return <button aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-all active:scale-[0.98] active:bg-card active:text-foreground", active || pressed ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground", className)} onClick={() => { if (!active) onSelect(); }} type="button">{children}</button>; }
+function Tab({ active, children, className, onSelect, pressed = false }: { active: boolean; children: React.ReactNode; className?: string; onSelect: () => void; pressed?: boolean }) { return <button aria-current={active ? "page" : undefined} className={cn("flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium transition-[background-color,color,box-shadow,transform] active:scale-[0.98] active:bg-card active:text-foreground", active || pressed ? "bg-card text-foreground shadow-[0_1px_2px_rgba(20,22,26,0.06)]" : "text-muted-foreground hover:bg-card/70 hover:text-foreground", className)} onClick={() => { if (!active) onSelect(); }} type="button">{children}</button>; }
 function href(data: ScheduleData, view: string, month?: string) { return `/${data.team.slug}/schedule?period=${data.selectedPeriod?.id}&view=${view}${month ? `&month=${month}` : ""}`; }
 function monthLabel(month: string) { return new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${month}-01T12:00:00Z`)); }
 
@@ -143,7 +143,7 @@ function Month({ data, month, onMonthChange, pendingMonth }: { data: ScheduleDat
       <MonthNavButton active={pendingMonth === shiftMonth(month, -1)} ariaLabel="חודש קודם" onClick={() => onMonthChange(shiftMonth(month, -1))}><ChevronRight className="size-4" /></MonthNavButton>
       <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
         <span className="text-sm font-bold sm:text-base">{monthLabel(month)}</span>
-        {month !== todayMonth ? <button className={cn("rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-all hover:border-primary/30 hover:bg-accent hover:text-primary active:scale-[0.96] active:border-primary/40 active:bg-accent active:text-primary", pendingMonth === todayMonth && "border-primary/40 bg-accent text-primary")} onClick={() => onMonthChange(todayMonth)} type="button">היום</button> : null}
+        {month !== todayMonth ? <button className={cn("rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground transition-[background-color,border-color,color,transform] hover:border-primary/30 hover:bg-accent hover:text-primary active:scale-[0.96] active:border-primary/40 active:bg-accent active:text-primary", pendingMonth === todayMonth && "border-primary/40 bg-accent text-primary")} onClick={() => onMonthChange(todayMonth)} type="button">היום</button> : null}
       </div>
       <MonthNavButton active={pendingMonth === shiftMonth(month, 1)} ariaLabel="חודש הבא" onClick={() => onMonthChange(shiftMonth(month, 1))}><ChevronLeft className="size-4" /></MonthNavButton>
     </div>
@@ -161,7 +161,7 @@ function Month({ data, month, onMonthChange, pendingMonth }: { data: ScheduleDat
 }
 
 function MonthNavButton({ active, ariaLabel, children, onClick }: { active: boolean; ariaLabel: string; children: React.ReactNode; onClick: () => void }) {
-  return <button aria-label={ariaLabel} className={cn("flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96] active:border-primary/40 active:bg-accent active:text-primary", active && "border-primary/40 bg-accent text-primary")} onClick={onClick} type="button">{children}</button>;
+  return <button aria-label={ariaLabel} className={cn("flex size-10 items-center justify-center rounded-md border bg-card text-muted-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)] transition-[background-color,border-color,color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/30 hover:bg-accent hover:text-primary active:translate-y-0 active:scale-[0.96] active:border-primary/40 active:bg-accent active:text-primary", active && "border-primary/40 bg-accent text-primary")} onClick={onClick} type="button">{children}</button>;
 }
 
 function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; inMonth: boolean; onPreview: () => void }) {
@@ -188,7 +188,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
     attendanceIssue ? { className: "bg-destructive", label: "פער נוכחות" } : null,
   ].filter(Boolean) as { className: string; label: string }[];
 
-  return <Link aria-haspopup="dialog" className={cn("group relative min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", commanderDay && "border-pink-500 bg-pink-200/95 text-pink-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35", riskyLeaveDate && "ring-2 ring-inset ring-red-500/75")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
+  return <Link aria-haspopup="dialog" className={cn("group relative min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", commanderDay && "border-pink-500 bg-pink-200/95 text-pink-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35", riskyLeaveDate && "ring-2 ring-inset ring-red-500/75")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
     event.preventDefault();
     onPreview();
   }}>
@@ -237,7 +237,7 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
           {leaveItems.length ? <div className="space-y-1.5">{leaveItems.map((item) => <PreviewLine className={riskyLeaveDate && isCountedLeaveRequestStatus(item.status) ? "border border-red-200 bg-red-50 text-red-900" : undefined} key={`${item.id}-${item.status}`} meta={riskyLeaveDate && isCountedLeaveRequestStatus(item.status) ? "יום אדום" : leaveStatusLabel(item.status)} text={peopleById.get(item.personId) ?? "איש צוות"} />)}</div> : <p className="text-muted-foreground">אין בקשות יציאה ביום הזה.</p>}
         </PreviewSection>
       </div>
-      <Link className="mt-4 flex h-10 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold !text-white" href={detailHref}>פתיחת פירוט מלא</Link>
+      <Link className="mt-4 flex h-10 items-center justify-center rounded-md bg-primary px-3 text-sm font-semibold !text-white transition-transform active:scale-[0.98]" href={detailHref}>פתיחת פירוט מלא</Link>
     </aside>
   </>;
 }

@@ -79,7 +79,7 @@ export function TeamNav({
                     if (!active) setPendingHref(href);
                   }}
                   className={cn(
-                    "relative flex h-[58px] flex-1 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
+                    "relative flex h-[58px] flex-1 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-medium text-muted-foreground outline-none transition-[background-color,color,transform] active:scale-[0.96] hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
                     active && "bg-accent font-semibold text-primary",
                     pending && "text-primary",
                   )}
@@ -118,7 +118,7 @@ export function TeamNav({
               if (!pathname.startsWith(`${base}/leave`)) setPendingHref(`${base}/leave`);
             }}
             className={cn(
-              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-[background-color,color,transform] active:scale-[0.98] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               pathname.startsWith(`${base}/leave`) && "bg-accent text-primary",
               effectivePendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) && "text-primary",
             )}
@@ -133,7 +133,7 @@ export function TeamNav({
               if (!pathname.startsWith(`${base}/settings`)) setPendingHref(`${base}/settings`);
             }}
             className={cn(
-              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-[background-color,color,transform] active:scale-[0.98] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               pathname.startsWith(`${base}/settings`) && "bg-accent text-primary",
               effectivePendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) && "text-primary",
             )}
@@ -148,7 +148,7 @@ export function TeamNav({
               if (!pathname.startsWith(`${base}/users`)) setPendingHref(`${base}/users`);
             }}
             className={cn(
-              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-[background-color,color,transform] active:scale-[0.98] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
               pathname.startsWith(`${base}/users`) && "bg-accent text-primary",
               effectivePendingHref === `${base}/users` && !pathname.startsWith(`${base}/users`) && "text-primary",
             )}
@@ -191,7 +191,7 @@ function DesktopNavItem({
         if (!active) setPendingHref(href);
       }}
       className={cn(
-        "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
+        "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-[background-color,color,transform] active:scale-[0.98] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
         active && "bg-accent text-primary",
         showingPending && "text-primary",
       )}

@@ -17,7 +17,7 @@ export function AppShell({
   profile: ShellPersonProfile | null;
 }) {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-[100dvh] bg-background">
       <InitialProfileWelcome profile={profile} />
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-60 flex-col border-l bg-card lg:flex">
         <div className="px-4 py-4">
@@ -48,7 +48,7 @@ export function AppShell({
           <form action="/logout" method="post">
             <button
               type="submit"
-              className="flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-sm text-muted-foreground transition-[background-color,color,transform] active:scale-[0.98] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
             >
               <LogOut className="size-4" />
               יציאה
@@ -56,7 +56,7 @@ export function AppShell({
           </form>
         </div>
       </aside>
-      <header className="sticky top-0 z-30 border-b bg-card/95 px-3 py-2 backdrop-blur-md lg:hidden">
+      <header className="sticky top-0 z-30 border-b bg-card/95 px-3 pb-2 pt-[calc(0.5rem+env(safe-area-inset-top,0px))] backdrop-blur-md lg:hidden">
         <div className="mx-auto flex max-w-[720px] items-center gap-2">
           <Link href={`/${membership.team.slug}`} className="flex min-w-0 flex-1 items-center gap-2" aria-label="KAV - בית">
             <KavMark />
@@ -69,7 +69,7 @@ export function AppShell({
           <form action="/logout" method="post">
             <button
               type="submit"
-              className="flex size-10 items-center justify-center rounded-md border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="flex size-10 items-center justify-center rounded-md border bg-background text-muted-foreground transition-[background-color,color,transform] active:scale-[0.96] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
               aria-label="יציאה מהחשבון"
             >
               <LogOut className="size-4" />
@@ -78,7 +78,7 @@ export function AppShell({
         </div>
       </header>
       <div className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:mr-60 lg:pb-0">
-        <div className="min-h-screen lg:mx-auto lg:max-w-[1180px]">{children}</div>
+        <div className="min-h-[100dvh] lg:mx-auto lg:max-w-[1180px]">{children}</div>
       </div>
       <TeamNav
         role={membership.role}
