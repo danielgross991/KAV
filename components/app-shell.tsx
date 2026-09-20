@@ -17,7 +17,7 @@ export function AppShell({
   profile: ShellPersonProfile | null;
 }) {
   return (
-    <div className="min-h-[100dvh] bg-background">
+    <div className="min-h-[100dvh] max-w-full overflow-x-clip bg-background">
       <InitialProfileWelcome profile={profile} />
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-60 flex-col border-l bg-card lg:flex">
         <div className="px-4 py-4">
@@ -77,8 +77,8 @@ export function AppShell({
           </form>
         </div>
       </header>
-      <div className="pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:mr-60 lg:pb-0">
-        <div className="min-h-[100dvh] lg:mx-auto lg:max-w-[1180px]">{children}</div>
+      <div className="max-w-full overflow-x-clip pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:mr-60 lg:pb-0">
+        <div className="min-h-[100dvh] min-w-0 max-w-full overflow-x-clip lg:mx-auto lg:max-w-[1180px]">{children}</div>
       </div>
       <TeamNav
         role={membership.role}

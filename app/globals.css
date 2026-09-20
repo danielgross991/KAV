@@ -64,20 +64,33 @@
   --special-soft: #f4f0ff;
 }
 
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
 * {
   border-color: var(--border);
 }
 
 html {
   background: var(--background);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
 }
 
 body {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
+  overflow-x: hidden;
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
@@ -145,7 +158,8 @@ summary::-webkit-details-marker {
 .kav-page {
   margin-inline: auto;
   width: 100%;
-  max-width: 1120px;
+  max-width: min(1120px, 100%);
+  overflow-x: clip;
   padding: 1rem;
 }
 
