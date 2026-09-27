@@ -5,7 +5,7 @@ import type { Database } from "@/lib/database.types";
 import { getCurrentDailyQuote, type CurrentDailyQuote } from "@/lib/kav/daily-quotes";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { getLineInactivePersonIds } from "@/lib/kav/line-participation";
-import { getAttendanceEntriesByDate, getLeaveRequestDayCounts, getOperationalDay } from "@/lib/kav/operations";
+import { getAttendanceEntriesByDate, getLeaveRequestDayCounts, getLeaveRequestMarkers, getOperationalDay } from "@/lib/kav/operations";
 import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
 import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
 import { getNextPersonalTask } from "@/lib/kav/tasks";
@@ -47,6 +47,14 @@ export type DashboardData = {
     personId: string;
     photoUrl: string | null;
     requestDays: number;
+  }>;
+  todayLeaveRequests: Array<{
+    endsOn: string;
+    fullName: string;
+    personId: string;
+    photoUrl: string | null;
+    startsOn: string;
+    status: string;
   }>;
   attendanceStats: PersonAttendanceStats[];
   issues: string[];
@@ -191,12 +199,14 @@ export const getDashboardData = cache(async function getDashboardData(
     teamStats,
     upcomingEventResult,
     leaveRequestDayCounts,
+    todayLeaveMarkers,
   ] = await Promise.all([
     getOperationalDay(supabase, team, today, selectedPeriod?.id),
     userId ? getNextPersonalTask(supabase, team, userId, selectedPeriod?.id) : Promise.resolve(null),
     getTeamStats(supabase, team, today, selectedPeriod?.id),
     upcomingEventQuery.maybeSingle(),
     selectedPeriod ? getLeaveRequestDayCounts(supabase, team.id, selectedPeriod.id) : Promise.resolve([]),
+    selectedPeriod ? getLeaveRequestMarkers(supabase, team.id, selectedPeriod.id, today, today) : Promise.resolve([]),
   ]);
   assertOk(upcomingEventResult.error, "upcoming event");
   const currentPeriod = selectedPeriod ?? operationalDay.period;
@@ -331,6 +341,20 @@ export const getDashboardData = cache(async function getDashboardData(
       .filter((item): item is NonNullable<typeof item> => item !== null)
       .sort((a, b) => b.requestDays - a.requestDays || a.fullName.localeCompare(b.fullName, "he"))
       .slice(0, 3),
+    todayLeaveRequests: todayLeaveMarkers
+      .map((item) => {
+        const person = peopleById.get(item.personId);
+        return person ? {
+          endsOn: item.endsOn,
+          fullName: person.full_name,
+          personId: person.id,
+          photoUrl: person.photo_url,
+          startsOn: item.startsOn,
+          status: item.status,
+        } : null;
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "he")),
     attendanceStats: teamStats.stats,
     issues,
     nextTask,

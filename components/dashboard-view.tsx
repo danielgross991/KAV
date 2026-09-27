@@ -65,8 +65,14 @@ function ManagerDashboard({
         }
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
-      <PersonalEquipmentCard data={data} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.8fr] lg:items-start">
+        <HomeLeaderboard data={data} />
+        <div className="space-y-4">
+          <TodayLeaveRequests data={data} />
+          <LeaveRequestLeaderboard data={data} />
+        </div>
+      </div>
 
       <section className="mt-4 overflow-hidden rounded-lg bg-primary !text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
         <div className="flex items-center justify-between gap-3 px-4 pt-3.5">
@@ -146,13 +152,12 @@ function ManagerDashboard({
           </Card>
 
           <NextTask data={data} />
+          <PersonalEquipmentCard data={data} />
         </div>
 
         <div className="space-y-4">
           <CurrentPeriod data={data} />
           <UpcomingEvent data={data} />
-          <HomeLeaderboard data={data} />
-          <LeaveRequestLeaderboard data={data} />
           <AttendanceByPerson data={data} />
           <QualificationReadiness data={data} />
         </div>
@@ -185,6 +190,9 @@ function ViewerDashboard({
 
       <div className="mt-4">
         <HomeLeaderboard data={data} />
+      </div>
+      <div className="mt-4">
+        <TodayLeaveRequests data={data} />
       </div>
       <div className="mt-4">
         <LeaveRequestLeaderboard data={data} />
@@ -354,14 +362,20 @@ function HomeLeaderboard({ data }: { data: DashboardData }) {
             האחוז הוא אחוז ימי הבית מתוך הימים המדווחים של הלוחם בקו.
           </p>
         ) : null}
-        {data.canManage ? <HomeLeaderboardFullStats stats={data.attendanceStats} /> : null}
+        <HomeLeaderboardFullStats currentPersonId={data.viewerProfile?.personId ?? null} stats={data.attendanceStats} />
         {data.specialPeople.length ? <SpecialPeople people={data.specialPeople} /> : null}
       </CardContent>
     </Card>
   );
 }
 
-function HomeLeaderboardFullStats({ stats }: { stats: DashboardData["attendanceStats"] }) {
+function HomeLeaderboardFullStats({
+  currentPersonId,
+  stats,
+}: {
+  currentPersonId: string | null;
+  stats: DashboardData["attendanceStats"];
+}) {
   const sorted = [...stats].sort((a, b) =>
     b.homeDays - a.homeDays ||
     b.homePercentage - a.homePercentage ||
@@ -371,12 +385,12 @@ function HomeLeaderboardFullStats({ stats }: { stats: DashboardData["attendanceS
   if (!sorted.length) return null;
 
   return (
-    <section className="mt-4 border-t pt-4">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold">אחוזי כל הצוות</h3>
+    <details className="mt-4 border-t pt-4">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md border bg-background px-3 py-2 text-sm font-semibold transition-colors hover:bg-muted/50 active:bg-muted [&::-webkit-details-marker]:hidden">
+        <span>פתיחת כל הצוות</span>
         <Badge variant="outline">{sorted.length}</Badge>
-      </div>
-      <div className="overflow-hidden rounded-lg border">
+      </summary>
+      <div className="mt-3 overflow-hidden rounded-lg border">
         <div className="max-h-72 overflow-auto">
           <table className="w-full min-w-[28rem] text-sm">
             <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground">
@@ -389,11 +403,18 @@ function HomeLeaderboardFullStats({ stats }: { stats: DashboardData["attendanceS
             </thead>
             <tbody className="divide-y">
               {sorted.map((item) => (
-                <tr key={item.personId} className="bg-card">
+                <tr
+                  key={item.personId}
+                  className={cn(
+                    "bg-card",
+                    item.personId === currentPersonId && "bg-primary/10 outline outline-1 -outline-offset-1 outline-primary/25",
+                  )}
+                >
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
                       <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} />
                       <span className="min-w-0 truncate font-medium">{item.fullName}</span>
+                      {item.personId === currentPersonId ? <Badge variant="outline">אני</Badge> : null}
                     </div>
                   </td>
                   <td className="kav-num px-3 py-2 text-center font-semibold">{Math.round(item.homePercentage * 100)}%</td>
@@ -405,7 +426,7 @@ function HomeLeaderboardFullStats({ stats }: { stats: DashboardData["attendanceS
           </table>
         </div>
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -476,6 +497,44 @@ function LeaveRequestLeaderboard({ data }: { data: DashboardData }) {
             );
           })}
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function TodayLeaveRequests({ data }: { data: DashboardData }) {
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 pb-3">
+        <div>
+          <CardTitle>יציאות היום</CardTitle>
+          <p className="mt-1 text-xs text-muted-foreground">מי ביקש או יצא היום בקו הנוכחי</p>
+        </div>
+        <Badge variant={data.todayLeaveRequests.length ? "warning" : "outline"}>{data.todayLeaveRequests.length}</Badge>
+      </CardHeader>
+      <CardContent>
+        {data.todayLeaveRequests.length ? (
+          <div className="divide-y rounded-lg border">
+            {data.todayLeaveRequests.map((request) => (
+              <div className="flex items-center gap-3 p-2.5" key={`${request.personId}-${request.startsOn}-${request.endsOn}-${request.status}`}>
+                <PersonAvatar name={request.fullName} photoUrl={request.photoUrl} />
+                <span className="min-w-0 flex-1">
+                  <b className="block truncate text-sm">{request.fullName}</b>
+                  <span className="kav-num block text-xs text-muted-foreground">{rangeDate(request.startsOn, request.endsOn)}</span>
+                </span>
+                <Badge variant={leaveStatusVariant(request.status)}>{leaveStatusLabel(request.status)}</Badge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">אין בקשות יציאה על היום.</div>
+        )}
+        <Link
+          className="mt-3 flex h-9 items-center justify-center rounded-md border bg-card text-sm font-medium transition-colors hover:bg-muted"
+          href={`/${data.team.slug}/leave`}
+        >
+          פתיחת כל הבקשות
+        </Link>
       </CardContent>
     </Card>
   );
@@ -688,6 +747,10 @@ function shortDate(value: string) {
   return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
 }
 
+function rangeDate(start: string, end: string) {
+  return start === end ? shortDate(start) : `${shortDate(start)}–${shortDate(end)}`;
+}
+
 function formatDateTime(value: string, timeZone: string) {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeStyle: "short", timeZone }).format(new Date(value));
 }
@@ -701,4 +764,20 @@ function statusLabel(status: string) {
   if (status === "published") return "פורסמה";
   if (status === "draft") return "טיוטה";
   return status;
+}
+
+function leaveStatusLabel(status: string) {
+  if (status === "approved") return "מאושר";
+  if (status === "partially_approved") return "מאושר";
+  if (status === "pending") return "ממתין";
+  if (status === "rejected") return "נדחה";
+  if (status === "cancelled") return "בוטל";
+  return status;
+}
+
+function leaveStatusVariant(status: string): React.ComponentProps<typeof Badge>["variant"] {
+  if (status === "approved" || status === "partially_approved") return "success";
+  if (status === "pending") return "warning";
+  if (status === "rejected" || status === "cancelled") return "danger";
+  return "secondary";
 }

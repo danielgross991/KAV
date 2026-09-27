@@ -35,6 +35,15 @@ test("2026 Otniel seed includes a reported commanders day for the four requested
   assert.deepEqual(attendanceDay.present, ["דניאל גרוס", "לידור דורון", "אורי בנבג'י", "ניתאי ידעי"]);
 });
 
+test("2026 Otniel seed tracks Ariel Doyev as present from September 25 through 27", () => {
+  for (const date of ["2026-09-25", "2026-09-26", "2026-09-27"]) {
+    const attendanceDay = periodSeed.attendanceDays.find((day) => day.date === date);
+    assert.ok(attendanceDay, `missing attendance day ${date}`);
+    assert.equal(attendanceDay.status, "submitted");
+    assert.deepEqual(attendanceDay.present, ["אריאל דויב"]);
+  }
+});
+
 test("Rosh Hashanah home instruction is modeled as an event, not fake leave requests", () => {
   const roshHashanah = periodSeed.events.find((event) => event.title === "חוזרים הביתה לראש השנה");
   assert.ok(roshHashanah);
