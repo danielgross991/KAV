@@ -9,6 +9,7 @@ import { eachCalendarDate } from "@/lib/kav/dates";
 import { getOperationalRange } from "@/lib/kav/operations";
 import { overlaps, validateLeaveRange } from "@/lib/kav/schedule-domain";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 const STATUSES = ["pending", "approved", "rejected", "cancelled"];
 export type ViewerLeaveRequestState = { error?: string };
@@ -90,6 +91,58 @@ export async function deleteLeaveAction(teamSlug: string, formData: FormData) {
     entityType: "leave_request",
     eventType: "leave.request_deleted",
     teamId: context.teamId,
+    title: "בקשת יציאה נמחקה",
+  });
+  refresh(teamSlug);
+  redirect(`/${teamSlug}/leave?deleted=1`);
+}
+
+export async function deleteViewerLeaveRequestAction(teamSlug: string, formData: FormData) {
+  const { supabase, userId } = await requireAuth();
+  const membership = await requireTeamAccess(supabase, userId, teamSlug);
+  const leaveId = required(formData, "id");
+  const { data: person, error: personError } = await supabase
+    .from("people")
+    .select("id")
+    .eq("team_id", membership.team.id)
+    .eq("auth_user_id", userId)
+    .maybeSingle();
+  assertOk(personError);
+  if (!person) throw new Error("לא ניתן למחוק בקשה עבור המשתמש הנוכחי");
+
+  const { data: leave, error: leaveError } = await supabase
+    .from("leave_requests")
+    .select("id, starts_on, ends_on, status")
+    .eq("id", leaveId)
+    .eq("team_id", membership.team.id)
+    .eq("person_id", person.id)
+    .maybeSingle();
+  assertOk(leaveError);
+  if (!leave) throw new Error("בקשת היציאה לא נמצאה");
+  if (leave.status !== "pending") throw new Error("אפשר למחוק רק בקשה שעדיין ממתינה לאישור");
+
+  const admin = createAdminClient();
+  const { data: deleted, error } = await admin
+    .from("leave_requests")
+    .delete()
+    .eq("id", leave.id)
+    .eq("team_id", membership.team.id)
+    .eq("person_id", person.id)
+    .eq("status", "pending")
+    .select("id")
+    .maybeSingle();
+  assertOk(error);
+  if (!deleted) throw new Error("לא הצלחנו למחוק את הבקשה");
+
+  await logActivityEvent(supabase, {
+    actorPersonId: person.id,
+    actorUserId: userId,
+    details: `${leave.starts_on}–${leave.ends_on}`,
+    entityId: leave.id,
+    entityType: "leave_request",
+    eventType: "leave.request_deleted",
+    metadata: { personId: person.id, status: "pending" },
+    teamId: membership.team.id,
     title: "בקשת יציאה נמחקה",
   });
   refresh(teamSlug);

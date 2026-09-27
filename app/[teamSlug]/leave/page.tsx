@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ViewerLeaveRequestForm } from "@/components/viewer-leave-request-form";
-import { deleteLeaveAction, saveLeaveAction } from "@/app/[teamSlug]/leave/actions";
+import { deleteLeaveAction, deleteViewerLeaveRequestAction, saveLeaveAction } from "@/app/[teamSlug]/leave/actions";
 import { requireAuth } from "@/lib/kav/auth";
 import { getDateInTimeZone } from "@/lib/kav/dates";
 import { buildLeaveRiskDateSet, buildLeaveRiskDays, getLeaveRiskDates, type LeaveRiskInput } from "@/lib/kav/leave-risk";
@@ -88,7 +88,8 @@ export default async function LeavePage({ params, searchParams }: {
 
   return <AppPage className="max-w-6xl">
     <PageHeader eyebrow={membership.team.name} title="יציאות" subtitle="ניהול בקשות וטווחים מאושרים" action={<a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="יציאה חדשה"><Plus className="size-4" /></a>} />
-    {query.saved ? <SuccessNotice>היציאה נשמרה</SuccessNotice> : null}{query.deleted ? <SuccessNotice>היציאה נמחקה</SuccessNotice> : null}
+    {query.saved ? <SuccessNotice>היציאה נשמרה</SuccessNotice> : null}
+    {query.deleted ? <SuccessNotice>בקשת היציאה נמחקה</SuccessNotice> : null}
     <LeaveFilters
       period={query.period}
       people={selectablePeople}
@@ -169,7 +170,7 @@ function MyLeaveRequests({
   const periodOptions = selectedPeriodId
     ? [...visiblePeriods.filter((period) => period.id === selectedPeriodId), ...visiblePeriods.filter((period) => period.id !== selectedPeriodId)]
     : visiblePeriods;
-  const visibleLeaves = selectedPeriodId ? leaves.filter((leave) => leave.reserve_period_id === selectedPeriodId) : leaves;
+  const visibleLeaves = [...leaves].sort(byLeaveDate);
 
   return (
     <section className="mb-4 rounded-lg border bg-card p-4">
@@ -182,7 +183,7 @@ function MyLeaveRequests({
       </div>
       {visibleLeaves.length ? (
         <div className="mb-3 grid gap-2 md:grid-cols-2">
-          {visibleLeaves.slice(0, 4).map((leave) => {
+          {visibleLeaves.map((leave) => {
             const riskDates = getLeaveRiskDates(toLeaveRiskInput(leave), riskDateSet);
             return (
             <div className={cn("rounded-md border p-3", riskDates.length && "border-red-300 bg-red-50 text-red-950")} key={leave.id}>
@@ -198,6 +199,8 @@ function MyLeaveRequests({
               <p className="mt-1 text-xs text-muted-foreground">
                 {periods.find((period) => period.id === leave.reserve_period_id)?.name ?? "סבב מילואים"}
               </p>
+              <p className="mt-2 text-sm">{leave.reason || "לא נכתבה סיבה מפורטת"}</p>
+              {leave.status === "pending" ? <ViewerDeleteLeaveForm id={leave.id} teamSlug={teamSlug} /> : null}
             </div>
             );
           })}
@@ -223,7 +226,7 @@ function ViewerLeavePage({
   currentPerson: { full_name: string; id: string } | null;
   leaves: LeaveRow[];
   periods: PeriodRow[];
-  query: { saved?: string; view?: string };
+  query: { deleted?: string; saved?: string; view?: string };
   riskDateSet: Set<string>;
   selectedPeriodId: string | null;
   teamName: string;
@@ -233,7 +236,7 @@ function ViewerLeavePage({
   const visiblePeriodOptions = selectedPeriodId
     ? [...visiblePeriods.filter((period) => period.id === selectedPeriodId), ...visiblePeriods.filter((period) => period.id !== selectedPeriodId)]
     : visiblePeriods;
-  const visibleLeaves = selectedPeriodId ? leaves.filter((leave) => leave.reserve_period_id === selectedPeriodId) : leaves;
+  const visibleLeaves = [...leaves].sort(byLeaveDate);
   return (
     <AppPage className="max-w-[920px]">
       <PageHeader
@@ -242,7 +245,12 @@ function ViewerLeavePage({
         subtitle={currentPerson ? currentPerson.full_name : "לא נמצא איש צוות מקושר למשתמש"}
         action={currentPerson ? <a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="בקשה חדשה"><Plus className="size-4" /></a> : null}
       />
-      {query.saved ? <SuccessNotice>הבקשה נשלחה</SuccessNotice> : null}
+      {query.saved ? (
+        <SuccessNotice>
+          הבקשה נשלחה. שים לב, זה שהגשת בקשת יציאה לא אומר שתצא, אנא ודא את המפקדים על מנת שנוכל להיערך בהתאם.
+        </SuccessNotice>
+      ) : null}
+      {query.deleted ? <SuccessNotice>בקשת היציאה נמחקה</SuccessNotice> : null}
       {!currentPerson ? (
         <EmptyState icon={<CalendarOff className="size-4" />} title="אין איש צוות מקושר למשתמש שלך" description="אדמין יכול לקשר אותך דרך ניהול משתמשים." />
       ) : (
@@ -251,8 +259,8 @@ function ViewerLeavePage({
             {visibleLeaves.map((leave) => {
               const riskDates = getLeaveRiskDates(toLeaveRiskInput(leave), riskDateSet);
               return (
-              <div className={cn("grid gap-2 p-3.5 sm:grid-cols-[1fr_auto] sm:items-center", riskDates.length && "bg-red-50 text-red-950")} key={leave.id}>
-                <div>
+              <div className={cn("grid gap-3 p-3.5 sm:grid-cols-[1fr_auto] sm:items-start", riskDates.length && "bg-red-50 text-red-950")} key={leave.id}>
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
                     {riskDates.length ? <RiskyLeaveBadge dates={riskDates} /> : null}
@@ -260,7 +268,11 @@ function ViewerLeavePage({
                   <p className="mt-1 text-sm text-muted-foreground">
                     {periods.find((period) => period.id === leave.reserve_period_id)?.name ?? "סבב מילואים"}
                   </p>
-                  {leave.reason ? <p className="mt-2 text-sm">{leave.reason}</p> : null}
+                  <div className="mt-3 rounded-md bg-muted/50 p-3 text-sm">
+                    <p className="text-xs font-semibold text-muted-foreground">סיבה מפורטת</p>
+                    <p className="mt-1 whitespace-pre-wrap">{leave.reason || "לא נכתבה סיבה"}</p>
+                  </div>
+                  {leave.status === "pending" ? <ViewerDeleteLeaveForm id={leave.id} teamSlug={teamSlug} /> : null}
                 </div>
                 <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
                   {statusLabel(leave.status)}
@@ -316,6 +328,24 @@ function LeaveFilters({
       <div className="rounded-md bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">ממויין לפי תאריך</div>
       <Button className="self-end" size="sm"><Filter className="size-4" />סינון</Button>
     </form>
+  );
+}
+
+function ViewerDeleteLeaveForm({ id, teamSlug }: { id: string; teamSlug: string }) {
+  return (
+    <details className="mt-3 rounded-md border bg-background">
+      <summary className="cursor-pointer list-none px-3 py-2 text-sm font-semibold text-destructive hover:bg-muted/50 active:bg-muted">
+        מחיקת בקשה
+      </summary>
+      <form action={deleteViewerLeaveRequestAction.bind(null, teamSlug)} className="grid gap-3 border-t p-3 text-sm">
+        <input name="id" type="hidden" value={id} />
+        <p className="text-muted-foreground">האם אתה בטוח? מחיקה אפשרית רק לבקשה שעדיין ממתינה לאישור.</p>
+        <Button className="justify-self-start" size="sm" variant="destructive">
+          <Trash2 className="size-4" />
+          כן, למחוק
+        </Button>
+      </form>
+    </details>
   );
 }
 

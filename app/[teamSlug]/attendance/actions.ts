@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { logActivityEvent } from "@/lib/kav/activity";
 import { requireAuth } from "@/lib/kav/auth";
 import { addCalendarDays } from "@/lib/kav/dates";
 import { getOperationalDay } from "@/lib/kav/operations";
@@ -94,6 +95,7 @@ async function markAttendance(
         is_present: state === "present", source: "manual", updated_by: context.userId,
       }, { onConflict: "attendance_day_id,person_id" });
   assertOk(result.error);
+  if (state === "absent") await ensureAutomaticLeaveForAbsence(context, day, date, personId);
 }
 
 async function markAllPresent(context: Awaited<ReturnType<typeof managerContext>>, date: string) {
@@ -150,6 +152,65 @@ async function seedMissingAttendanceFromYesterday(
     .from("attendance_entries")
     .upsert(defaults, { onConflict: "attendance_day_id,person_id" });
   assertOk(error);
+
+  for (const row of defaults) {
+    if (!row.is_present) await ensureAutomaticLeaveForAbsence(context, day, date, row.person_id);
+  }
+}
+
+async function ensureAutomaticLeaveForAbsence(
+  context: Awaited<ReturnType<typeof managerContext>>,
+  day: Awaited<ReturnType<typeof getOperationalDay>>,
+  date: string,
+  personId: string,
+) {
+  if (!day.period) return;
+  const person = day.people.find((candidate) => candidate.id === personId);
+  if (!person || person.resolution.plannedState !== "base") return;
+
+  const { data: existing, error: existingError } = await context.supabase
+    .from("leave_requests")
+    .select("id")
+    .eq("team_id", context.team.id)
+    .eq("reserve_period_id", day.period.id)
+    .eq("person_id", personId)
+    .lte("starts_on", date)
+    .gte("ends_on", date)
+    .in("status", ["pending", "approved", "partially_approved"])
+    .limit(1);
+  assertOk(existingError);
+  if ((existing ?? []).length) return;
+
+  const { data: created, error } = await context.supabase
+    .from("leave_requests")
+    .insert({
+      approved_ends_on: date,
+      approved_starts_on: date,
+      created_by: context.userId,
+      decided_at: new Date().toISOString(),
+      decided_by: context.userId,
+      ends_on: date,
+      person_id: personId,
+      reason: "נוצר אוטומטית מדיווח נוכחות",
+      reserve_period_id: day.period.id,
+      starts_on: date,
+      status: "approved",
+      team_id: context.team.id,
+    })
+    .select("id")
+    .single();
+  assertOk(error);
+
+  await logActivityEvent(context.supabase, {
+    actorUserId: context.userId,
+    details: date,
+    entityId: created?.id,
+    entityType: "leave_request",
+    eventType: "leave.request_created",
+    metadata: { automatic: true, personId, status: "approved" },
+    teamId: context.team.id,
+    title: "בקשת יציאה נוצרה מדיווח נוכחות",
+  });
 }
 
 async function ensureDay(context: Awaited<ReturnType<typeof managerContext>>, periodId: string, date: string) {
