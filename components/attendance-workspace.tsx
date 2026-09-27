@@ -32,6 +32,8 @@ export function AttendanceWorkspace({
   const [message, setMessage] = useState<string | null>(null);
   const [savingPeople, setSavingPeople] = useState<Set<string>>(() => new Set());
   const [bulkPending, startBulkTransition] = useTransition();
+  const activePeople = useMemo(() => people.filter((person) => person.lineParticipation !== "special"), [people]);
+  const specialPeople = useMemo(() => people.filter((person) => person.lineParticipation === "special"), [people]);
   const summary = useMemo(() => attendanceSummary(people), [people]);
   const reportText = useMemo(() => attendanceReportText(people, date), [date, people]);
   const reportContacts = useMemo(() => people.filter((person) => person.phone), [people]);
@@ -70,7 +72,8 @@ export function AttendanceWorkspace({
   function markAllPresent() {
     const previous = people;
     setMessage(null);
-    setPeople((current) => current.map((person) => withAttendance(person, "present")));
+    setPeople((current) => current.map((person) =>
+      person.lineParticipation === "special" ? person : withAttendance(person, "present")));
     startBulkTransition(async () => {
       const result = await markExpectedPresentInlineAction(teamSlug, { date });
       if (!result.ok) {
@@ -96,10 +99,10 @@ export function AttendanceWorkspace({
     <>
       <section className="overflow-hidden rounded-lg bg-primary !text-white">
         <div className="grid grid-cols-4 divide-x divide-x-reverse divide-white/15">
-          <Metric label="צוות" value={summary.total} />
+          <Metric label="צוות" value={activePeople.length} />
           <Metric label="נוכחים" value={summary.present} />
           <Metric label="לא נוכחים" value={summary.absent} />
-          <Metric label="טרם דווחו" value={summary.unreported} />
+          <Metric label="מדורכים" value={specialPeople.length} />
         </div>
         <div className="flex flex-col gap-2 border-t border-white/15 p-3 sm:flex-row">
           <Button
@@ -137,28 +140,44 @@ export function AttendanceWorkspace({
         <Roster
           date={date}
           onChange={updatePerson}
-          people={people}
+          people={activePeople}
           savingPeople={savingPeople}
+          title="כל הצוות"
         />
+        {specialPeople.length ? (
+          <Roster
+            date={date}
+            description="אנשים שלא פעילים בקו באופן קבוע, אבל אפשר לדווח עליהם כשהם מגיעים."
+            onChange={updatePerson}
+            people={specialPeople}
+            savingPeople={savingPeople}
+            title="מדורכים / מיוחדים"
+          />
+        ) : null}
       </div>
     </>
   );
 }
 
 function Roster({
+  description,
   date,
   onChange,
   people,
   savingPeople,
+  title,
 }: {
+  description?: string;
   date: string;
   onChange: (personId: string, state: AttendanceState) => void;
   people: OperationalPerson[];
   savingPeople: Set<string>;
+  title: string;
 }) {
   return (
     <section>
-      <SectionHeader hint={`${people.length}`} title="כל הצוות" />
+      <SectionHeader hint={`${people.length}`} title={title} />
+      {description ? <p className="-mt-1 mb-2 text-sm leading-6 text-muted-foreground">{description}</p> : null}
       {people.length ? (
         <div className="overflow-hidden rounded-lg border bg-card">
           <div className="divide-y">

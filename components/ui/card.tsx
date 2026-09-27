@@ -6,7 +6,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "rounded-lg border bg-card text-card-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)]",
+        "min-w-0 w-full rounded-lg border bg-card text-card-foreground shadow-[0_1px_2px_rgba(20,22,26,0.04)]",
         className,
       )}
       {...props}
@@ -15,7 +15,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("grid gap-1 p-4", className)} {...props} />;
+  return <div className={cn("grid min-w-0 gap-1 p-4", className)} {...props} />;
 }
 
 function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
@@ -34,7 +34,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
-  return <div className={cn("p-4 pt-0", className)} {...props} />;
+  return <div className={cn("min-w-0 p-4 pt-0", className)} {...props} />;
 }
 
 export { Card, CardContent, CardDescription, CardHeader, CardTitle };

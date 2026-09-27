@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 
 import { logActivityEvent } from "@/lib/kav/activity";
 import { requireAuth } from "@/lib/kav/auth";
-import { getDateInTimeZone } from "@/lib/kav/dates";
+import { addCalendarDays, getDateInTimeZone } from "@/lib/kav/dates";
 import { getDailyQuoteIndex } from "@/lib/kav/daily-quotes";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
@@ -48,10 +48,13 @@ export async function submitDailyQuoteSuggestionAction(
     return { message: "רק איש צוות משויך יכול להציע משפט.", ok: false };
   }
 
+  const approvedAt = new Date().toISOString();
   const { data: quote, error } = await supabase.from("daily_quotes").insert({
+    approved_at: approvedAt,
+    approved_by: userId,
     is_active: true,
     source: "viewer",
-    status: "pending",
+    status: "approved",
     submitted_by: userId,
     submitted_person_id: person.id,
     team_id: membership.team.id,
@@ -64,16 +67,14 @@ export async function submitDailyQuoteSuggestionAction(
       return { message: "משהו השתבש בהגשה. נסה שוב עוד רגע.", ok: false };
     }
 
-    if (existing.status === "approved" && existing.is_active) {
-      return { message: "המשפט הזה כבר קיים ומאושר במערכת.", ok: true };
-    }
-
     const { error: updateError } = await supabase
       .from("daily_quotes")
       .update({
+        approved_at: approvedAt,
+        approved_by: userId,
         is_active: true,
         source: "viewer",
-        status: "pending",
+        status: "approved",
         submitted_by: userId,
         submitted_person_id: person.id,
         updated_at: new Date().toISOString(),
@@ -85,6 +86,7 @@ export async function submitDailyQuoteSuggestionAction(
       return { message: "משהו השתבש בהגשה. נסה שוב עוד רגע.", ok: false };
     }
 
+    await placeDailyQuoteForTomorrow(supabase, membership.team.id, existing.id, getDateInTimeZone(membership.team.timezone), userId);
     await logQuoteSuggestion(supabase, {
       personId: person.id,
       quoteId: existing.id,
@@ -96,9 +98,10 @@ export async function submitDailyQuoteSuggestionAction(
     revalidatePath(`/${teamSlug}`);
     revalidatePath(`/${teamSlug}/settings`);
     revalidatePath(`/${teamSlug}/notifications`);
-    return { message: "המשפט הועבר לאישור מנהל.", ok: true };
+    return { message: "המשפט אושר וייכנס לתור של מחר.", ok: true };
   }
 
+  await placeDailyQuoteForTomorrow(supabase, membership.team.id, quote.id, getDateInTimeZone(membership.team.timezone), userId);
   await logQuoteSuggestion(supabase, {
     personId: person.id,
     quoteId: quote.id,
@@ -110,7 +113,7 @@ export async function submitDailyQuoteSuggestionAction(
   revalidatePath(`/${teamSlug}`);
   revalidatePath(`/${teamSlug}/settings`);
   revalidatePath(`/${teamSlug}/notifications`);
-  return { message: "המשפט הועבר לאישור מנהל.", ok: true };
+  return { message: "המשפט אושר וייכנס לתור של מחר.", ok: true };
 }
 
 async function findExistingQuote(
@@ -126,6 +129,44 @@ async function findExistingQuote(
     .maybeSingle();
 
   return data;
+}
+
+async function placeDailyQuoteForTomorrow(
+  supabase: Awaited<ReturnType<typeof requireAuth>>["supabase"],
+  teamId: string,
+  quoteId: string,
+  today: string,
+  userId: string,
+) {
+  const { data: activeQuotes, error } = await supabase
+    .from("daily_quotes")
+    .select("id")
+    .eq("team_id", teamId)
+    .eq("status", "approved")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`לא ניתן לסדר משפטים: ${error.message}`);
+
+  const ids = [...new Set([...(activeQuotes ?? []).map((item) => item.id), quoteId])];
+  const tomorrow = addCalendarDays(today, 1);
+  const targetIndex = getDailyQuoteIndex(tomorrow, ids.length);
+  const reordered = ids.filter((id) => id !== quoteId);
+  reordered.splice(targetIndex, 0, quoteId);
+
+  for (const [index, id] of reordered.entries()) {
+    const { error: updateError } = await supabase
+      .from("daily_quotes")
+      .update({
+        ...(id === quoteId ? { approved_at: new Date().toISOString(), approved_by: userId } : {}),
+        is_active: true,
+        sort_order: index,
+        status: "approved" as const,
+      })
+      .eq("team_id", teamId)
+      .eq("id", id);
+    if (updateError) throw new Error(`לא ניתן לקבוע משפט למחר: ${updateError.message}`);
+  }
 }
 
 async function logQuoteSuggestion(

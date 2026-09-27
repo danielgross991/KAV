@@ -17,6 +17,7 @@ type Client = SupabaseClient<Database>;
 type Row<Name extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][Name]["Row"];
 
 export type OperationalPerson = Pick<Row<"people">, "full_name" | "id" | "is_active" | "phone"> & {
+  lineParticipation: "active" | "special";
   personal_number: string | null;
   resolution: ReturnType<typeof resolveOperationalPerson> & {
     attendanceSource?: "yesterday";
@@ -249,6 +250,7 @@ export const getOperationalDay = cache(async function getOperationalDay(
   date = getDateInTimeZone(team.timezone),
   explicitPeriodId?: string,
   includeContactDetails = false,
+  includeLineSpecialPeople = false,
 ): Promise<OperationalDay> {
   const [{ data: periods, error: periodsError }, { data: people, error: peopleError }] = await Promise.all([
     supabase.from("reserve_periods").select("*").eq("team_id", team.id),
@@ -288,7 +290,7 @@ export const getOperationalDay = cache(async function getOperationalDay(
   assertOk(membersResult.error, "rotation memberships");
 
   const inactivePersonIds = await getLineInactivePersonIds(supabase, team.id, period.id);
-  const linePeople = filterLineActivePeople(people ?? [], inactivePersonIds);
+  const linePeople = includeLineSpecialPeople ? (people ?? []) : filterLineActivePeople(people ?? [], inactivePersonIds);
   const memberships = (membersResult.data ?? [])
     .filter((item) => !inactivePersonIds.has(item.person_id))
     .map((item) => ({
@@ -308,6 +310,7 @@ export const getOperationalDay = cache(async function getOperationalDay(
   const privateDetailsByPersonId = new Map((privateDetailsResult.data ?? []).map((item) => [item.person_id, item]));
   const resolvedPeople = linePeople.map((person) => ({
     ...person,
+    lineParticipation: inactivePersonIds.has(person.id) ? "special" as const : "active" as const,
     phone: contactDetailsByPersonId.get(person.id)?.phone ?? null,
     personal_number: privateDetailsByPersonId.get(person.id)?.personal_number ?? null,
     resolution: resolveOperationalPerson({

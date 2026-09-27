@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export function AppPage({ children, className, ...props }: React.ComponentProps<"main">) {
   return (
-    <main className={cn("kav-page", className)} {...props}>
+    <main className={cn("kav-page min-w-0", className)} {...props}>
       {children}
     </main>
   );
@@ -24,7 +24,7 @@ export function PageHeader({
   title: React.ReactNode;
 }) {
   return (
-    <header className="kav-page-header">
+    <header className="kav-page-header min-w-0">
       <div className="flex min-w-0 items-start gap-3">
         <div className="min-w-0 flex-1">
           {eyebrow ? <div className="mb-1.5 text-xs font-medium text-muted-foreground">{eyebrow}</div> : null}

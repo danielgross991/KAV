@@ -21,8 +21,8 @@ export default async function AttendancePage({ params, searchParams }: {
   const today = getDateInTimeZone(membership.team.timezone);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(query.date ?? "") ? query.date! : today;
   const [rawDay, previousDay] = await Promise.all([
-    getOperationalDay(supabase, membership.team, date, undefined, true),
-    getOperationalDay(supabase, membership.team, addCalendarDays(date, -1)),
+    getOperationalDay(supabase, membership.team, date, undefined, true, true),
+    getOperationalDay(supabase, membership.team, addCalendarDays(date, -1), undefined, false, true),
   ]);
   const day = applyYesterdayAttendanceDefaults(rawDay, previousDay);
 

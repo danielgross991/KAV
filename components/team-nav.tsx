@@ -17,6 +17,7 @@ const managerItems = [
   { href: "/attendance", label: "נוכחות", icon: UserCheck },
   { href: "/team", label: "צוות", icon: UsersRound },
   { href: "/notifications", label: "עדכונים", icon: Bell },
+  { href: "/settings", label: "הגדרות", icon: Settings },
 ];
 
 const viewerItems = [
@@ -63,7 +64,7 @@ export function TeamNav({
       <>
         {showRouteLoading ? <KavLoading label="טוען מסך" /> : null}
         <nav className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 backdrop-blur-md lg:hidden" aria-label="ניווט ראשי">
-          <div className="mx-auto flex max-w-md items-stretch px-1">
+          <div className="mx-auto flex max-w-lg items-stretch px-1">
             {items.map((item) => {
               const href = `${base}${item.href}`;
               const active = item.href === "" ? pathname === href : pathname.startsWith(href);
@@ -79,14 +80,14 @@ export function TeamNav({
                     if (!active) setPendingHref(href);
                   }}
                   className={cn(
-                    "relative flex h-[58px] flex-1 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-medium text-muted-foreground outline-none transition-[background-color,color,transform] active:scale-[0.96] hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
+                    "relative flex h-[58px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md px-0.5 text-[10px] font-medium text-muted-foreground outline-none transition-[background-color,color,transform] active:scale-[0.96] hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 min-[390px]:text-[11px]",
                     active && "bg-accent font-semibold text-primary",
                     pending && "text-primary",
                   )}
                 >
                   <span className={cn("absolute top-0 h-0.5 w-8 rounded-full bg-primary transition-opacity", active || pending ? "opacity-100" : "opacity-0")} />
                   {pending ? <KavMark className="size-[19px] rounded-[0.3rem]" loading /> : <Icon className="size-[19px]" strokeWidth={active ? 2.2 : 1.8} />}
-                  {item.label}
+                  <span className="max-w-full truncate">{item.label}</span>
                 </Link>
               );
             })}
@@ -126,21 +127,6 @@ export function TeamNav({
             <ActiveRail active={pathname.startsWith(`${base}/leave`) || effectivePendingHref === `${base}/leave`} />
             {effectivePendingHref === `${base}/leave` && !pathname.startsWith(`${base}/leave`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <CalendarOff className="size-4" />}
             יציאות
-          </Link><Link
-            href={`${base}/settings`}
-            aria-current={pathname.startsWith(`${base}/settings`) ? "page" : undefined}
-            onClick={() => {
-              if (!pathname.startsWith(`${base}/settings`)) setPendingHref(`${base}/settings`);
-            }}
-            className={cn(
-              "relative flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-muted-foreground transition-[background-color,color,transform] active:scale-[0.98] hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40",
-              pathname.startsWith(`${base}/settings`) && "bg-accent text-primary",
-              effectivePendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) && "text-primary",
-            )}
-          >
-            <ActiveRail active={pathname.startsWith(`${base}/settings`) || effectivePendingHref === `${base}/settings`} />
-            {effectivePendingHref === `${base}/settings` && !pathname.startsWith(`${base}/settings`) ? <KavMark className="size-4 rounded-[0.25rem]" loading /> : <Settings className="size-4" />}
-            הגדרות
           </Link>{role === "admin" ? <Link
             href={`${base}/users`}
             aria-current={pathname.startsWith(`${base}/users`) ? "page" : undefined}

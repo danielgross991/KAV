@@ -83,7 +83,7 @@ async function markAttendance(
   personId: string,
   state: AttendanceState,
 ) {
-  const day = await getOperationalDay(context.supabase, context.team, date);
+  const day = await getOperationalDay(context.supabase, context.team, date, undefined, false, true);
   if (!day.period || !day.people.some((person) => person.id === personId)) throw new Error("איש הצוות או היום אינם תקינים");
   const attendanceDayId = await ensureDay(context, day.period.id, date);
   const result = state === "unreported"
@@ -97,11 +97,12 @@ async function markAttendance(
 }
 
 async function markAllPresent(context: Awaited<ReturnType<typeof managerContext>>, date: string) {
-  const day = await getOperationalDay(context.supabase, context.team, date);
+  const day = await getOperationalDay(context.supabase, context.team, date, undefined, false, true);
   if (!day.period) throw new Error("אין תקופת מילואים פעילה ביום זה");
-  if (!day.people.length) return;
+  const activePeople = day.people.filter((person) => person.lineParticipation !== "special");
+  if (!activePeople.length) return;
   const attendanceDayId = await ensureDay(context, day.period.id, date);
-  const { error } = await context.supabase.from("attendance_entries").upsert(day.people.map((person) => ({
+  const { error } = await context.supabase.from("attendance_entries").upsert(activePeople.map((person) => ({
     team_id: context.team.id, attendance_day_id: attendanceDayId, person_id: person.id,
     is_present: true, source: "schedule_default", updated_by: context.userId,
   })), { onConflict: "attendance_day_id,person_id" });
@@ -109,7 +110,7 @@ async function markAllPresent(context: Awaited<ReturnType<typeof managerContext>
 }
 
 async function submitAttendance(context: Awaited<ReturnType<typeof managerContext>>, date: string) {
-  const day = await getOperationalDay(context.supabase, context.team, date);
+  const day = await getOperationalDay(context.supabase, context.team, date, undefined, false, true);
   if (!day.period) throw new Error("אין תקופת מילואים פעילה ביום זה");
   const attendanceDayId = await ensureDay(context, day.period.id, date);
   await seedMissingAttendanceFromYesterday(context, day, attendanceDayId, date);
@@ -128,7 +129,7 @@ async function seedMissingAttendanceFromYesterday(
   const missingPeople = day.people.filter((person) => person.resolution.attendance === "unreported");
   if (!missingPeople.length) return;
 
-  const previousDay = await getOperationalDay(context.supabase, context.team, addCalendarDays(date, -1));
+  const previousDay = await getOperationalDay(context.supabase, context.team, addCalendarDays(date, -1), undefined, false, true);
   const previousByPersonId = new Map(previousDay.people.map((person) => [person.id, person.resolution.attendance]));
   const defaults = missingPeople.flatMap((person) => {
     const previousAttendance = previousByPersonId.get(person.id);
