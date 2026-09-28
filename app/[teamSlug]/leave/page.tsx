@@ -66,28 +66,25 @@ export default async function LeavePage({ params, searchParams }: {
   const periodsById = new Map((periods ?? []).map((period) => [period.id, period]));
   const selectablePeople = (people ?? []).filter((person) => person.is_active);
   const selectedPersonId = query.person && peopleById.has(query.person) ? query.person : "all";
-  const view = ["all", "active", "upcoming", "history"].includes(query.view ?? "") ? query.view! : "all";
+  const view = ["future", "history"].includes(query.view ?? "") ? query.view! : "future";
   const periodFiltered = (leaves ?? [])
     .filter((leave) => selectedLinePeriodId ? leave.reserve_period_id === selectedLinePeriodId : true)
-    .filter((leave) => view === "all"
-      ? true
-      : view === "active"
-      ? leave.starts_on <= today && leave.ends_on >= today
-      : view === "upcoming" ? leave.starts_on > today : leave.ends_on < today);
+    .filter((leave) => view === "history" ? leave.ends_on < today : leave.ends_on >= today);
   const riskDays = buildRiskDays(periodFiltered, peopleById);
   const managerRiskDateSet = selectedRiskPeriod ? riskDateSet : new Set(riskDays.map((day) => day.date));
   const filtered = periodFiltered
     .filter((leave) => selectedPersonId === "all" ? true : leave.person_id === selectedPersonId)
-    .sort(byLeaveDate);
+    .sort(view === "history" ? byLeaveDateDesc : byLeaveDate);
   const managementLeaves = currentPerson
     ? filtered.filter((leave) => leave.person_id !== currentPerson.id)
     : filtered;
+  const managementLeavesByPerson = groupLeavesByPerson(managementLeaves, peopleById);
   const periodOptions = selectedLinePeriodId
     ? [...(periods ?? []).filter((period) => period.id === selectedLinePeriodId), ...(periods ?? []).filter((period) => period.id !== selectedLinePeriodId)]
     : periods ?? [];
 
   return <AppPage className="max-w-6xl">
-    <PageHeader eyebrow={membership.team.name} title="יציאות" subtitle="ניהול בקשות וטווחים מאושרים" action={<a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="יציאה חדשה"><Plus className="size-4" /></a>} />
+    <PageHeader eyebrow={membership.team.name} title="יציאות" subtitle="תיעוד בקשות יציאה ותיאום מול החיילים" action={<a className={buttonVariants({ size: "icon" })} href="#new-leave" aria-label="יציאה חדשה"><Plus className="size-4" /></a>} />
     {query.saved ? <SuccessNotice>היציאה נשמרה</SuccessNotice> : null}
     {query.deleted ? <SuccessNotice>בקשת היציאה נמחקה</SuccessNotice> : null}
     <LeaveFilters
@@ -106,37 +103,54 @@ export default async function LeavePage({ params, searchParams }: {
       selectedPeriodId={selectedLinePeriodId}
       teamSlug={teamSlug}
     />
-    <section className="divide-y overflow-hidden rounded-lg border bg-card">
-      {managementLeaves.map((leave) => {
-        const riskDates = getLeaveRiskDates(toLeaveRiskInput(leave, peopleById), managerRiskDateSet);
-        return <details key={leave.id}>
-        <summary className={cn("grid min-h-16 cursor-pointer gap-3 p-3.5 transition-colors hover:bg-muted/40 active:bg-muted sm:grid-cols-[8rem_1fr_auto] sm:items-center", riskDates.length && "bg-red-50 text-red-950")}>
-          <div className="kav-num rounded-md bg-muted px-2.5 py-2 text-center text-sm font-bold">{range(leave.starts_on, leave.ends_on)}</div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <b>{peopleById.get(leave.person_id)}</b>
-              <span className="text-xs text-muted-foreground">{periodsById.get(leave.reserve_period_id)?.name}</span>
-              {riskDates.length ? <RiskyLeaveBadge dates={riskDates} /> : null}
+    {view === "history" ? (
+      <section className="divide-y overflow-hidden rounded-lg border bg-card">
+        {managementLeaves.map((leave) => (
+          <ManagerLeaveRequest
+            key={leave.id}
+            leave={leave}
+            managerRiskDateSet={managerRiskDateSet}
+            people={people ?? []}
+            peopleById={peopleById}
+            periodOptions={periodOptions}
+            periodsById={periodsById}
+            selectedLinePeriodId={selectedLinePeriodId}
+            teamSlug={teamSlug}
+          />
+        ))}
+        {!managementLeaves.length ? <div className="grid min-h-52 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין בקשות יציאה שהיו כבר</p></div></div> : null}
+      </section>
+    ) : (
+      <section className="grid gap-3">
+        {managementLeavesByPerson.map((group) => (
+          <section className="overflow-hidden rounded-lg border bg-card" key={group.personId}>
+            <div className="flex items-center justify-between gap-3 border-b bg-muted/25 px-3.5 py-3">
+              <div>
+                <h2 className="text-base font-semibold">{group.fullName}</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">בקשות עתידיות לתיאום</p>
+              </div>
+              <Badge variant="outline">{group.leaves.length}</Badge>
             </div>
-            <p className="mt-1 truncate text-sm text-muted-foreground">{leave.reason || "ללא סיבה"}</p>
-          </div>
-          <Badge variant={statusVariant(leave.status)}>{statusLabel(leave.status)}</Badge>
-        </summary>
-        <form action={saveLeaveAction.bind(null, teamSlug)} className="grid gap-3 border-t bg-muted/30 p-3.5 md:grid-cols-4">
-          <input type="hidden" name="id" value={leave.id} />
-          <Select label="איש צוות" name="person_id" value={leave.person_id} options={(people ?? []).map((p) => [p.id, p.full_name])} />
-          <PeriodInput options={periodOptions} selectedPeriodId={selectedLinePeriodId} value={leave.reserve_period_id} />
-          <Field label="מתאריך" name="starts_on" type="date" defaultValue={leave.starts_on} required />
-          <Field label="עד תאריך" name="ends_on" type="date" defaultValue={leave.ends_on} required />
-          <Select label="אישור" name="status" value={statusFormValue(leave.status)} options={statusOptions} />
-          <Field label="סיבה" name="reason" defaultValue={leave.reason ?? ""} />
-          <Button className="self-end">שמירת שינויים</Button>
-        </form>
-        <form action={deleteLeaveAction.bind(null, teamSlug)} className="bg-muted/30 px-3.5 pb-3.5"><input type="hidden" name="id" value={leave.id} /><Button variant="ghost" size="sm"><Trash2 className="size-4" />מחיקה</Button></form>
-      </details>;
-      })}
-      {!managementLeaves.length ? <div className="grid min-h-52 place-items-center text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין בקשות יציאה להצגה</p></div></div> : null}
-    </section>
+            <div className="divide-y">
+              {group.leaves.map((leave) => (
+                <ManagerLeaveRequest
+                  key={leave.id}
+                  leave={leave}
+                  managerRiskDateSet={managerRiskDateSet}
+                  people={people ?? []}
+                  peopleById={peopleById}
+                  periodOptions={periodOptions}
+                  periodsById={periodsById}
+                  selectedLinePeriodId={selectedLinePeriodId}
+                  teamSlug={teamSlug}
+                />
+              ))}
+            </div>
+          </section>
+        ))}
+        {!managementLeavesByPerson.length ? <div className="grid min-h-52 place-items-center rounded-lg border bg-card text-center"><div><CalendarOff className="mx-auto size-8 text-muted-foreground" /><p className="mt-3 font-medium">אין בקשות עתידיות להצגה</p></div></div> : null}
+      </section>
+    )}
     <section className="mt-5 scroll-mt-24 rounded-lg border bg-card p-4" id="new-leave"><h2 className="text-base font-semibold">יציאה חדשה</h2>
       <form action={saveLeaveAction.bind(null, teamSlug)} className="mt-4 grid gap-3 md:grid-cols-4">
         <Select label="איש צוות" name="person_id" options={(people ?? []).filter((p) => p.is_active).map((p) => [p.id, p.full_name])} />
@@ -148,6 +162,58 @@ export default async function LeavePage({ params, searchParams }: {
       </form>
     </section>
   </AppPage>;
+}
+
+function ManagerLeaveRequest({
+  leave,
+  managerRiskDateSet,
+  people,
+  peopleById,
+  periodOptions,
+  periodsById,
+  selectedLinePeriodId,
+  teamSlug,
+}: {
+  leave: LeaveRow;
+  managerRiskDateSet: Set<string>;
+  people: { full_name: string; id: string }[];
+  peopleById: Map<string, string>;
+  periodOptions: PeriodRow[];
+  periodsById: Map<string, PeriodRow>;
+  selectedLinePeriodId: string | null;
+  teamSlug: string;
+}) {
+  const riskDates = getLeaveRiskDates(toLeaveRiskInput(leave, peopleById), managerRiskDateSet);
+
+  return (
+    <details>
+      <summary className={cn("grid min-h-16 cursor-pointer gap-3 p-3.5 transition-colors hover:bg-muted/40 active:bg-muted sm:grid-cols-[8rem_1fr] sm:items-center", riskDates.length && "bg-red-50 text-red-950")}>
+        <div className="kav-num rounded-md bg-muted px-2.5 py-2 text-center text-sm font-bold">{range(leave.starts_on, leave.ends_on)}</div>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <b>{peopleById.get(leave.person_id)}</b>
+            <span className="text-xs text-muted-foreground">{periodsById.get(leave.reserve_period_id)?.name}</span>
+            {riskDates.length ? <RiskyLeaveBadge dates={riskDates} /> : null}
+          </div>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{leave.reason || "ללא סיבה"}</p>
+        </div>
+      </summary>
+      <form action={saveLeaveAction.bind(null, teamSlug)} className="grid gap-3 border-t bg-muted/30 p-3.5 md:grid-cols-4">
+        <input type="hidden" name="id" value={leave.id} />
+        <input type="hidden" name="status" value={leave.status} />
+        <Select label="איש צוות" name="person_id" value={leave.person_id} options={people.map((person) => [person.id, person.full_name])} />
+        <PeriodInput options={periodOptions} selectedPeriodId={selectedLinePeriodId} value={leave.reserve_period_id} />
+        <Field label="מתאריך" name="starts_on" type="date" defaultValue={leave.starts_on} required />
+        <Field label="עד תאריך" name="ends_on" type="date" defaultValue={leave.ends_on} required />
+        <Field label="סיבה" name="reason" defaultValue={leave.reason ?? ""} />
+        <Button className="self-end">שמירת תיעוד</Button>
+      </form>
+      <form action={deleteLeaveAction.bind(null, teamSlug)} className="bg-muted/30 px-3.5 pb-3.5">
+        <input type="hidden" name="id" value={leave.id} />
+        <Button variant="ghost" size="sm"><Trash2 className="size-4" />מחיקה</Button>
+      </form>
+    </details>
+  );
 }
 
 function MyLeaveRequests({
@@ -189,11 +255,8 @@ function MyLeaveRequests({
             <div className={cn("rounded-md border p-3", riskDates.length && "border-red-300 bg-red-50 text-red-950")} key={leave.id}>
               <div className="flex items-center justify-between gap-2">
                 <b className="text-sm">{range(leave.starts_on, leave.ends_on)}</b>
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5">
                   {riskDates.length ? <RiskyLeaveBadge dates={riskDates} /> : null}
-                  <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
-                    {statusLabel(leave.status)}
-                  </Badge>
                 </div>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
@@ -274,9 +337,6 @@ function ViewerLeavePage({
                   </div>
                   {leave.status === "pending" ? <ViewerDeleteLeaveForm id={leave.id} teamSlug={teamSlug} /> : null}
                 </div>
-                <Badge variant={isApprovedStatus(leave.status) ? "success" : leave.status === "rejected" ? "danger" : "secondary"}>
-                  {statusLabel(leave.status)}
-                </Badge>
               </div>
               );
             })}
@@ -292,7 +352,6 @@ function ViewerLeavePage({
   );
 }
 
-const statusOptions = [["pending", "טרם הוחלט"], ["approved", "כן"], ["rejected", "לא"], ["cancelled", "בוטל"]];
 function LeaveFilters({
   people,
   period,
@@ -312,10 +371,8 @@ function LeaveFilters({
       <label className="grid min-w-44 flex-1 gap-1.5 text-xs font-medium text-muted-foreground">
         תצוגה
         <select className="h-10 rounded-md border bg-background px-2 text-sm" defaultValue={view} name="view">
-          <option value="all">כל הבקשות</option>
-          <option value="active">פעילות עכשיו</option>
-          <option value="upcoming">קרובות</option>
-          <option value="history">היסטוריה</option>
+          <option value="future">בקשות עתידיות</option>
+          <option value="history">בקשות שהיו</option>
         </select>
       </label>
       <label className="grid min-w-44 flex-1 gap-1.5 text-xs font-medium text-muted-foreground">
@@ -325,7 +382,9 @@ function LeaveFilters({
           {people.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}
         </select>
       </label>
-      <div className="rounded-md bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">ממויין לפי תאריך</div>
+      <div className="rounded-md bg-muted px-3 py-2 text-xs font-medium text-muted-foreground">
+        {view === "history" ? "לשונית עבר" : "מקובץ לפי אנשים"}
+      </div>
       <Button className="self-end" size="sm"><Filter className="size-4" />סינון</Button>
     </form>
   );
@@ -404,13 +463,25 @@ function PeriodInput({ options, selectedPeriodId, value }: { options: PeriodRow[
 function range(start: string, end: string) { return `${short(start)}–${short(end)}`; }
 function short(date: string) { return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
 function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
-function statusLabel(value: string) { return Object.fromEntries(statusOptions)[value] ?? value; }
-function statusFormValue(value: string) { return value === "partially_approved" ? "approved" : value; }
-function isApprovedStatus(value: string) { return value === "approved" || value === "partially_approved"; }
-function statusVariant(value: string): React.ComponentProps<typeof Badge>["variant"] {
-  return isApprovedStatus(value) ? "success" : value === "rejected" || value === "cancelled" ? "danger" : "secondary";
-}
 function byLeaveDate(a: LeaveRow, b: LeaveRow) { return a.starts_on.localeCompare(b.starts_on) || a.ends_on.localeCompare(b.ends_on); }
+function byLeaveDateDesc(a: LeaveRow, b: LeaveRow) { return b.starts_on.localeCompare(a.starts_on) || b.ends_on.localeCompare(a.ends_on); }
+function groupLeavesByPerson(leaves: LeaveRow[], peopleById: Map<string, string>) {
+  const grouped = new Map<string, { fullName: string; leaves: LeaveRow[]; personId: string }>();
+  for (const leave of leaves) {
+    const existing = grouped.get(leave.person_id);
+    if (existing) {
+      existing.leaves.push(leave);
+    } else {
+      grouped.set(leave.person_id, {
+        fullName: peopleById.get(leave.person_id) ?? "איש צוות",
+        leaves: [leave],
+        personId: leave.person_id,
+      });
+    }
+  }
+
+  return [...grouped.values()].sort((a, b) => a.fullName.localeCompare(b.fullName, "he"));
+}
 
 type LeaveRow = {
   approved_ends_on: string | null;
