@@ -6,14 +6,17 @@ import {
   Check,
   ClipboardList,
   Clock3,
+  Flag,
   Home,
   PackageCheck,
   PlaneTakeoff,
+  TrendingUp,
   UserCheck,
   UserRound,
   Users,
 } from "lucide-react";
 
+import { AnimatedLinePercent } from "@/components/animated-line-percent";
 import { AppPage, PageHeader, SectionHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -319,30 +322,51 @@ function LineProgressCard({ data }: { data: DashboardData }) {
   const progress = data.lineProgress;
   if (!progress) return null;
   const roundedPercent = Math.round(progress.percent);
+  const lineName = data.currentPeriod?.name ?? "הקו הנוכחי";
 
   return (
-    <Card className="mt-4 overflow-hidden">
-      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 pb-3">
-        <div>
-          <CardTitle>אחוז הקו</CardTitle>
-          <p className="kav-num mt-1 text-sm text-muted-foreground">
-            {shortDate(progress.startsOn)}–{shortDate(progress.endsOn)}
-          </p>
+    <section className="mt-4 overflow-hidden rounded-lg bg-primary !text-white shadow-[0_18px_44px_-24px_rgba(10,25,45,0.85)]">
+      <div className="relative p-4 sm:p-5">
+        <div className="absolute inset-x-0 top-0 h-px bg-white/20" aria-hidden />
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white/72">
+              <Flag className="size-4" />
+              <span>{lineName}</span>
+            </div>
+            <h2 className="kav-num mt-2 text-[2.15rem] font-black leading-none tracking-normal sm:text-5xl">
+              <AnimatedLinePercent value={roundedPercent} />
+            </h2>
+            <p className="mt-2 text-sm font-medium text-white/76">אחוז הקו שעבר עד היום</p>
+          </div>
+          <div className="shrink-0 rounded-lg border border-white/16 bg-white/[0.09] px-3 py-2 text-left shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+            <p className="text-[0.7rem] font-semibold text-white/62">משך הקו</p>
+            <p className="kav-num mt-1 text-sm font-bold text-white">
+              {shortDate(progress.startsOn)}–{shortDate(progress.endsOn)}
+            </p>
+          </div>
         </div>
-        <span className="kav-num text-3xl font-bold leading-none text-primary">{roundedPercent}%</span>
-      </CardHeader>
-      <CardContent>
-        <div className="h-3 overflow-hidden rounded-full bg-muted" aria-label={`הקו הושלם ב-${roundedPercent} אחוז`}>
+
+        <div className="mt-4">
           <div
-            className="kav-line-progress-fill h-full rounded-full bg-primary"
-            style={{ width: `${progress.percent}%` }}
-          />
+            className="h-4 overflow-hidden rounded-full bg-white/15 ring-1 ring-white/12"
+            aria-label={`הקו הושלם ב-${roundedPercent} אחוז`}
+          >
+            <div
+              className="kav-line-progress-fill h-full rounded-full bg-[linear-gradient(90deg,#5ee0a0,#6fd6ff)] shadow-[0_0_18px_rgba(111,214,255,0.45)]"
+              style={{ width: `${Math.max(2, progress.percent)}%` }}
+            />
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-3 text-xs font-medium text-white/72">
+            <span className="kav-num">{progress.elapsedDays} ימים עברו</span>
+            <span className="flex items-center gap-1.5">
+              <TrendingUp className="size-3.5" />
+              <span className="kav-num">מתוך {progress.totalDays}</span>
+            </span>
+          </div>
         </div>
-        <p className="kav-num mt-2 text-xs text-muted-foreground">
-          יום {progress.elapsedDays} מתוך {progress.totalDays}
-        </p>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 

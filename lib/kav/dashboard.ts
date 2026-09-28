@@ -437,7 +437,7 @@ function getLineProgress(
   today: string,
 ) {
   const startsOn = period.name.includes("עותניאל") ? "2026-09-09" : period.starts_on;
-  const endsOn = period.name.includes("עותניאל") ? "2027-02-16" : period.ends_on;
+  const endsOn = period.name.includes("עותניאל") ? "2026-12-16" : period.ends_on;
   const totalDays = eachCalendarDate(startsOn, endsOn).length;
   const elapsedDays = today < startsOn
     ? 0
