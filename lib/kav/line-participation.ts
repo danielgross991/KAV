@@ -41,6 +41,24 @@ export async function getLineInactivePersonIds(
   );
 }
 
+export async function getLineStatsStartDates(
+  supabase: Client,
+  teamId: string,
+  reservePeriodId: string,
+) {
+  const startsByPersonId = new Map<string, string>();
+  for (const status of await getLineParticipationStatuses(supabase, teamId, reservePeriodId)) {
+    const statsStart = parseStatsStartDate(status.notes);
+    if (statsStart) startsByPersonId.set(status.person_id, statsStart);
+  }
+  return startsByPersonId;
+}
+
+export function parseStatsStartDate(notes: string | null) {
+  const match = notes?.match(/\bstats_start:(\d{4}-\d{2}-\d{2})\b/);
+  return match?.[1] ?? null;
+}
+
 export function filterLineActivePeople<T extends { id: string }>(
   people: T[],
   inactivePersonIds: ReadonlySet<string>,

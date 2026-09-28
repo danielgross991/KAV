@@ -213,6 +213,11 @@ summary::-webkit-details-marker {
   transform-origin: top;
 }
 
+.kav-line-progress-fill {
+  animation: kav-line-progress-fill 1.15s cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: right center;
+}
+
 @keyframes kav-spin {
   to {
     transform: rotate(360deg);
@@ -252,6 +257,16 @@ summary::-webkit-details-marker {
   to {
     opacity: 1;
     transform: translateY(0) scaleY(1);
+  }
+}
+
+@keyframes kav-line-progress-fill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
   }
 }
 

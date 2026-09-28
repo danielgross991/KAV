@@ -3,7 +3,7 @@ import { cache } from "react";
 
 import type { Database } from "@/lib/database.types";
 import { getCurrentDailyQuote, type CurrentDailyQuote } from "@/lib/kav/daily-quotes";
-import { getDateInTimeZone } from "@/lib/kav/dates";
+import { eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
 import { getLineInactivePersonIds } from "@/lib/kav/line-participation";
 import { getAttendanceEntriesByDate, getLeaveRequestDayCounts, getLeaveRequestMarkers, getOperationalDay } from "@/lib/kav/operations";
 import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
@@ -48,6 +48,13 @@ export type DashboardData = {
     photoUrl: string | null;
     requestDays: number;
   }>;
+  lineProgress: {
+    elapsedDays: number;
+    endsOn: string;
+    percent: number;
+    startsOn: string;
+    totalDays: number;
+  } | null;
   todayLeaveRequests: Array<{
     endsOn: string;
     fullName: string;
@@ -341,6 +348,7 @@ export const getDashboardData = cache(async function getDashboardData(
       .filter((item): item is NonNullable<typeof item> => item !== null)
       .sort((a, b) => b.requestDays - a.requestDays || a.fullName.localeCompare(b.fullName, "he"))
       .slice(0, 3),
+    lineProgress: currentPeriod ? getLineProgress(currentPeriod, today) : null,
     todayLeaveRequests: todayLeaveMarkers
       .map((item) => {
         const person = peopleById.get(item.personId);
@@ -423,6 +431,26 @@ export const getDashboardData = cache(async function getDashboardData(
       : null,
   };
 });
+
+function getLineProgress(
+  period: { ends_on: string; name: string; starts_on: string },
+  today: string,
+) {
+  const startsOn = period.name.includes("עותניאל") ? "2026-09-09" : period.starts_on;
+  const endsOn = period.name.includes("עותניאל") ? "2027-02-16" : period.ends_on;
+  const totalDays = eachCalendarDate(startsOn, endsOn).length;
+  const elapsedDays = today < startsOn
+    ? 0
+    : today > endsOn ? totalDays : eachCalendarDate(startsOn, today).length;
+
+  return {
+    elapsedDays,
+    endsOn,
+    percent: totalDays ? Math.min(100, Math.max(0, (elapsedDays / totalDays) * 100)) : 0,
+    startsOn,
+    totalDays,
+  };
+}
 
 function assertOk(error: { message: string } | null, label: string) {
   if (error) {

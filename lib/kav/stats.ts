@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/database.types";
 import { eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
 import { getLegacyLineStatsOverride } from "@/lib/kav/legacy-line-stats";
+import { getLineStatsStartDates } from "@/lib/kav/line-participation";
 import { getOperationalRange } from "@/lib/kav/operations";
 import { selectOperationalReservePeriod } from "@/lib/kav/schedule-domain";
 import {
@@ -74,9 +75,10 @@ export async function getTeamStats(
   };
 
   async function buildStatsForPeriod(targetPeriod: NonNullable<typeof period>, targetElapsedEnd: string) {
-    const [range, submittedAttendanceDates] = await Promise.all([
+    const [range, submittedAttendanceDates, statsStartDates] = await Promise.all([
       getOperationalRange(supabase, team, targetPeriod, targetPeriod.starts_on, targetElapsedEnd),
       getSubmittedAttendanceDates(supabase, team.id, targetPeriod.id, targetPeriod.starts_on, targetElapsedEnd),
+      getLineStatsStartDates(supabase, team.id, targetPeriod.id),
     ]);
     const activePeople = range.people.filter((person) => person.is_active);
     const elapsedDates = eachCalendarDate(targetPeriod.starts_on, targetElapsedEnd);
@@ -84,7 +86,11 @@ export async function getTeamStats(
     const resolutionsByPerson = new Map<string, DailyResolution[]>();
     const useActualHistoricalAttendance = targetPeriod.status === "completed";
     for (const person of activePeople) {
-      const days: DailyResolution[] = elapsedDates.map((date) => {
+      const personStatsStart = statsStartDates.get(person.id);
+      const personDates = personStatsStart
+        ? elapsedDates.filter((date) => date >= personStatsStart)
+        : elapsedDates;
+      const days: DailyResolution[] = personDates.map((date) => {
         const resolution = range.resolve(person.id, date);
         const day = {
           attendance: submittedAttendanceDates.has(date) ? resolution.attendance : "unreported",

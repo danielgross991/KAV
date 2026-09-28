@@ -66,6 +66,7 @@ function ManagerDashboard({
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
+      <LineProgressCard data={data} />
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_0.8fr] lg:items-start">
         <HomeLeaderboard data={data} />
         <div className="space-y-4">
@@ -187,6 +188,7 @@ function ViewerDashboard({
       />
       <HomeLineSelector data={data} lineOptions={lineOptions} selectedLinePeriodId={selectedLinePeriodId} />
       <DailyQuoteCard quote={data.dailyQuote} teamSlug={data.team.slug} />
+      <LineProgressCard data={data} />
 
       <div className="mt-4">
         <HomeLeaderboard data={data} />
@@ -310,6 +312,37 @@ function MiniMetric({ label, value }: { label: string; value: number | string })
       <b className="kav-num block text-xl">{value}</b>
       <span className="mt-1 block text-xs text-muted-foreground">{label}</span>
     </div>
+  );
+}
+
+function LineProgressCard({ data }: { data: DashboardData }) {
+  const progress = data.lineProgress;
+  if (!progress) return null;
+  const roundedPercent = Math.round(progress.percent);
+
+  return (
+    <Card className="mt-4 overflow-hidden">
+      <CardHeader className="flex-row items-start justify-between gap-3 space-y-0 pb-3">
+        <div>
+          <CardTitle>אחוז הקו</CardTitle>
+          <p className="kav-num mt-1 text-sm text-muted-foreground">
+            {shortDate(progress.startsOn)}–{shortDate(progress.endsOn)}
+          </p>
+        </div>
+        <span className="kav-num text-3xl font-bold leading-none text-primary">{roundedPercent}%</span>
+      </CardHeader>
+      <CardContent>
+        <div className="h-3 overflow-hidden rounded-full bg-muted" aria-label={`הקו הושלם ב-${roundedPercent} אחוז`}>
+          <div
+            className="kav-line-progress-fill h-full rounded-full bg-primary"
+            style={{ width: `${progress.percent}%` }}
+          />
+        </div>
+        <p className="kav-num mt-2 text-xs text-muted-foreground">
+          יום {progress.elapsedDays} מתוך {progress.totalDays}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -444,7 +477,7 @@ function SpecialPeople({ people }: { people: DashboardData["specialPeople"] }) {
               <PersonAvatar name={person.fullName} photoUrl={person.photoUrl} />
               <span className="min-w-0 flex-1">
                 <b className="block truncate text-sm">{person.fullName}</b>
-                <span className="text-xs text-muted-foreground">לא פעיל בקו הנוכחי</span>
+                <span className="text-xs text-muted-foreground">{person.presentDays} ימי מילואים בקו</span>
               </span>
               <Badge variant="muted">מיוחד</Badge>
             </summary>
