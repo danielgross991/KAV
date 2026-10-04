@@ -298,9 +298,18 @@ async function removeOutdatedCurrentEvents(teamId, reservePeriodId, events) {
     "זיכויים ועלייה לקו",
     "המשך אימון לפני הפעלה",
   ].filter((title) => !expectedTitles.has(title));
-  if (!outdatedTitles.length) return;
-  const { error } = await supabase.from("schedule_events").delete()
-    .eq("team_id", teamId).eq("reserve_period_id", reservePeriodId).in("title", outdatedTitles);
+  const { data: existing, error: loadError } = await supabase.from("schedule_events")
+    .select("id, title, event_type")
+    .eq("team_id", teamId)
+    .eq("reserve_period_id", reservePeriodId);
+  if (loadError) throw new Error(`Unable to load current events: ${loadError.message}`);
+
+  const staleIds = (existing ?? [])
+    .filter((event) => outdatedTitles.includes(event.title) ||
+      (["changeover", "processing"].includes(event.event_type) && !expectedTitles.has(event.title)))
+    .map((event) => event.id);
+  if (!staleIds.length) return;
+  const { error } = await supabase.from("schedule_events").delete().in("id", staleIds);
   if (error) throw new Error(`Unable to remove outdated current events: ${error.message}`);
 }
 

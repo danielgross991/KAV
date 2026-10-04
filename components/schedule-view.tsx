@@ -22,8 +22,8 @@ import { generateRotationBlocks } from "@/lib/kav/schedule-domain";
 import { getDaySchedule, type ScheduleData } from "@/lib/kav/schedule";
 import { cn } from "@/lib/utils";
 
-const phaseLabels: Record<string, string> = { preparation: "הכנה", line: "קו", stand_down: "ירידה / התארגנות", processing: "זיכויים", other: "אחר" };
-const eventLabels: Record<string, string> = { briefing: "תדריך", training: "אימון", family: "משפחות", processing: "זיכויים", changeover: "החלפה", holiday: "חג / מועד", other: "אחר" };
+const phaseLabels: Record<string, string> = { preparation: "הכנה", line: "קו", stand_down: "ירידה / התארגנות", processing: "ימי התארגנות", other: "אחר" };
+const eventLabels: Record<string, string> = { briefing: "תדריך", training: "אימון", family: "משפחות", processing: "ימי התארגנות", changeover: "החלפה", holiday: "חג / מועד", other: "אחר" };
 const scheduleLoadingHandoffMs = 32;
 const scheduleMinimumLoadingMs = 220;
 const schedulePressFeedbackMs = 220;
@@ -153,6 +153,7 @@ function Month({ data, month, onMonthChange, pendingMonth }: { data: ScheduleDat
     <div className="flex flex-wrap gap-x-3 gap-y-1 border-t bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground">
       <LegendDot className="bg-pink-500" label="יום מפקדים" />
       <LegendDot className="bg-violet-500" label="חג" />
+      <LegendDot className="bg-amber-500" label="ימי התארגנות" />
       <LegendDot className="bg-primary" label="משימות" />
       <LegendDot className="bg-fuchsia-600" label="בקשות/יציאות" />
       <LegendDot className="bg-destructive" label="פער נוכחות" />
@@ -167,7 +168,8 @@ function MonthNavButton({ active, ariaLabel, children, onClick }: { active: bool
 function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData; date: string; day: ReturnType<typeof getDaySchedule>; inMonth: boolean; onPreview: () => void }) {
   const commanderDay = day.events.find(isCommanderDayEvent);
   const holiday = day.events.find(isHolidayEvent);
-  const otherEvents = day.events.filter((event) => !isHolidayEvent(event) && !isCommanderDayEvent(event));
+  const processingDay = isProcessingDay(day);
+  const otherEvents = day.events.filter((event) => !isHolidayEvent(event) && !isCommanderDayEvent(event) && event.event_type !== "processing");
   const personalLeaves = data.viewerPersonId
     ? [...day.leaveMarkers, ...day.leaveRequests].filter((item) => item.personId === data.viewerPersonId)
     : [];
@@ -183,12 +185,13 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
   const enrichmentMarkers = [
     commanderDay ? { className: "bg-pink-600", label: commanderDay.title } : null,
     holiday ? { className: "bg-violet-500", label: holiday.title } : null,
-    otherEvents.length ? { className: "bg-amber-500", label: `${otherEvents.length} אירועים` } : null,
+    processingDay ? { className: "bg-amber-500", label: "ימי התארגנות" } : null,
+    otherEvents.length ? { className: "bg-slate-500", label: `${otherEvents.length} אירועים` } : null,
     day.tasks.length ? { className: "bg-primary", label: `${day.tasks.length} משימות` } : null,
     attendanceIssue ? { className: "bg-destructive", label: "פער נוכחות" } : null,
   ].filter(Boolean) as { className: string; label: string }[];
 
-  return <Link aria-haspopup="dialog" className={cn("group relative min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", commanderDay && "border-pink-500 bg-pink-200/95 text-pink-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35", riskyLeaveDate && "ring-2 ring-inset ring-red-500/75")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
+  return <Link aria-haspopup="dialog" className={cn("group relative min-h-[5.9rem] rounded-md border border-transparent bg-muted/25 p-1.5 transition-[background-color,border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-[0_8px_22px_-18px_rgba(20,22,26,0.6)] active:translate-y-0 active:scale-[0.99] active:border-primary/40 active:bg-accent sm:min-h-[7.25rem] sm:p-2", inMonth && "bg-background", !inMonth && "text-muted-foreground opacity-60", dominantState === "base" && "border-emerald-400 bg-emerald-200/90 text-emerald-950", dominantState === "home" && "border-sky-400 bg-sky-200/90 text-sky-950", isChangeover && "border-primary/45 bg-[linear-gradient(135deg,rgb(167_243_208)_0%,rgb(167_243_208)_49%,rgb(125_211_252)_51%,rgb(125_211_252)_100%)] text-slate-950", processingDay && "border-amber-500 bg-amber-200/95 text-amber-950", commanderDay && "border-pink-500 bg-pink-200/95 text-pink-950", personalLeaves.length && "border-primary/70 ring-2 ring-inset ring-primary/35", riskyLeaveDate && "ring-2 ring-inset ring-red-500/75")} href={`/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`} onClick={(event) => {
     event.preventDefault();
     onPreview();
   }}>
@@ -203,7 +206,7 @@ function MonthCell({ data, date, day, inMonth, onPreview }: { data: ScheduleData
       {enrichmentMarkers.map((marker) => <span aria-label={marker.label} className={cn("size-2 rounded-full", marker.className)} key={marker.label} title={marker.label} />)}
     </div>
     <div className={cn("mb-1 rounded-md px-1.5 py-1 text-center text-[0.72rem] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.45)] sm:text-xs", dominantState === "base" ? "bg-emerald-600 text-white" : dominantState === "home" ? "bg-sky-700 text-white" : "bg-card text-muted-foreground", isChangeover && "bg-primary text-white", commanderDay && "bg-pink-700 text-white")}>
-      {commanderDay ? "יום מפקדים" : operationalLabel}
+      {commanderDay ? "יום מפקדים" : processingDay ? "ימי התארגנות" : operationalLabel}
     </div>
   </Link>;
 }
@@ -214,6 +217,7 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
   const riskyLeaveDate = isRiskyLeaveDate(day.leaveRequests);
   const baseGroups = day.groups.filter((group) => group.block?.state === "base");
   const dominantState = day.groups.find((group) => group.block?.state)?.block?.state ?? null;
+  const processingDay = isProcessingDay(day);
   const detailHref = `/${data.team.slug}/schedule/${date}?period=${data.selectedPeriod?.id}`;
 
   return <>
@@ -228,7 +232,9 @@ function DayPreview({ data, date, day, onClose }: { data: ScheduleData; date: st
       </div>
       <div className="mt-4 grid gap-3 text-sm">
         <PreviewSection title="מה יש ביום הזה">
-          <Badge variant={dominantState === "base" ? "success" : "info"}>{stateLabel(dominantState)}</Badge>
+          <Badge variant={processingDay ? "warning" : dominantState === "base" ? "success" : "info"}>
+            {processingDay ? "ימי התארגנות" : stateLabel(dominantState)}
+          </Badge>
           {baseGroups.length ? <div className="mt-2 flex flex-wrap gap-1.5">{baseGroups.map((group) => <Badge key={group.id} variant="outline">{group.name}</Badge>)}</div> : null}
           {[...day.events, ...day.tasks].length ? <div className="mt-2 space-y-1.5">{day.events.map((event) => <PreviewLine key={event.id} meta={event.is_all_day ? "כל היום" : time(event.starts_at, data.team.timezone)} text={event.title} />)}{day.tasks.map((task) => <PreviewLine key={task.id} meta={time(task.starts_at, data.team.timezone)} text={task.title} />)}</div> : <p className="mt-2 text-muted-foreground">אין אירועים או משימות.</p>}
         </PreviewSection>
@@ -418,6 +424,11 @@ function isHolidayEvent(event: ScheduleData["events"][number]) {
 
 function isCommanderDayEvent(event: ScheduleData["events"][number]) {
   return event.title === "יום מפקדים";
+}
+
+function isProcessingDay(day: ReturnType<typeof getDaySchedule>) {
+  return day.phase?.phase_type === "processing" ||
+    day.events.some((event) => event.event_type === "processing" || event.title.includes("התארגנות"));
 }
 
 function isChangeoverDate(data: ScheduleData, date: string, state: string | null) {

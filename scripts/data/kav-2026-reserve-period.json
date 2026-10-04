@@ -3,7 +3,7 @@
     "name": "קו עותניאל",
     "location": "קו עותניאל",
     "starts_on": "2026-09-08",
-    "ends_on": "2026-12-02",
+    "ends_on": "2026-12-12",
     "status": "published"
   },
   "phases": [
@@ -43,10 +43,10 @@
       "sort_order": 4
     },
     {
-      "name": "ירידה מהמשימה",
-      "phase_type": "stand_down",
+      "name": "ימי התארגנות",
+      "phase_type": "processing",
       "starts_on": "2026-12-02",
-      "ends_on": "2026-12-02",
+      "ends_on": "2026-12-12",
       "sort_order": 5
     }
   ],
@@ -113,78 +113,91 @@
       "state": "home",
       "starts_on": "2026-09-17",
       "ends_on": "2026-09-21",
-      "notes": "יציאה הביתה אחרי העלייה לגזרה ב-17/09, עד אחרי יום כיפור"
+      "notes": "תחילת סבב ויציאה הביתה עד החזרה לבסיס"
     },
     {
       "group_name": "כל הצוות",
       "state": "base",
       "starts_on": "2026-09-22",
       "ends_on": "2026-09-28",
-      "notes": "סגירת שבוע כולל סוכות א׳"
+      "notes": "חזרה לבסיס"
     },
     {
       "group_name": "כל הצוות",
       "state": "home",
       "starts_on": "2026-09-29",
-      "ends_on": "2026-10-05",
-      "notes": "שבוע בית כולל סוכות ב׳"
+      "ends_on": "2026-10-06",
+      "notes": "יציאה הביתה"
     },
     {
       "group_name": "כל הצוות",
       "state": "base",
-      "starts_on": "2026-10-06",
-      "ends_on": "2026-10-10",
-      "notes": "חזרה לבסיס ל-5 ימים"
+      "starts_on": "2026-10-07",
+      "ends_on": "2026-10-13",
+      "notes": "חזרה לבסיס"
     },
     {
       "group_name": "כל הצוות",
       "state": "home",
-      "starts_on": "2026-10-11",
-      "ends_on": "2026-10-17",
-      "notes": "יציאה ביום ראשון ומעבר למתכונת שבוע-שבוע"
+      "starts_on": "2026-10-14",
+      "ends_on": "2026-10-19",
+      "notes": "יציאה הביתה"
     },
     {
       "group_name": "כל הצוות",
       "state": "base",
-      "starts_on": "2026-10-18",
-      "ends_on": "2026-10-24"
+      "starts_on": "2026-10-20",
+      "ends_on": "2026-10-26",
+      "notes": "חזרה לבסיס"
     },
     {
       "group_name": "כל הצוות",
       "state": "home",
-      "starts_on": "2026-10-25",
-      "ends_on": "2026-10-31"
+      "starts_on": "2026-10-27",
+      "ends_on": "2026-11-02",
+      "notes": "יציאה הביתה"
     },
     {
       "group_name": "כל הצוות",
       "state": "base",
-      "starts_on": "2026-11-01",
-      "ends_on": "2026-11-07"
+      "starts_on": "2026-11-03",
+      "ends_on": "2026-11-07",
+      "notes": "חזרה לבסיס"
     },
     {
       "group_name": "כל הצוות",
       "state": "home",
       "starts_on": "2026-11-08",
-      "ends_on": "2026-11-14"
+      "ends_on": "2026-11-11",
+      "notes": "יציאה הביתה"
     },
     {
       "group_name": "כל הצוות",
       "state": "base",
-      "starts_on": "2026-11-15",
-      "ends_on": "2026-11-21"
+      "starts_on": "2026-11-12",
+      "ends_on": "2026-11-17",
+      "notes": "חזרה לבסיס"
     },
     {
       "group_name": "כל הצוות",
       "state": "home",
-      "starts_on": "2026-11-22",
-      "ends_on": "2026-11-28"
+      "starts_on": "2026-11-18",
+      "ends_on": "2026-11-24",
+      "notes": "יציאה הביתה"
     },
     {
       "group_name": "כל הצוות",
       "state": "base",
-      "starts_on": "2026-11-29",
+      "starts_on": "2026-11-25",
       "ends_on": "2026-12-02",
-      "notes": "שבוע בסיס אחרון עד סיום המשימה"
+      "notes": "חזרה לבסיס עד סיום הקו המבצעי"
+    },
+    {
+      "group_name": "כל הצוות",
+      "state": "home",
+      "starts_on": "2026-12-03",
+      "ends_on": "2026-12-12",
+      "notes": "ימי התארגנות אחרי סיום הקו"
     }
   ],
   "events": [
@@ -432,54 +445,114 @@
       "is_all_day": false
     },
     {
-      "title": "עלייה לגזרת עותניאל",
+      "title": "17/9 - תחילת סבב",
       "event_type": "changeover",
       "starts_on": "2026-09-17",
-      "starts_time": "14:00",
+      "starts_time": "12:00",
       "is_all_day": false,
-      "location": "עותניאל",
-      "notes": "עולים לגזרה, מתמקמים, ואז הצוות יוצא הביתה עד אחרי יום כיפור · קהל: כולם"
+      "notes": "תחילת סבב ב׳ בקו עותניאל · קהל: כולם"
     },
     {
-      "title": "חזרה לבסיס לסגירת שבוע",
+      "title": "22/9 - חזרה לבסיס",
       "event_type": "changeover",
       "starts_on": "2026-09-22",
       "starts_time": "12:00",
       "is_all_day": false,
       "location": "עותניאל",
-      "notes": "חזרה לבסיס לסגור שבוע · קהל: כולם"
+      "notes": "חזרה לבסיס · קהל: כולם"
     },
     {
-      "title": "יוצאים לשבוע בבית",
+      "title": "29/9 - יציאה הביתה",
       "event_type": "changeover",
       "starts_on": "2026-09-29",
       "starts_time": "12:00",
       "is_all_day": false,
-      "notes": "כל הצוות יוצא לשבוע בבית · קהל: כולם"
+      "notes": "יציאה הביתה · קהל: כולם"
     },
     {
-      "title": "חזרה לבסיס ל-5 ימים",
+      "title": "7/10 - חזרה לבסיס",
       "event_type": "changeover",
-      "starts_on": "2026-10-06",
+      "starts_on": "2026-10-07",
       "starts_time": "12:00",
       "is_all_day": false,
       "location": "עותניאל",
-      "notes": "כל הצוות חוזר לבסיס ל-5 ימים · קהל: כולם"
+      "notes": "חזרה לבסיס · קהל: כולם"
     },
     {
-      "title": "יציאה הביתה ותחילת שבוע-שבוע",
+      "title": "14/10 - יציאה הביתה",
       "event_type": "changeover",
-      "starts_on": "2026-10-11",
+      "starts_on": "2026-10-14",
       "starts_time": "12:00",
       "is_all_day": false,
-      "notes": "מכאן ההחלפות בכל יום ראשון: שבוע בית / שבוע בסיס לסירוגין · קהל: כולם"
+      "notes": "יציאה הביתה · קהל: כולם"
     },
     {
-      "title": "ירידה מהמשימה",
+      "title": "20/10 - חזרה לבסיס",
+      "event_type": "changeover",
+      "starts_on": "2026-10-20",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "location": "עותניאל",
+      "notes": "חזרה לבסיס · קהל: כולם"
+    },
+    {
+      "title": "27/10 - יציאה הביתה",
+      "event_type": "changeover",
+      "starts_on": "2026-10-27",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "notes": "יציאה הביתה · קהל: כולם"
+    },
+    {
+      "title": "3/11 - חזרה לבסיס",
+      "event_type": "changeover",
+      "starts_on": "2026-11-03",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "location": "עותניאל",
+      "notes": "חזרה לבסיס · קהל: כולם"
+    },
+    {
+      "title": "8/11 - יציאה הביתה",
+      "event_type": "changeover",
+      "starts_on": "2026-11-08",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "notes": "יציאה הביתה · קהל: כולם"
+    },
+    {
+      "title": "12/11 - חזרה לבסיס",
+      "event_type": "changeover",
+      "starts_on": "2026-11-12",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "location": "עותניאל",
+      "notes": "חזרה לבסיס · קהל: כולם"
+    },
+    {
+      "title": "18/11 - יציאה הביתה",
+      "event_type": "changeover",
+      "starts_on": "2026-11-18",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "notes": "יציאה הביתה · קהל: כולם"
+    },
+    {
+      "title": "25/11 - חזרה לבסיס",
+      "event_type": "changeover",
+      "starts_on": "2026-11-25",
+      "starts_time": "12:00",
+      "is_all_day": false,
+      "location": "עותניאל",
+      "notes": "חזרה לבסיס עד 2/12 · קהל: כולם"
+    },
+    {
+      "title": "ימי התארגנות",
       "event_type": "processing",
       "starts_on": "2026-12-02",
+      "ends_on": "2026-12-12",
       "is_all_day": true,
-      "notes": "זיכויים וימי התרעננות · קהל: כולם"
+      "notes": "מה-2 עד ה-12 בדצמבר: ימי התארגנות בצבע נפרד בלוח השנה · קהל: כולם"
     }
   ],
   "holidays": [
