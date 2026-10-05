@@ -34,8 +34,10 @@ export type PersonAttendanceStats = {
  * passed in — the caller decides what "elapsed" means (typically: strictly before today).
  * Unreported attendance is never counted as absence, and a legitimate home rotation or
  * approved leave never reduces the attendance percentage. For "אלופי הבית", count only
- * actual submitted attendance records: present = base, absent = home. Leave requests are
- * tracked separately and never influence the home leaderboard.
+ * actual submitted attendance records for the numerator: present = base, absent = home.
+ * The home percentage denominator is every elapsed day passed for that person, including
+ * unreported days. Leave requests are tracked separately and never influence the home
+ * leaderboard.
  */
 export function computeAttendanceStats(
   people: PersonStatsInput[],
@@ -49,7 +51,7 @@ export function computeAttendanceStats(
     const expectedDays = days.filter((day) => day.expectedAtBase);
     const finalizedExpectedDays = expectedDays.filter((day) => day.attendance !== "unreported");
     const presentOnExpectedDays = finalizedExpectedDays.filter((day) => day.attendance === "present").length;
-    const totalElapsedDays = days.filter((day) => day.attendance !== "unreported").length;
+    const totalElapsedDays = days.length;
 
     return {
       attendancePercentage: finalizedExpectedDays.length > 0
