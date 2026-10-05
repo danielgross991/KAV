@@ -433,11 +433,7 @@ function HomeLeaderboardFullStats({
   currentPersonId: string | null;
   stats: DashboardData["attendanceStats"];
 }) {
-  const sorted = [...stats].sort((a, b) =>
-    b.homeDays - a.homeDays ||
-    b.homePercentage - a.homePercentage ||
-    a.fullName.localeCompare(b.fullName, "he") ||
-    a.personId.localeCompare(b.personId));
+  const sorted = [...stats].sort(compareHomeChampionStats);
 
   if (!sorted.length) return null;
 
@@ -485,6 +481,16 @@ function HomeLeaderboardFullStats({
       </div>
     </details>
   );
+}
+
+function compareHomeChampionStats(
+  a: DashboardData["attendanceStats"][number],
+  b: DashboardData["attendanceStats"][number],
+) {
+  return b.homePercentage - a.homePercentage ||
+    b.homeDays - a.homeDays ||
+    a.fullName.localeCompare(b.fullName, "he") ||
+    a.personId.localeCompare(b.personId);
 }
 
 function SpecialPeople({ people }: { people: DashboardData["specialPeople"] }) {

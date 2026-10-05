@@ -33,8 +33,9 @@ export type PersonAttendanceStats = {
  * schedule-domain resolver) into attendance/home statistics. Only elapsed dates should be
  * passed in — the caller decides what "elapsed" means (typically: strictly before today).
  * Unreported attendance is never counted as absence, and a legitimate home rotation or
- * approved leave never reduces the attendance percentage. For "אלופי הבית", count what
- * actually exists in operational records: a reported absence or an approved leave day.
+ * approved leave never reduces the attendance percentage. For "אלופי הבית", count only
+ * actual submitted attendance records: present = base, absent = home. Leave requests are
+ * tracked separately and never influence the home leaderboard.
  */
 export function computeAttendanceStats(
   people: PersonStatsInput[],
@@ -44,11 +45,11 @@ export function computeAttendanceStats(
     const days = resolutionsByPerson.get(person.id) ?? [];
     const baseDays = days.filter((day) => day.attendance === "present").length;
     const leaveDays = days.filter((day) => day.leave).length;
-    const homeDays = days.filter((day) => day.attendance === "absent" || day.leave).length;
+    const homeDays = days.filter((day) => day.attendance === "absent").length;
     const expectedDays = days.filter((day) => day.expectedAtBase);
     const finalizedExpectedDays = expectedDays.filter((day) => day.attendance !== "unreported");
     const presentOnExpectedDays = finalizedExpectedDays.filter((day) => day.attendance === "present").length;
-    const totalElapsedDays = days.filter((day) => day.attendance !== "unreported" || day.leave).length;
+    const totalElapsedDays = days.filter((day) => day.attendance !== "unreported").length;
 
     return {
       attendancePercentage: finalizedExpectedDays.length > 0
@@ -85,13 +86,13 @@ export function applyHistoricalAttendanceSemantics(day: DailyResolution): DailyR
 }
 
 /**
- * Deterministic "אלופי הבית" ranking: most home days wins, ties broken by home
- * percentage, then by name/id so the order never depends on incidental array order.
+ * Deterministic "אלופי הבית" ranking: highest actual home percentage wins, ties broken
+ * by actual home days, then by name/id so the order never depends on incidental array order.
  */
 export function rankHomeLeaderboard(stats: PersonAttendanceStats[]): PersonAttendanceStats[] {
   return [...stats].sort((a, b) =>
-    b.homeDays - a.homeDays ||
     b.homePercentage - a.homePercentage ||
+    b.homeDays - a.homeDays ||
     a.fullName.localeCompare(b.fullName, "he") ||
     a.personId.localeCompare(b.personId));
 }
