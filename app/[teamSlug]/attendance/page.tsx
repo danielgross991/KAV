@@ -1,13 +1,11 @@
-import Link from "next/link";
-import { ArrowLeft, ArrowRight, CalendarX2 } from "lucide-react";
+import { CalendarX2 } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AttendanceWorkspace } from "@/components/attendance-workspace";
 import { AppPage, EmptyState, PageHeader } from "@/components/ui/app-page";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { addCalendarDays, getDateInTimeZone } from "@/lib/kav/dates";
+import { addCalendarDays, eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
 import { requireAuth } from "@/lib/kav/auth";
-import { getOperationalDay } from "@/lib/kav/operations";
+import { getOperationalDay, type OperationalDay } from "@/lib/kav/operations";
 import { canManage, requireTeamAccess } from "@/lib/kav/teams";
 
 export default async function AttendancePage({ params, searchParams }: {
@@ -20,43 +18,53 @@ export default async function AttendancePage({ params, searchParams }: {
   if (!canManage(membership.role)) redirect(`/${teamSlug}`);
   const today = getDateInTimeZone(membership.team.timezone);
   const date = /^\d{4}-\d{2}-\d{2}$/.test(query.date ?? "") ? query.date! : today;
-  const [rawDay, previousDay] = await Promise.all([
-    getOperationalDay(supabase, membership.team, date, undefined, true, true),
-    getOperationalDay(supabase, membership.team, addCalendarDays(date, -1), undefined, false, true),
-  ]);
-  const day = applyYesterdayAttendanceDefaults(rawDay, previousDay);
+  const rawSelectedDay = await getOperationalDay(supabase, membership.team, date, undefined, true, true);
+  const period = rawSelectedDay.period;
+  const startsOn = period ? maxDate(period.starts_on, addCalendarDays(date, -14)) : date;
+  const endsOn = period ? minDate(period.ends_on, addCalendarDays(date, 14)) : date;
+  const preloadDates = period ? [addCalendarDays(startsOn, -1), ...eachCalendarDate(startsOn, endsOn)] : [date];
+  const rawDays = await Promise.all(
+    preloadDates.map((dayDate) => getOperationalDay(supabase, membership.team, dayDate, period?.id, true, true)),
+  );
+  const rawDaysByDate = new Map(rawDays.map((day) => [day.date, day]));
+  const days = eachCalendarDate(startsOn, endsOn).map((dayDate) => {
+    const rawDay = rawDaysByDate.get(dayDate) ?? emptyDay(dayDate);
+    const previousDay = rawDaysByDate.get(addCalendarDays(dayDate, -1)) ?? emptyDay(addCalendarDays(dayDate, -1));
+    return applyYesterdayAttendanceDefaults(rawDay, previousDay);
+  });
 
   return (
     <AppPage className="max-w-[920px]">
-      <PageHeader eyebrow={membership.team.name} title="נוכחות" subtitle={`${fullDate(date)}${date === today ? " · היום" : ""}`}>
-        <div className="flex items-center gap-1.5">
-          <Link aria-label="היום הקודם" className={buttonVariants({ variant: "outline", size: "icon" })} href={href(teamSlug, addCalendarDays(date, -1))}><ArrowRight className="size-4" /></Link>
-          <form className="flex min-w-0 flex-1 gap-1.5">
-            <input className="min-w-0 flex-1 rounded-md border bg-card px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/30" type="date" name="date" defaultValue={date} aria-label="תאריך נוכחות" />
-            <Button variant="outline">מעבר</Button>
-          </form>
-          <Link aria-label="היום הבא" className={buttonVariants({ variant: "outline", size: "icon" })} href={href(teamSlug, addCalendarDays(date, 1))}><ArrowLeft className="size-4" /></Link>
-          {date !== today ? <Link className="hidden h-10 items-center px-2 text-sm font-medium text-primary sm:flex" href={href(teamSlug, today)}>היום</Link> : null}
-        </div>
-      </PageHeader>
+      <PageHeader eyebrow={membership.team.name} title="נוכחות" subtitle="דיווח מהיר לפי ימים" />
 
-      {!day.period ? (
+      {!period ? (
         <EmptyState icon={<CalendarX2 className="size-4" />} title="אין תקופת מילואים פעילה" description="לא ניתן לדווח נוכחות ללא תקופה תפעולית לתאריך הזה." />
       ) : (
         <AttendanceWorkspace
-          attendanceDayStatus={day.attendanceDayStatus}
-          date={date}
-          initialPeople={day.people}
-          key={date}
+          initialDate={date}
+          initialDays={days}
           teamSlug={teamSlug}
+          today={today}
         />
       )}
     </AppPage>
   );
 }
 
-function href(slug: string, date: string) { return `/${slug}/attendance?date=${date}`; }
-function fullDate(date: string) { return new Intl.DateTimeFormat("he-IL", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`)); }
+function maxDate(a: string, b: string) { return a > b ? a : b; }
+function minDate(a: string, b: string) { return a < b ? a : b; }
+
+function emptyDay(date: string): OperationalDay {
+  return {
+    attendanceDayStatus: null,
+    date,
+    leaves: [],
+    people: [],
+    period: null,
+    rotationStatus: [],
+    summary: { absent: 0, expected: 0, expectedPresent: 0, leave: 0, present: 0, unexpectedPresent: 0, unreported: 0 },
+  };
+}
 
 function applyYesterdayAttendanceDefaults(day: Awaited<ReturnType<typeof getOperationalDay>>, previousDay: Awaited<ReturnType<typeof getOperationalDay>>) {
   const previousByPersonId = new Map(previousDay.people.map((person) => [person.id, person.resolution.attendance]));

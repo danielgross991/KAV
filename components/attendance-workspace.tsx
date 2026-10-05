@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
-import { Check, CircleMinus, MessageCircle, RotateCcw, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useMemo, useRef, useState, useTransition, type ReactNode, type TouchEvent } from "react";
+import { ArrowLeft, ArrowRight, Check, CircleMinus, MessageCircle, RotateCcw, Send } from "lucide-react";
 
 import {
   markAttendanceInlineAction,
@@ -11,27 +12,35 @@ import {
 import { SectionHeader } from "@/components/ui/app-page";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import type { OperationalPerson } from "@/lib/kav/operations";
+import { addCalendarDays } from "@/lib/kav/dates";
+import type { OperationalDay, OperationalPerson } from "@/lib/kav/operations";
 import { cn } from "@/lib/utils";
 
 type AttendanceState = OperationalPerson["resolution"]["attendance"];
 
 export function AttendanceWorkspace({
-  attendanceDayStatus,
-  date,
-  initialPeople,
+  initialDate,
+  initialDays,
   teamSlug,
+  today,
 }: {
-  attendanceDayStatus: string | null;
-  date: string;
-  initialPeople: OperationalPerson[];
+  initialDate: string;
+  initialDays: OperationalDay[];
   teamSlug: string;
+  today: string;
 }) {
-  const [people, setPeople] = useState(initialPeople);
-  const [status, setStatus] = useState(attendanceDayStatus);
+  const [date, setDate] = useState(initialDate);
+  const [daysByDate, setDaysByDate] = useState(() => new Map(initialDays.map((day) => [day.date, day])));
   const [message, setMessage] = useState<string | null>(null);
   const [savingPeople, setSavingPeople] = useState<Set<string>>(() => new Set());
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const router = useRouter();
   const [bulkPending, startBulkTransition] = useTransition();
+  const loadedDates = useMemo(() => [...daysByDate.keys()].sort(), [daysByDate]);
+  const day = daysByDate.get(date) ?? initialDays[0];
+  const people = useMemo(() => day?.people ?? [], [day]);
+  const status = day?.attendanceDayStatus ?? null;
   const activePeople = useMemo(() => people.filter((person) => person.lineParticipation !== "special"), [people]);
   const specialPeople = useMemo(() => people.filter((person) => person.lineParticipation === "special"), [people]);
   const summary = useMemo(() => attendanceSummary(people), [people]);
@@ -51,11 +60,11 @@ export function AttendanceWorkspace({
     let previous: OperationalPerson | undefined;
     setMessage(null);
     setPersonSaving(personId, true);
-    setPeople((current) => current.map((person) => {
-      if (person.id !== personId) return person;
-      previous = person;
-      return withAttendance(person, state);
-    }));
+    patchPeople(date, (current) => current.map((person) => {
+        if (person.id !== personId) return person;
+        previous = person;
+        return withAttendance(person, state);
+      }));
 
     startBulkTransition(async () => {
       const result = await markAttendanceInlineAction(teamSlug, { date, personId, state });
@@ -63,7 +72,7 @@ export function AttendanceWorkspace({
       if (!result.ok) {
         setMessage(result.message ?? "לא הצלחנו לעדכן את הנוכחות. נסה שוב.");
         if (previous) {
-          setPeople((current) => current.map((person) => person.id === personId ? previous! : person));
+          patchPeople(date, (current) => current.map((person) => person.id === personId ? previous! : person));
         }
       }
     });
@@ -72,13 +81,13 @@ export function AttendanceWorkspace({
   function markAllPresent() {
     const previous = people;
     setMessage(null);
-    setPeople((current) => current.map((person) =>
+    patchPeople(date, (current) => current.map((person) =>
       person.lineParticipation === "special" ? person : withAttendance(person, "present")));
     startBulkTransition(async () => {
       const result = await markExpectedPresentInlineAction(teamSlug, { date });
       if (!result.ok) {
         setMessage(result.message ?? "לא הצלחנו לסמן את הצוות כנוכח. נסה שוב.");
-        setPeople(previous);
+        patchPeople(date, () => previous);
       }
     });
   }
@@ -88,15 +97,103 @@ export function AttendanceWorkspace({
     startBulkTransition(async () => {
       const result = await submitAttendanceInlineAction(teamSlug, { date });
       if (result.ok) {
-        setStatus("submitted");
+        patchDay(date, (current) => ({ ...current, attendanceDayStatus: "submitted" }));
       } else {
         setMessage(result.message ?? "לא הצלחנו לסיים דיווח. נסה שוב.");
       }
     });
   }
 
+  function patchDay(targetDate: string, updater: (day: OperationalDay) => OperationalDay) {
+    setDaysByDate((current) => {
+      const existing = current.get(targetDate);
+      if (!existing) return current;
+      const next = new Map(current);
+      next.set(targetDate, updater(existing));
+      return next;
+    });
+  }
+
+  function patchPeople(targetDate: string, updater: (people: OperationalPerson[]) => OperationalPerson[]) {
+    patchDay(targetDate, (current) => ({ ...current, people: updater(current.people) }));
+  }
+
+  function selectDate(nextDate: string) {
+    if (!daysByDate.has(nextDate)) {
+      router.push(`/${teamSlug}/attendance?date=${nextDate}`, { scroll: false });
+      return;
+    }
+    setMessage(null);
+    setDate(nextDate);
+    window.history.replaceState(null, "", `/${teamSlug}/attendance?date=${nextDate}`);
+  }
+
+  function handleTouchStart(event: TouchEvent<HTMLElement>) {
+    const touch = event.touches[0];
+    touchStartX.current = touch.clientX;
+    touchStartY.current = touch.clientY;
+  }
+
+  function handleTouchEnd(event: TouchEvent<HTMLElement>) {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStartX.current;
+    const deltaY = touch.clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (Math.abs(deltaX) < 58 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+    selectDate(addCalendarDays(date, deltaX > 0 ? -1 : 1));
+  }
+
   return (
-    <>
+    <section
+      className="touch-pan-y"
+      onTouchEnd={handleTouchEnd}
+      onTouchStart={handleTouchStart}
+    >
+      <section className="mb-4 rounded-lg border bg-card p-3 shadow-[0_1px_2px_rgba(20,22,26,0.04)]">
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            aria-label="היום הקודם"
+            loadingOverlay={false}
+            onClick={() => selectDate(addCalendarDays(date, -1))}
+            size="icon"
+            type="button"
+            variant="outline"
+          >
+            <ArrowRight className="size-4" />
+          </Button>
+          <label className="min-w-0 flex-1">
+            <span className="sr-only">תאריך נוכחות</span>
+            <input
+              aria-label="תאריך נוכחות"
+              className="h-11 w-full rounded-md border bg-background px-3 text-center text-base font-semibold outline-none transition-colors active:bg-accent focus-visible:ring-2 focus-visible:ring-ring/30"
+              max={loadedDates.at(-1)}
+              min={loadedDates[0]}
+              onChange={(event) => selectDate(event.target.value)}
+              type="date"
+              value={date}
+            />
+          </label>
+          <Button
+            aria-label="היום הבא"
+            loadingOverlay={false}
+            onClick={() => selectDate(addCalendarDays(date, 1))}
+            size="icon"
+            type="button"
+            variant="outline"
+          >
+            <ArrowLeft className="size-4" />
+          </Button>
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-2 text-sm text-muted-foreground">
+          <span>{fullDate(date)}{date === today ? " · היום" : ""}</span>
+          {date !== today && daysByDate.has(today) ? (
+            <button className="font-semibold text-primary active:opacity-70" onClick={() => selectDate(today)} type="button">היום</button>
+          ) : null}
+        </div>
+      </section>
+
       <section className="overflow-hidden rounded-lg bg-primary !text-white">
         <div className="grid grid-cols-4 divide-x divide-x-reverse divide-white/15">
           <Metric label="צוות" value={activePeople.length} />
@@ -155,7 +252,7 @@ export function AttendanceWorkspace({
           />
         ) : null}
       </div>
-    </>
+    </section>
   );
 }
 
@@ -326,6 +423,10 @@ function attendanceSummary(people: OperationalPerson[]) {
 
 function shortReportDate(date: string) {
   return new Intl.DateTimeFormat("he-IL", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
+}
+
+function fullDate(date: string) {
+  return new Intl.DateTimeFormat("he-IL", { dateStyle: "full", timeZone: "UTC" }).format(new Date(`${date}T12:00:00Z`));
 }
 
 function whatsAppHref(text: string, phone?: string | null) {
