@@ -9,7 +9,6 @@ import {
   Flag,
   Home,
   PackageCheck,
-  PlaneTakeoff,
   TrendingUp,
   UserCheck,
   UserRound,
@@ -74,7 +73,6 @@ function ManagerDashboard({
         <HomeLeaderboard data={data} />
         <div className="space-y-4">
           <TodayLeaveRequests data={data} />
-          <LeaveRequestLeaderboard data={data} />
         </div>
       </div>
 
@@ -200,7 +198,6 @@ function ViewerDashboard({
         <TodayLeaveRequests data={data} />
       </div>
       <div className="mt-4">
-        <LeaveRequestLeaderboard data={data} />
       </div>
 
       <section className="mt-4 rounded-lg bg-primary px-4 py-4 !text-white shadow-[0_8px_24px_-16px_rgba(20,22,26,0.7)]">
@@ -521,47 +518,6 @@ function SpecialPeople({ people }: { people: DashboardData["specialPeople"] }) {
         ))}
       </div>
     </section>
-  );
-}
-
-function LeaveRequestLeaderboard({ data }: { data: DashboardData }) {
-  if (!data.leaveRequestLeaderboard.length) return null;
-  const podium = [
-    data.leaveRequestLeaderboard[1],
-    data.leaveRequestLeaderboard[0],
-    data.leaveRequestLeaderboard[2],
-  ].filter(Boolean);
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle>אלופי בקשות יציאה</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-3 items-end gap-2">
-          {podium.map((item) => {
-            const rank = data.leaveRequestLeaderboard.findIndex((candidate) => candidate.personId === item.personId) + 1;
-            return (
-              <div
-                className={cn(
-                  "grid min-h-32 place-items-center rounded-lg border border-sky-200 bg-sky-50/60 p-2 text-center",
-                  rank === 1 && "min-h-40 border-sky-400 bg-sky-100",
-                )}
-                key={item.personId}
-              >
-                <span className="text-xl" aria-hidden>{MEDALS[rank - 1]}</span>
-                <PersonAvatar name={item.fullName} photoUrl={item.photoUrl} featured={rank === 1} />
-                <b className="mt-2 line-clamp-2 text-xs leading-4">{item.fullName}</b>
-                <span className="kav-num mt-1 inline-flex items-center gap-1 text-xs text-sky-800">
-                  <PlaneTakeoff className="size-3.5" />
-                  {item.requestDays} ימי בקשה
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

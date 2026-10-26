@@ -5,7 +5,7 @@ import type { Database } from "@/lib/database.types";
 import { getCurrentDailyQuote, type CurrentDailyQuote } from "@/lib/kav/daily-quotes";
 import { eachCalendarDate, getDateInTimeZone } from "@/lib/kav/dates";
 import { getLineInactivePersonIds } from "@/lib/kav/line-participation";
-import { getAttendanceEntriesByDate, getLeaveRequestDayCounts, getLeaveRequestMarkers, getOperationalDay } from "@/lib/kav/operations";
+import { getAttendanceEntriesByDate, getLeaveRequestMarkers, getOperationalDay } from "@/lib/kav/operations";
 import { selectDefaultScheduleReservePeriod } from "@/lib/kav/schedule-domain";
 import { getTeamStats, type PersonAttendanceStats } from "@/lib/kav/stats";
 import { getNextPersonalTask } from "@/lib/kav/tasks";
@@ -41,12 +41,6 @@ export type DashboardData = {
     personId: string;
     photoUrl: string | null;
     presentDays: number;
-  }>;
-  leaveRequestLeaderboard: Array<{
-    fullName: string;
-    personId: string;
-    photoUrl: string | null;
-    requestDays: number;
   }>;
   lineProgress: {
     elapsedDays: number;
@@ -205,14 +199,12 @@ export const getDashboardData = cache(async function getDashboardData(
     nextTask,
     teamStats,
     upcomingEventResult,
-    leaveRequestDayCounts,
     todayLeaveMarkers,
   ] = await Promise.all([
     getOperationalDay(supabase, team, today, selectedPeriod?.id),
     userId ? getNextPersonalTask(supabase, team, userId, selectedPeriod?.id) : Promise.resolve(null),
     getTeamStats(supabase, team, today, selectedPeriod?.id),
     upcomingEventQuery.maybeSingle(),
-    selectedPeriod ? getLeaveRequestDayCounts(supabase, team.id, selectedPeriod.id) : Promise.resolve([]),
     selectedPeriod ? getLeaveRequestMarkers(supabase, team.id, selectedPeriod.id, today, today) : Promise.resolve([]),
   ]);
   assertOk(upcomingEventResult.error, "upcoming event");
@@ -334,20 +326,6 @@ export const getDashboardData = cache(async function getDashboardData(
           }))
           .sort((a, b) => b.presentDays - a.presentDays || a.fullName.localeCompare(b.fullName, "he"))
       : [],
-    leaveRequestLeaderboard: leaveRequestDayCounts
-      .map((item) => {
-        if (inactiveLinePersonIds.has(item.personId)) return null;
-        const person = peopleById.get(item.personId);
-        return person ? {
-          fullName: person.full_name,
-          personId: person.id,
-          photoUrl: person.photo_url,
-          requestDays: item.requestDays,
-        } : null;
-      })
-      .filter((item): item is NonNullable<typeof item> => item !== null)
-      .sort((a, b) => b.requestDays - a.requestDays || a.fullName.localeCompare(b.fullName, "he"))
-      .slice(0, 3),
     lineProgress: currentPeriod ? getLineProgress(currentPeriod, today) : null,
     todayLeaveRequests: todayLeaveMarkers
       .map((item) => {
